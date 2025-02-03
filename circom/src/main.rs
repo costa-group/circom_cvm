@@ -62,7 +62,11 @@ fn start() -> Result<(), ()> {
         wasm_file: user_input.wasm_file().to_string(),
         produce_input_log: user_input.main_inputs_flag(),
         no_asm_flag: user_input.no_asm_flag(),
-        constraint_assert_disabled_flag: user_input.constraint_assert_disabled_flag()
+        constraint_assert_disabled_flag: user_input.constraint_assert_disabled_flag(),
+        cvm_flag: user_input.cvm_flag(),
+        cvm_folder: user_input.cvm_folder().to_string(),
+        cvm_name: user_input.cvm_name().to_string(),
+        cvm_file: user_input.cvm_file().to_string(),
     };
     compilation_user::compile(compilation_config)?;
     Result::Ok(())

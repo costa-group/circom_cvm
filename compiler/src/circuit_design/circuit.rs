@@ -884,11 +884,11 @@ impl Circuit {
         self.write_wasm(writer, &self.wasm_producer)
     }
 
-    pub fn produce_cvm<W: Write>(&self, js_folder: &str, _wasm_name: &str, writer: &mut W) -> Result<(), ()> {
+    pub fn produce_cvm<W: Write>(&self, cvm_folder: &str, _cvm_name: &str, writer: &mut W) -> Result<(), ()> {
         use std::path::Path;
-        let js_folder_path = Path::new(js_folder).to_path_buf();
-            cvm_code_generator::generate_generate_witness_js_file(&js_folder_path).map_err(|_err| {})?;
-            cvm_code_generator::generate_witness_calculator_js_file(&js_folder_path).map_err(|_err| {})?;
+        let cvm_folder_path = Path::new(cvm_folder).to_path_buf();
+            cvm_code_generator::generate_generate_witness_js_file(&cvm_folder_path).map_err(|_err| {})?;
+            cvm_code_generator::generate_witness_calculator_js_file(&cvm_folder_path).map_err(|_err| {})?;
             self.write_cvm(writer, &self.cvm_producer)
         }
 }

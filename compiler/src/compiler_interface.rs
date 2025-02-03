@@ -49,6 +49,18 @@ pub fn write_c(circuit: &Circuit, c_folder: &str, c_run_name: &str, c_file: &str
     circuit.produce_c(c_folder, c_run_name, &mut c_file, &mut dat_file)
 }
 
+
+pub fn write_cvm(circuit: &Circuit, cvm_folder: &str, cvm_name: &str, cvm_file: &str) -> Result<(), ()> {
+    use std::path::Path;
+    if Path::new(cvm_folder).is_dir() {
+        std::fs::remove_dir_all(cvm_folder).map_err(|_err| {})?;
+    }
+    std::fs::create_dir(cvm_folder).map_err(|_err| {})?;
+    let cvm_file = File::create(cvm_file).map_err(|_err| {})?;
+    let mut cvm_file = BufWriter::new(cvm_file);
+    circuit.produce_cvm(cvm_folder, cvm_name, &mut cvm_file)
+}
+
 fn produce_debug_output(circuit: &Circuit) -> Result<(), ()> {
     use std::io::Write;
     use std::path::Path;

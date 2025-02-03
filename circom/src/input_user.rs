@@ -14,8 +14,12 @@ pub struct Input {
     pub out_c_code: PathBuf,
     pub out_c_dat: PathBuf,
     pub out_sym: PathBuf,
+    pub out_cvm_folder: PathBuf,
+    pub out_cvm_code: PathBuf,
+    pub out_cvm_name: String,
     //pub field: &'static str,
     pub c_flag: bool,
+    pub cvm_flag: bool,
     pub wasm_flag: bool,
     pub wat_flag: bool,
     pub no_asm_flag: bool,
@@ -43,6 +47,7 @@ const R1CS: &'static str = "r1cs";
 const WAT: &'static str = "wat";
 const WASM: &'static str = "wasm";
 const CPP: &'static str = "cpp";
+const CVM: &'static str = "cvm";
 const JS: &'static str = "js";
 const DAT: &'static str = "dat";
 const SYM: &'static str = "sym";
@@ -66,12 +71,16 @@ impl Input {
         };
         let output_c_path = Input::build_folder(&output_path, &file_name, CPP);
         let output_js_path = Input::build_folder(&output_path, &file_name, JS);
+        let output_cvm_path = Input::build_folder(&output_path, &file_name, CVM);
         let o_style = input_processing::get_simplification_style(&matches)?;
         let link_libraries = input_processing::get_link_libraries(&matches);
         Result::Ok(Input {
             //field: P_BN128,
             input_program: input,
             out_r1cs: Input::build_output(&output_path, &file_name, R1CS),
+            out_cvm_folder: output_cvm_path.clone(),
+            out_cvm_code: Input::build_output(&output_cvm_path, &file_name, CVM),
+            out_cvm_name: file_name.clone(),
             out_wat_code: Input::build_output(&output_js_path, &file_name, WAT),
             out_wasm_code: Input::build_output(&output_js_path, &file_name, WASM),
 	        out_js_folder: output_js_path.clone(),
@@ -94,6 +103,7 @@ impl Input {
             wat_flag:input_processing::get_wat(&matches),
             wasm_flag: input_processing::get_wasm(&matches),
             c_flag: c_flag,
+            cvm_flag: input_processing::get_cvm(&matches),
             no_asm_flag:input_processing::get_no_asm(&matches),
             r1cs_flag: input_processing::get_r1cs(&matches),
             sym_flag: input_processing::get_sym(&matches),
@@ -141,6 +151,15 @@ impl Input {
     pub fn sym_file(&self) -> &str {
         self.out_sym.to_str().unwrap()
     }
+    pub fn cvm_file(&self) -> &str {
+        self.out_cvm_code.to_str().unwrap()
+    }
+    pub fn cvm_folder(&self) -> &str {
+        self.out_cvm_folder.to_str().unwrap()
+    }
+    pub fn cvm_name(&self) -> String {
+        self.out_cvm_name.clone()
+    }
     pub fn wat_file(&self) -> &str {
         self.out_wat_code.to_str().unwrap()
     }
@@ -181,6 +200,9 @@ impl Input {
     }
     pub fn c_flag(&self) -> bool {
         self.c_flag
+    }
+    pub fn cvm_flag(&self) -> bool {
+        self.cvm_flag
     }
     pub fn no_asm_flag(&self) -> bool {
         self.no_asm_flag
@@ -305,6 +327,10 @@ mod input_processing {
 
     pub fn get_wat(matches: &ArgMatches) -> bool {
         matches.is_present("print_wat")
+    }
+
+    pub fn get_cvm(matches: &ArgMatches) -> bool {
+        matches.is_present("print_cvm")
     }
 
     pub fn get_no_asm(matches: &ArgMatches) -> bool {
@@ -479,6 +505,13 @@ mod input_processing {
                     .takes_value(false)
                     .display_order(120)
                     .help("Compiles the circuit to wat"),
+            )
+            .arg(
+                Arg::with_name("print_cvm")
+                    .long("cvm")
+                    .takes_value(false)
+                    .display_order(90)
+                    .help("Compiles the circuit to CVM (Circom Virtual Machine)"),
             )
             .arg(
                 Arg::with_name("no_asm")
