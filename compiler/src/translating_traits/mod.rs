@@ -1,5 +1,7 @@
 use code_producers::c_elements::*;
 use code_producers::wasm_elements::*;
+use code_producers::cvm_elements::*;
+
 use std::io::Write;
 
 pub trait WriteC {
@@ -27,3 +29,14 @@ pub trait WriteWasm {
         writer.flush().map_err(|_| {})
     }
 }
+
+pub trait WriteCVM {
+    fn produce_cvm(&self, producer: &CVMProducer) -> Vec<String>;
+    fn write_cvm<T: Write>(&self, writer: &mut T, producer: &CVMProducer) -> Result<(), ()> {
+        let wasm_instructions = self.produce_cvm(producer);
+        let code = cvm_code_generator::merge_code(wasm_instructions);
+        writer.write_all(code.as_bytes()).map_err(|_| {})?;
+        writer.flush().map_err(|_| {})
+    }
+}
+

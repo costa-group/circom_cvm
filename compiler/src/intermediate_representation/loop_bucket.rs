@@ -2,6 +2,8 @@ use super::ir_interface::*;
 use crate::translating_traits::*;
 use code_producers::c_elements::*;
 use code_producers::wasm_elements::*;
+use code_producers::cvm_elements::*;
+
 
 #[derive(Clone)]
 pub struct LoopBucket {
@@ -88,5 +90,12 @@ impl WriteC for LoopBucket {
         let mut loop_c = continue_code;
         loop_c.push(while_loop);
         (loop_c, "".to_string())
+    }
+}
+
+
+impl WriteCVM for LoopBucket{
+    fn produce_cvm(&self, producer: &CVMProducer) -> Vec<String> {
+        Vec::new()
     }
 }

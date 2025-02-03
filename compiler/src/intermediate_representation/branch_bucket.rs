@@ -2,6 +2,7 @@ use super::ir_interface::*;
 use crate::translating_traits::*;
 use code_producers::c_elements::*;
 use code_producers::wasm_elements::*;
+use code_producers::cvm_elements::*;
 
 #[derive(Clone)]
 pub struct BranchBucket {
@@ -119,5 +120,11 @@ impl WriteC for BranchBucket {
         let mut c_branch = condition_code;
         c_branch.push(conditional);
         (c_branch, "".to_string())
+    }
+}
+
+impl WriteCVM for BranchBucket{
+    fn produce_cvm(&self, producer: &CVMProducer) -> Vec<String> {
+        Vec::new()
     }
 }

@@ -2,6 +2,8 @@ use super::ir_interface::*;
 use crate::translating_traits::*;
 use code_producers::c_elements::*;
 use code_producers::wasm_elements::*;
+use code_producers::cvm_elements::*;
+
 
 #[derive(Clone)]
 pub struct CreateCmpBucket {
@@ -325,5 +327,11 @@ impl WriteC for CreateCmpBucket {
         }
 	    
         (instructions, "".to_string())
+    }
+}
+
+impl WriteCVM for CreateCmpBucket{
+    fn produce_cvm(&self, producer: &CVMProducer) -> Vec<String> {
+        Vec::new()
     }
 }

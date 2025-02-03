@@ -2,6 +2,8 @@ use super::ir_interface::*;
 use crate::translating_traits::*;
 use code_producers::c_elements::*;
 use code_producers::wasm_elements::*;
+use code_producers::cvm_elements::*;
+
 
 
 #[derive(Clone)]
@@ -158,5 +160,12 @@ impl WriteC for LogBucket {
         log_c.push(format!("{};", print_end_line));
         log_c.push("}".to_string());
         (log_c, "".to_string())
+    }
+}
+
+
+impl WriteCVM for LogBucket{
+    fn produce_cvm(&self, producer: &CVMProducer) -> Vec<String> {
+        Vec::new()
     }
 }

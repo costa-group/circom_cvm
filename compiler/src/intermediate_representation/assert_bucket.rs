@@ -2,6 +2,8 @@ use super::ir_interface::*;
 use crate::translating_traits::*;
 use code_producers::c_elements::*;
 use code_producers::wasm_elements::*;
+use code_producers::cvm_elements::*;
+
 
 #[derive(Clone)]
 pub struct AssertBucket {
@@ -37,6 +39,12 @@ impl ToString for AssertBucket {
         let template_id = self.message_id.to_string();
         let evaluate = self.evaluate.to_string();
         format!("ASSERT(line: {},template_id: {},evaluate: {})", line, template_id, evaluate)
+    }
+}
+
+impl WriteCVM for AssertBucket{
+    fn produce_cvm(&self, producer: &CVMProducer) -> Vec<String> {
+        Vec::new()
     }
 }
 

@@ -2,6 +2,8 @@ use super::ir_interface::*;
 use crate::translating_traits::*;
 use code_producers::c_elements::*;
 use code_producers::wasm_elements::*;
+use code_producers::cvm_elements::*;
+
 
 #[derive(Clone)]
 pub struct FinalData {
@@ -844,5 +846,11 @@ impl WriteC for CallBucket {
         prologue.push("// end call bucket".to_string());
         prologue.push("}\n".to_string());
         (prologue, result)
+    }
+}
+
+impl WriteCVM for CallBucket{
+    fn produce_cvm(&self, producer: &CVMProducer) -> Vec<String> {
+        Vec::new()
     }
 }

@@ -5,6 +5,8 @@ use crate::hir::very_concrete_program::VCP;
 use crate::translating_traits::*;
 use code_producers::c_elements::*;
 use code_producers::wasm_elements::*;
+use code_producers::cvm_elements::*;
+
 use std::io::Write;
 
 pub struct CompilationFlags {
@@ -17,6 +19,7 @@ pub struct CompilationFlags {
 pub struct Circuit {
     pub wasm_producer: WASMProducer,
     pub c_producer: CProducer,
+    pub cvm_producer: CVMProducer,
     pub templates: Vec<TemplateCode>,
     pub functions: Vec<FunctionCode>,
 }
@@ -26,6 +29,7 @@ impl Default for Circuit {
         Circuit {
             c_producer: CProducer::default(),
             wasm_producer: WASMProducer::default(),
+            cvm_producer: CVMProducer::default(),
             templates: Vec::new(),
             functions: Vec::new(),
         }
@@ -564,6 +568,271 @@ impl WriteC for Circuit {
 
 }
 
+impl WriteCVM for Circuit {
+    fn produce_cvm(&self, producer: &CVMProducer) -> Vec<String> {
+        use code_producers::cvm_elements::cvm_code_generator::*;
+        let mut code = vec![];
+        code.push("(module".to_string());
+        let mut code_aux = generate_imports_list();
+        code.append(&mut code_aux);
+        code_aux = generate_memory_def_list(&producer);
+        code.append(&mut code_aux);
+
+        code_aux = fr_types(&producer.prime_str);
+        code.append(&mut code_aux);
+
+        code_aux = generate_types_list();
+        code.append(&mut code_aux);
+        code_aux = generate_exports_list();
+        code.append(&mut code_aux);
+
+        code_aux = fr_code(&producer.prime_str);
+        code.append(&mut code_aux);
+
+        code_aux = desp_io_subcomponent_generator(&producer);
+        code.append(&mut code_aux);
+
+        code_aux = get_version_generator(&producer);
+        code.append(&mut code_aux);
+
+        code_aux = get_shared_rw_memory_start_generator(&producer);
+        code.append(&mut code_aux);
+
+        code_aux = read_shared_rw_memory_generator(&producer);
+        code.append(&mut code_aux);
+
+        code_aux = write_shared_rw_memory_generator(&producer);
+        code.append(&mut code_aux);
+
+        code_aux = reserve_stack_fr_function_generator();
+        code.append(&mut code_aux);
+
+        code_aux = init_generator(&producer);
+        code.append(&mut code_aux);
+
+        code_aux = set_input_signal_generator(&producer);
+        code.append(&mut code_aux);
+
+        code_aux = get_input_signal_size_generator(&producer);
+        code.append(&mut code_aux);
+
+        code_aux = get_raw_prime_generator(&producer);
+        code.append(&mut code_aux);
+
+        code_aux = get_field_num_len32_generator(&producer);
+        code.append(&mut code_aux);
+
+        code_aux = get_input_size_generator(&producer);
+        code.append(&mut code_aux);	
+
+        code_aux = get_witness_size_generator(&producer);
+        code.append(&mut code_aux);
+
+        code_aux = get_witness_generator(&producer);
+        code.append(&mut code_aux);
+
+        code_aux = copy_32_in_shared_rw_memory_generator(&producer);
+        code.append(&mut code_aux);
+
+        code_aux = copy_fr_in_shared_rw_memory_generator(&producer);
+        code.append(&mut code_aux);
+
+        code_aux = get_message_char_generator(&producer);
+        code.append(&mut code_aux);
+
+        code_aux = build_buffer_message_generator(&producer);
+        code.append(&mut code_aux);
+
+        code_aux = build_log_message_generator(&producer);
+        code.append(&mut code_aux);
+
+        // Actual code from the program
+
+        for f in &self.functions {
+            code.append(&mut f.produce_cvm(producer));
+        }
+
+        for t in &self.templates {
+            code.append(&mut t.produce_cvm(producer));
+        }
+
+        code_aux = generate_table_of_template_runs(&producer);
+        code.append(&mut code_aux);
+
+        code_aux = fr_data(&producer.prime_str);
+        code.append(&mut code_aux);
+
+        code_aux = generate_data_list(&producer);
+        code.append(&mut code_aux);
+
+        code.push(")".to_string());
+        code
+    }
+
+    fn write_cvm<T: Write>(&self, writer: &mut T, producer: &CVMProducer) -> Result<(), ()> {
+        use code_producers::cvm_elements::cvm_code_generator::*;
+
+        writer.write_all("(module".as_bytes()).map_err(|_| {})?;
+        //writer.flush().map_err(|_| {})?;
+
+        let mut code_aux = generate_imports_list();
+        let mut code = merge_code(code_aux);
+        writer.write_all(code.as_bytes()).map_err(|_| {})?;
+        //writer.flush().map_err(|_| {})?;
+
+        code_aux = generate_memory_def_list(&producer);
+        code = merge_code(code_aux);
+        writer.write_all(code.as_bytes()).map_err(|_| {})?;
+        //writer.flush().map_err(|_| {})?;
+
+        code_aux = fr_types(&producer.prime_str);
+        code = merge_code(code_aux);
+        writer.write_all(code.as_bytes()).map_err(|_| {})?;
+        //writer.flush().map_err(|_| {})?;
+
+        code_aux = generate_types_list();
+        code = merge_code(code_aux);
+        writer.write_all(code.as_bytes()).map_err(|_| {})?;
+        //writer.flush().map_err(|_| {})?;
+
+        code_aux = generate_exports_list();
+        code = merge_code(code_aux);
+        writer.write_all(code.as_bytes()).map_err(|_| {})?;
+        //writer.flush().map_err(|_| {})?;
+
+        code_aux = fr_code(&producer.prime_str);
+        code = merge_code(code_aux);
+        writer.write_all(code.as_bytes()).map_err(|_| {})?;
+        //writer.flush().map_err(|_| {})?;
+
+        code_aux = desp_io_subcomponent_generator(&producer);
+        code = merge_code(code_aux);
+        writer.write_all(code.as_bytes()).map_err(|_| {})?;
+        //writer.flush().map_err(|_| {})?;
+
+        code_aux = get_version_generator(&producer);
+        code = merge_code(code_aux);
+        writer.write_all(code.as_bytes()).map_err(|_| {})?;
+        //writer.flush().map_err(|_| {})?;
+
+        code_aux = get_shared_rw_memory_start_generator(&producer);
+        code = merge_code(code_aux);
+        writer.write_all(code.as_bytes()).map_err(|_| {})?;
+        //writer.flush().map_err(|_| {})?;
+
+        code_aux = read_shared_rw_memory_generator(&producer);
+        code = merge_code(code_aux);
+        writer.write_all(code.as_bytes()).map_err(|_| {})?;
+        //writer.flush().map_err(|_| {})?;
+
+        code_aux = write_shared_rw_memory_generator(&producer);
+        code = merge_code(code_aux);
+        writer.write_all(code.as_bytes()).map_err(|_| {})?;
+        //writer.flush().map_err(|_| {})?;
+
+        code_aux = reserve_stack_fr_function_generator();
+        code = merge_code(code_aux);
+        writer.write_all(code.as_bytes()).map_err(|_| {})?;
+        //writer.flush().map_err(|_| {})?;
+
+        code_aux = init_generator(&producer);
+        code = merge_code(code_aux);
+        writer.write_all(code.as_bytes()).map_err(|_| {})?;
+        //writer.flush().map_err(|_| {})?;
+
+        code_aux = set_input_signal_generator(&producer);
+        code = merge_code(code_aux);
+        writer.write_all(code.as_bytes()).map_err(|_| {})?;
+        //writer.flush().map_err(|_| {})?;
+
+        code_aux = get_input_signal_size_generator(&producer);
+        code = merge_code(code_aux);
+        writer.write_all(code.as_bytes()).map_err(|_| {})?;
+        //writer.flush().map_err(|_| {})?;
+
+        code_aux = get_raw_prime_generator(&producer);
+        code = merge_code(code_aux);
+        writer.write_all(code.as_bytes()).map_err(|_| {})?;
+        //writer.flush().map_err(|_| {})?;
+
+        code_aux = get_field_num_len32_generator(&producer);
+        code = merge_code(code_aux);
+        writer.write_all(code.as_bytes()).map_err(|_| {})?;
+        //writer.flush().map_err(|_| {})?;
+
+        code_aux = get_input_size_generator(&producer);
+        code = merge_code(code_aux);
+        writer.write_all(code.as_bytes()).map_err(|_| {})?;
+        //writer.flush().map_err(|_| {})?;
+	
+        code_aux = get_witness_size_generator(&producer);
+        code = merge_code(code_aux);
+        writer.write_all(code.as_bytes()).map_err(|_| {})?;
+        //writer.flush().map_err(|_| {})?;
+
+        code_aux = get_witness_generator(&producer);
+        code = merge_code(code_aux);
+        writer.write_all(code.as_bytes()).map_err(|_| {})?;
+        //writer.flush().map_err(|_| {})?;
+
+        code_aux = copy_32_in_shared_rw_memory_generator(&producer);
+        code = merge_code(code_aux);
+        writer.write_all(code.as_bytes()).map_err(|_| {})?;
+        //writer.flush().map_err(|_| {})?;
+
+        code_aux = copy_fr_in_shared_rw_memory_generator(&producer);
+        code = merge_code(code_aux);
+        writer.write_all(code.as_bytes()).map_err(|_| {})?;
+        //writer.flush().map_err(|_| {})?;
+
+        code_aux = get_message_char_generator(&producer);
+        code = merge_code(code_aux);
+        writer.write_all(code.as_bytes()).map_err(|_| {})?;
+        //writer.flush().map_err(|_| {})?;
+
+        code_aux = build_buffer_message_generator(&producer);
+        code = merge_code(code_aux);
+        writer.write_all(code.as_bytes()).map_err(|_| {})?;
+        //writer.flush().map_err(|_| {})?;
+
+        code_aux = build_log_message_generator(&producer);
+        code = merge_code(code_aux);
+        writer.write_all(code.as_bytes()).map_err(|_| {})?;
+        //writer.flush().map_err(|_| {})?;
+
+        // Actual code from the program
+
+        for f in &self.functions {
+            f.write_cvm(writer, producer)?;
+            //writer.flush().map_err(|_| {})?;
+        }
+
+        for t in &self.templates {
+            t.write_cvm(writer, producer)?;
+            //writer.flush().map_err(|_| {})?;
+        }
+
+        code_aux = generate_table_of_template_runs(&producer);
+        code = merge_code(code_aux);
+        writer.write_all(code.as_bytes()).map_err(|_| {})?;
+        //writer.flush().map_err(|_| {})?;
+
+        code_aux = fr_data(&producer.prime_str);
+        code = merge_code(code_aux);
+        writer.write_all(code.as_bytes()).map_err(|_| {})?;
+        //writer.flush().map_err(|_| {})?;
+
+        code_aux = generate_data_list(&producer);
+        code = merge_code(code_aux);
+        writer.write_all(code.as_bytes()).map_err(|_| {})?;
+        //writer.flush().map_err(|_| {})?;
+
+        writer.write_all(")".as_bytes()).map_err(|_| {})?;
+        writer.flush().map_err(|_| {})
+    }
+}
+
+
 impl Circuit {
     pub fn build(vcp: VCP, flags: CompilationFlags, version: &str) -> Self {
         use super::build::build_circuit;
@@ -614,4 +883,12 @@ impl Circuit {
         wasm_code_generator::generate_witness_calculator_js_file(&js_folder_path).map_err(|_err| {})?;
         self.write_wasm(writer, &self.wasm_producer)
     }
+
+    pub fn produce_cvm<W: Write>(&self, js_folder: &str, _wasm_name: &str, writer: &mut W) -> Result<(), ()> {
+        use std::path::Path;
+        let js_folder_path = Path::new(js_folder).to_path_buf();
+            cvm_code_generator::generate_generate_witness_js_file(&js_folder_path).map_err(|_err| {})?;
+            cvm_code_generator::generate_witness_calculator_js_file(&js_folder_path).map_err(|_err| {})?;
+            self.write_cvm(writer, &self.cvm_producer)
+        }
 }

@@ -2,6 +2,8 @@ use super::ir_interface::*;
 use crate::translating_traits::*;
 use code_producers::c_elements::*;
 use code_producers::wasm_elements::*;
+use code_producers::cvm_elements::*;
+
 
 #[derive(Clone, PartialEq, Eq)]
 pub enum OperatorType {
@@ -463,5 +465,11 @@ impl WriteC for ComputeBucket {
         }
 	//compute_c.push(format!("// end of compute with result {}",result));
         (compute_c, result)
+    }
+}
+
+impl WriteCVM for ComputeBucket{
+    fn produce_cvm(&self, producer: &CVMProducer) -> Vec<String> {
+        Vec::new()
     }
 }

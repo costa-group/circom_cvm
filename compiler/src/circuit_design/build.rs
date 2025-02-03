@@ -6,6 +6,8 @@ use crate::intermediate_representation::translate;
 use crate::intermediate_representation::translate::{CodeInfo, FieldTracker, TemplateDB, ParallelClusters};
 use code_producers::c_elements::*;
 use code_producers::wasm_elements::*;
+use code_producers::cvm_elements::*;
+
 use program_structure::file_definition::FileLibrary;
 use std::collections::{BTreeMap, HashMap};
 
@@ -193,6 +195,62 @@ fn build_function_instances(
         circuit.add_function_code(function_info);
     }
     (field_tracker, function_to_arena_size, string_table)
+}
+
+// CVM producer builder
+fn initialize_cvm_producer(vcp: &VCP, database: &TemplateDB, wat_flag:bool, version: &str) -> CVMProducer {
+    use program_structure::utils::constants::UsefulConstants;
+    let initial_node = vcp.get_main_id();
+    let prime = UsefulConstants::new(&vcp.prime).get_p().clone();
+    let mut producer = CVMProducer::default();
+    let stats = vcp.get_stats();
+    producer.main_header = vcp.get_main_instance().unwrap().template_header.clone();
+    producer.main_signal_offset = 1;
+    producer.prime = prime.to_str_radix(10);
+    producer.prime_str = vcp.prime.clone();
+    producer.fr_memory_size = match vcp.prime.as_str(){
+        "goldilocks" => 412,
+        "bn128" => 1948,
+        "bls12381" => 1948,
+        "grumpkin" => 1948,
+        "pallas" => 1948,
+        "vesta" => 1948,
+        "secq256r1" => 1948,
+        "bls12-377" => 1948,
+        _ => unreachable!()
+    };
+    //producer.fr_memory_size = 412 if goldilocks and 1948 for bn128 and bls12381
+    // for each created component we store three u32, for each son we store a u32 in its father
+    producer.size_of_component_tree = stats.all_created_components * 3 + stats.all_needed_subcomponents_indexes;
+    producer.total_number_of_signals = stats.all_signals + 1;
+    producer.size_32_bit = prime.bits() / 32 + if prime.bits() % 32 != 0 { 1 } else { 0 };
+    producer.size_32_shift = 0;
+    let mut pow = 1;
+    while pow < producer.size_32_bit {
+        pow *= 2;
+        producer.size_32_shift += 1;
+    }
+    producer.size_32_shift += 2;
+    producer.number_of_components = stats.all_created_components;
+    producer.witness_to_signal_list = vcp.get_witness_list().clone();
+    producer.signals_in_witness = producer.witness_to_signal_list.len();
+    producer.number_of_main_inputs = vcp.templates[initial_node].number_of_inputs;
+    producer.number_of_main_outputs = vcp.templates[initial_node].number_of_outputs;
+
+    // add the info of the buses
+    (
+        producer.num_of_bus_instances, 
+        producer.busid_field_info
+    ) = get_info_buses(&vcp.buses); 
+
+    producer.main_input_list = main_input_list(&vcp.templates[initial_node],&producer.busid_field_info);
+    producer.io_map = build_io_map(vcp, database);
+    producer.template_instance_list = build_template_list(vcp);
+    producer.field_tracking.clear();
+    producer.wat_flag = wat_flag;
+
+    (producer.major_version, producer.minor_version, producer.patch_version) = get_number_version(version);
+    producer
 }
 
 // WASM producer builder

@@ -2,6 +2,8 @@ use crate::intermediate_representation::InstructionList;
 use crate::translating_traits::*;
 use code_producers::c_elements::*;
 use code_producers::wasm_elements::*;
+use code_producers::cvm_elements::*;
+
 
 type TemplateID = usize;
 pub type TemplateCode = Box<TemplateCodeInfo>;
@@ -137,6 +139,121 @@ impl WriteWasm for TemplateCodeInfo {
 
         for t in &self.body {
             let mut instructions_body = t.produce_wasm(producer);
+            instructions.append(&mut instructions_body);
+        }
+
+        //free stack
+        let mut free_stack_code = free_stack(producer);
+        instructions.append(&mut free_stack_code);
+        instructions.push(set_constant("0"));	
+        instructions.push(")".to_string());
+        instructions
+    }
+}
+
+impl WriteCVM for TemplateCodeInfo {
+    fn produce_cvm(&self, producer: &CVMProducer) -> Vec<String> {
+        use code_producers::cvm_elements::cvm_code_generator::*;
+        // create function code
+        let mut instructions = vec![];
+        let funcdef1 = format!("(func ${}_create (type $_t_i32ri32)", self.header); //return offset
+        instructions.push(funcdef1);
+        instructions.push(format!(" (param {} i32)", producer.get_signal_offset_tag()));
+        instructions.push("(result i32)".to_string());
+        instructions.push(format!(" (local {} i32)", producer.get_offset_tag())); //here is a local var to be returned
+        instructions.push(format!(" (local {} i32)", producer.get_merror_tag()));
+        instructions.push(set_constant(&producer.get_component_free_pos().to_string()));
+        instructions.push(load32(None));
+        instructions.push(set_local(producer.get_offset_tag()));
+        // set template id
+        instructions.push(get_local(producer.get_offset_tag()));
+        instructions.push(set_constant(&self.id.to_string()));
+        instructions.push(store32(None));
+        //set component signal start
+        instructions.push(get_local(producer.get_offset_tag()));
+        instructions.push(get_local(producer.get_signal_offset_tag()));
+        instructions
+            .push(store32(Some(&producer.get_signal_start_address_in_component().to_string())));
+        //set component inputs_to_be_set
+        instructions.push(get_local(producer.get_offset_tag()));
+        instructions.push(set_constant(&self.number_of_inputs.to_string()));
+        instructions
+            .push(store32(Some(&producer.get_input_counter_address_in_component().to_string())));
+        //reserve memory for component
+        instructions.push(set_constant(&producer.get_component_free_pos().to_string()));
+        instructions.push(get_local(producer.get_offset_tag()));
+        let nbytes_component =
+            producer.get_sub_component_start_in_component() + self.number_of_components * 4;
+        instructions.push(set_constant(&nbytes_component.to_string()));
+        instructions.push(add32());
+        instructions.push(store32(None));
+        //add the position of the component in the tree as result
+        instructions.push(get_local(producer.get_offset_tag()));
+        instructions.push(")".to_string());
+
+        // run function code
+
+        let funcdef2 = format!("(func ${}_run (type $_t_i32ri32)", self.header);
+        instructions.push(funcdef2);
+        instructions.push(format!(" (param {} i32)", producer.get_offset_tag()));
+	instructions.push("(result i32)".to_string()); //state 0 = OK; > 0 error
+        instructions.push(format!(" (local {} i32)", producer.get_cstack_tag()));
+        instructions.push(format!(" (local {} i32)", producer.get_signal_start_tag()));
+        instructions.push(format!(" (local {} i32)", producer.get_sub_cmp_tag()));
+        instructions.push(format!(" (local {} i32)", producer.get_sub_cmp_load_tag()));
+        instructions.push(format!(" (local {} i32)", producer.get_io_info_tag()));
+        instructions.push(format!(" (local {} i32)", producer.get_lvar_tag()));
+        instructions.push(format!(" (local {} i32)", producer.get_expaux_tag()));
+        instructions.push(format!(" (local {} i32)", producer.get_temp_tag()));
+        instructions.push(format!(" (local {} i32)", producer.get_aux_0_tag()));
+        instructions.push(format!(" (local {} i32)", producer.get_aux_1_tag()));
+        instructions.push(format!(" (local {} i32)", producer.get_aux_2_tag()));
+        instructions.push(format!(" (local {} i32)", producer.get_counter_tag()));
+        instructions.push(format!(" (local {} i32)", producer.get_store_aux_1_tag()));
+        instructions.push(format!(" (local {} i32)", producer.get_store_aux_2_tag()));
+        instructions.push(format!(" (local {} i32)", producer.get_copy_counter_tag()));
+        instructions.push(format!(" (local {} i32)", producer.get_call_lvar_tag()));
+        instructions.push(format!(" (local {} i32)", producer.get_create_loop_sub_cmp_tag()));
+        instructions.push(format!(" (local {} i32)", producer.get_create_loop_offset_tag()));
+        instructions.push(format!(" (local {} i32)", producer.get_create_loop_counter_tag()));
+        instructions.push(format!(" (local {} i32)", producer.get_merror_tag()));
+        instructions.push(format!(" (local {} i32)", producer.get_result_size_tag())); // used when calling functions assigned to inputs of subcomponents
+        let local_info_size_u32 = producer.get_local_info_size_u32(); // in the future we can add some info like pointer to run father or text father
+                                                                      //set lvar (start of auxiliar memory for vars)
+        instructions.push(set_constant("0"));
+        instructions.push(load32(None));
+        let var_start = local_info_size_u32 * 4; // starts after local info
+        if local_info_size_u32 != 0 {
+            instructions.push(set_constant(&var_start.to_string()));
+            instructions.push(add32());
+        }
+        instructions.push(set_local(producer.get_lvar_tag()));
+        //set expaux (start of auxiliar memory for expressions)
+        instructions.push(get_local(producer.get_lvar_tag()));
+        let var_stack_size = self.var_stack_depth * 4 * (producer.get_size_32_bit() + 2); // starts after vars
+        instructions.push(set_constant(&var_stack_size.to_string()));
+        instructions.push(add32());
+        instructions.push(set_local(producer.get_expaux_tag()));
+        //reserve stack and sets cstack (starts of local var memory)
+        let needed_stack_bytes = var_start
+            + var_stack_size
+            + self.expression_stack_depth * 4 * (producer.get_size_32_bit() + 2);
+        let mut reserve_stack_fr_code = reserve_stack_fr(producer, needed_stack_bytes);
+        instructions.append(&mut reserve_stack_fr_code);
+        if producer.needs_comments() {
+            instructions.push(";; start of the template code".to_string());
+	}
+        //set signalstart local
+        instructions.push(get_local(producer.get_offset_tag()));
+        instructions
+            .push(set_constant(&producer.get_signal_start_address_in_component().to_string()));
+        instructions.push(add32());
+        instructions.push(load32(None));
+        instructions.push(set_local(producer.get_signal_start_tag()));
+        //generate code
+
+        for t in &self.body {
+            let mut instructions_body = t.produce_cvm(producer);
             instructions.append(&mut instructions_body);
         }
 

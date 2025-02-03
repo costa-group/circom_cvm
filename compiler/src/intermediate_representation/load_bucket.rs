@@ -2,6 +2,8 @@ use super::ir_interface::*;
 use crate::translating_traits::*;
 use code_producers::c_elements::*;
 use code_producers::wasm_elements::*;
+use code_producers::cvm_elements::*;
+
 
 #[derive(Clone)]
 pub struct LoadBucket {
@@ -448,5 +450,11 @@ impl WriteC for LoadBucket {
         
 	//prologue.push(format!("// end of load line {} with access {}",self.line.to_string(),access));
         (prologue, access)
+    }
+}
+
+impl WriteCVM for LoadBucket{
+    fn produce_cvm(&self, producer: &CVMProducer) -> Vec<String> {
+        Vec::new()
     }
 }
