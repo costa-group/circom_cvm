@@ -569,7 +569,7 @@ impl WriteC for Circuit {
 }
 
 impl WriteCVM for Circuit {
-    fn produce_cvm(&self, producer: &CVMProducer) -> Vec<String> {
+    fn produce_cvm(&self, producer: &CVMProducer) -> (Vec<String>, String) {
         use code_producers::cvm_elements::cvm_code_generator::*;
         Vec::new()
     }
