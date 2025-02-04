@@ -672,135 +672,22 @@ impl WriteCVM for Circuit {
     fn write_cvm<T: Write>(&self, writer: &mut T, producer: &CVMProducer) -> Result<(), ()> {
         use code_producers::cvm_elements::cvm_code_generator::*;
 
-        writer.write_all("(module".as_bytes()).map_err(|_| {})?;
-        //writer.flush().map_err(|_| {})?;
-
-        let mut code_aux = generate_imports_list();
+        let mut code_aux = generate_prime(&producer);
         let mut code = merge_code(code_aux);
         writer.write_all(code.as_bytes()).map_err(|_| {})?;
         //writer.flush().map_err(|_| {})?;
 
-        code_aux = generate_memory_def_list(&producer);
+        code_aux = generate_signals_memory(&producer);
         code = merge_code(code_aux);
         writer.write_all(code.as_bytes()).map_err(|_| {})?;
-        //writer.flush().map_err(|_| {})?;
 
-        code_aux = fr_types(&producer.prime_str);
+        code_aux = generate_components_heap(&producer);
         code = merge_code(code_aux);
         writer.write_all(code.as_bytes()).map_err(|_| {})?;
-        //writer.flush().map_err(|_| {})?;
 
-        code_aux = generate_types_list();
+        code_aux = generate_types(&producer);
         code = merge_code(code_aux);
         writer.write_all(code.as_bytes()).map_err(|_| {})?;
-        //writer.flush().map_err(|_| {})?;
-
-        code_aux = generate_exports_list();
-        code = merge_code(code_aux);
-        writer.write_all(code.as_bytes()).map_err(|_| {})?;
-        //writer.flush().map_err(|_| {})?;
-
-        code_aux = fr_code(&producer.prime_str);
-        code = merge_code(code_aux);
-        writer.write_all(code.as_bytes()).map_err(|_| {})?;
-        //writer.flush().map_err(|_| {})?;
-
-        code_aux = desp_io_subcomponent_generator(&producer);
-        code = merge_code(code_aux);
-        writer.write_all(code.as_bytes()).map_err(|_| {})?;
-        //writer.flush().map_err(|_| {})?;
-
-        code_aux = get_version_generator(&producer);
-        code = merge_code(code_aux);
-        writer.write_all(code.as_bytes()).map_err(|_| {})?;
-        //writer.flush().map_err(|_| {})?;
-
-        code_aux = get_shared_rw_memory_start_generator(&producer);
-        code = merge_code(code_aux);
-        writer.write_all(code.as_bytes()).map_err(|_| {})?;
-        //writer.flush().map_err(|_| {})?;
-
-        code_aux = read_shared_rw_memory_generator(&producer);
-        code = merge_code(code_aux);
-        writer.write_all(code.as_bytes()).map_err(|_| {})?;
-        //writer.flush().map_err(|_| {})?;
-
-        code_aux = write_shared_rw_memory_generator(&producer);
-        code = merge_code(code_aux);
-        writer.write_all(code.as_bytes()).map_err(|_| {})?;
-        //writer.flush().map_err(|_| {})?;
-
-        code_aux = reserve_stack_fr_function_generator();
-        code = merge_code(code_aux);
-        writer.write_all(code.as_bytes()).map_err(|_| {})?;
-        //writer.flush().map_err(|_| {})?;
-
-        code_aux = init_generator(&producer);
-        code = merge_code(code_aux);
-        writer.write_all(code.as_bytes()).map_err(|_| {})?;
-        //writer.flush().map_err(|_| {})?;
-
-        code_aux = set_input_signal_generator(&producer);
-        code = merge_code(code_aux);
-        writer.write_all(code.as_bytes()).map_err(|_| {})?;
-        //writer.flush().map_err(|_| {})?;
-
-        code_aux = get_input_signal_size_generator(&producer);
-        code = merge_code(code_aux);
-        writer.write_all(code.as_bytes()).map_err(|_| {})?;
-        //writer.flush().map_err(|_| {})?;
-
-        code_aux = get_raw_prime_generator(&producer);
-        code = merge_code(code_aux);
-        writer.write_all(code.as_bytes()).map_err(|_| {})?;
-        //writer.flush().map_err(|_| {})?;
-
-        code_aux = get_field_num_len32_generator(&producer);
-        code = merge_code(code_aux);
-        writer.write_all(code.as_bytes()).map_err(|_| {})?;
-        //writer.flush().map_err(|_| {})?;
-
-        code_aux = get_input_size_generator(&producer);
-        code = merge_code(code_aux);
-        writer.write_all(code.as_bytes()).map_err(|_| {})?;
-        //writer.flush().map_err(|_| {})?;
-	
-        code_aux = get_witness_size_generator(&producer);
-        code = merge_code(code_aux);
-        writer.write_all(code.as_bytes()).map_err(|_| {})?;
-        //writer.flush().map_err(|_| {})?;
-
-        code_aux = get_witness_generator(&producer);
-        code = merge_code(code_aux);
-        writer.write_all(code.as_bytes()).map_err(|_| {})?;
-        //writer.flush().map_err(|_| {})?;
-
-        code_aux = copy_32_in_shared_rw_memory_generator(&producer);
-        code = merge_code(code_aux);
-        writer.write_all(code.as_bytes()).map_err(|_| {})?;
-        //writer.flush().map_err(|_| {})?;
-
-        code_aux = copy_fr_in_shared_rw_memory_generator(&producer);
-        code = merge_code(code_aux);
-        writer.write_all(code.as_bytes()).map_err(|_| {})?;
-        //writer.flush().map_err(|_| {})?;
-
-        code_aux = get_message_char_generator(&producer);
-        code = merge_code(code_aux);
-        writer.write_all(code.as_bytes()).map_err(|_| {})?;
-        //writer.flush().map_err(|_| {})?;
-
-        code_aux = build_buffer_message_generator(&producer);
-        code = merge_code(code_aux);
-        writer.write_all(code.as_bytes()).map_err(|_| {})?;
-        //writer.flush().map_err(|_| {})?;
-
-        code_aux = build_log_message_generator(&producer);
-        code = merge_code(code_aux);
-        writer.write_all(code.as_bytes()).map_err(|_| {})?;
-        //writer.flush().map_err(|_| {})?;
-
-        // Actual code from the program
 
         for f in &self.functions {
             f.write_cvm(writer, producer)?;
@@ -812,22 +699,7 @@ impl WriteCVM for Circuit {
             //writer.flush().map_err(|_| {})?;
         }
 
-        code_aux = generate_table_of_template_runs(&producer);
-        code = merge_code(code_aux);
-        writer.write_all(code.as_bytes()).map_err(|_| {})?;
-        //writer.flush().map_err(|_| {})?;
-
-        code_aux = fr_data(&producer.prime_str);
-        code = merge_code(code_aux);
-        writer.write_all(code.as_bytes()).map_err(|_| {})?;
-        //writer.flush().map_err(|_| {})?;
-
-        code_aux = generate_data_list(&producer);
-        code = merge_code(code_aux);
-        writer.write_all(code.as_bytes()).map_err(|_| {})?;
-        //writer.flush().map_err(|_| {})?;
-
-        writer.write_all(")".as_bytes()).map_err(|_| {})?;
+        
         writer.flush().map_err(|_| {})
     }
 }

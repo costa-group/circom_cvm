@@ -1709,59 +1709,18 @@ fn get_file_instructions(name: &str) -> Vec<CVMInstruction> {
 }
 
 pub fn fr_types(prime: &String) -> Vec<CVMInstruction> {
-    let mut instructions = vec![];
-    let file = match prime.as_ref(){
-        "bn128" => include_str!("bn128/fr-types.wat"),
-        "bls12381" => include_str!("bls12381/fr-types.wat"),
-        "goldilocks" => include_str!("goldilocks/fr-types.wat"),
-        "grumpkin" => include_str!("grumpkin/fr-types.wat"),
-        "pallas" => include_str!("pallas/fr-types.wat"),
-        "vesta" => include_str!("vesta/fr-types.wat"),
-        "secq256r1" => include_str!("secq256r1/fr-types.wat"),
-        "bls12-377" => include_str!("bls12-377/fr-types.wat"),
-        _ => unreachable!(),
-    };    
-    for line in file.lines() {
-        instructions.push(line.to_string());
-    }
-    instructions
+
+    // TODO
+    Vec::new()
 }
 
 pub fn fr_data(prime: &String) -> Vec<CVMInstruction> {
-    let mut instructions = vec![];
-    let file = match prime.as_ref(){
-        "bn128" => include_str!("bn128/fr-data.wat"),
-        "bls12381" => include_str!("bls12381/fr-data.wat"),
-        "goldilocks" => include_str!("goldilocks/fr-data.wat"),
-        "grumpkin" => include_str!("grumpkin/fr-data.wat"),
-        "pallas" => include_str!("pallas/fr-data.wat"),
-        "vesta" => include_str!("vesta/fr-data.wat"),
-        "secq256r1" => include_str!("secq256r1/fr-data.wat"),
-        "bls12-377" => include_str!("bls12-377/fr-data.wat"),
-        _ => unreachable!(),
-    };    
-    for line in file.lines() {
-        instructions.push(line.to_string());
-    }
-    instructions
+    // TODO
+    Vec::new()
 }
 pub fn fr_code(prime: &String) -> Vec<CVMInstruction> {
-    let mut instructions = vec![];
-    let file = match prime.as_ref(){
-        "bn128" => include_str!("bn128/fr-code.wat"),
-        "bls12381" => include_str!("bls12381/fr-code.wat"),
-        "goldilocks" => include_str!("goldilocks/fr-code.wat"),
-        "grumpkin" => include_str!("grumpkin/fr-code.wat"),
-        "pallas" => include_str!("pallas/fr-code.wat"),
-        "vesta" => include_str!("vesta/fr-code.wat"),
-        "secq256r1" => include_str!("secq256r1/fr-code.wat"),
-        "bls12-377" => include_str!("bls12-377/fr-code.wat"),
-        _ => unreachable!(),
-    };    
-    for line in file.lines() {
-        instructions.push(line.to_string());
-    }
-    instructions
+    // TODO
+    Vec::new()
 }
 
 /*
@@ -1971,3 +1930,114 @@ mod tests {
         assert!(true);
     }
 }
+
+
+
+// FUNCTIONS FOR GENERATING CVM
+
+pub fn generate_prime(producer: &CVMProducer)-> Vec<CVMInstruction>{
+    let mut instr = Vec::new();
+    instr.push(";; Prime value".to_string());
+    instr.push(format!("%% prime {}", producer.get_prime()));
+    instr
+}
+
+
+pub fn generate_signals_memory(producer: &CVMProducer) -> Vec<CVMInstruction>{
+    let mut instr = Vec::new();
+    instr.push(";; Memory of signals".to_string());
+    instr.push(format!("%% signals {}", producer.get_total_number_of_signals()));
+    instr
+}
+
+
+
+pub fn generate_components_heap(producer: &CVMProducer)-> Vec<CVMInstruction>{
+    let mut instr = Vec::new();
+    instr.push(";; Heap of components".to_string());
+    instr.push(format!("%% components {}", producer.get_size_of_component_tree()));// ???
+    instr
+}
+
+
+pub fn generate_types(producer: &CVMProducer) -> Vec<CVMInstruction>{
+    let mut instr = Vec::new();
+    instr.push(";; Types".to_string());
+    let mut node_id = 0;
+    for bus in producer.get_busid_field_info(){
+        instr.push(format!("%% type $bus_{}", node_id));
+        for field in bus{
+            // We store the following info: name type offset size number_dims dims
+            let type_field = if field.bus_id.is_some(){
+                format!("$bus_{}", field.bus_id.unwrap())
+            } else{
+                "ff".to_string()
+            };
+            let mut dims = "".to_string();
+            for dim in &field.dimensions{
+                dims = format!("{} {}", dims, dim);
+            }
+
+            instr.push(format!("       ${} ${} {} {} {} {}",
+                field.name,
+                type_field,
+                field.offset,
+                field.size,
+                field.dimensions.len(),
+                dims
+            ));
+
+        }
+        node_id += 1;
+
+    }
+    instr
+}
+
+
+
+pub fn generate_main_template(producer: &CVMProducer) -> Vec<CVMInstruction>{
+    Vec::new()
+}
+
+
+pub fn generate_components(producer: &CVMProducer) -> Vec<CVMInstruction>{
+    Vec::new()
+
+}
+
+
+pub fn generate_witness(producer: &CVMProducer) -> Vec<CVMProducer>{
+    Vec::new()
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
