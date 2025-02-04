@@ -569,7 +569,7 @@ impl WriteC for Circuit {
 }
 
 impl WriteCVM for Circuit {
-    fn produce_cvm(&self, producer: &CVMProducer) -> Vec<String> {
+    fn produce_cvm(&self, producer: &CVMProducer) -> (Vec<String>, String) {
         use code_producers::cvm_elements::cvm_code_generator::*;
         let mut code = vec![];
         code.push("(module".to_string());
@@ -649,11 +649,11 @@ impl WriteCVM for Circuit {
         // Actual code from the program
 
         for f in &self.functions {
-            code.append(&mut f.produce_cvm(producer));
+            code.append(&mut f.produce_cvm(producer).0);
         }
 
         for t in &self.templates {
-            code.append(&mut t.produce_cvm(producer));
+            code.append(&mut t.produce_cvm(producer).0);
         }
 
         code_aux = generate_table_of_template_runs(&producer);

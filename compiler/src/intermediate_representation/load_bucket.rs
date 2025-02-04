@@ -454,7 +454,55 @@ impl WriteC for LoadBucket {
 }
 
 impl WriteCVM for LoadBucket{
-    fn produce_cvm(&self, producer: &CVMProducer) -> Vec<String> {
-        Vec::new()
+    fn produce_cvm(&self, producer: &CVMProducer) -> (Vec<String>, String) {
+        use code_producers::cvm_elements::cvm_code_generator::*;
+        let mut instructions = vec![];
+        if producer.needs_comments() {
+            instructions.push(";; load bucket".to_string());
+	}
+        match &self.src {
+            LocationRule::Indexed { location, .. } => {
+                let mut instructions_src = location.produce_cvm(producer);
+                instructions.append(&mut instructions_src);
+                let res = producer.fresh_var();
+                match &self.address_type {
+                    AddressType::Variable => {
+                        instructions.push(get_var();
+                    }
+                    AddressType::Signal => {
+                        instructions.push(get_local(producer.get_signal_start_tag()).to_string());
+                    }
+                    AddressType::SubcmpSignal { cmp_address, .. } => {
+			if producer.needs_comments() {
+			    instructions.push(";; is subcomponent".to_string());
+			}
+                        instructions.push(get_local(producer.get_offset_tag()));
+                        instructions.push(set_constant(
+                            &producer.get_sub_component_start_in_component().to_string(),
+                        ));
+                        instructions.push(add32());
+                        let mut instructions_sci = cmp_address.produce_wasm(producer);
+                        instructions.append(&mut instructions_sci);
+                        instructions.push(set_constant("4")); //size in byte of i32
+                        instructions.push(mul32());
+                        instructions.push(add32());
+                        instructions.push(load32(None)); //subcomponent block
+                        instructions.push(set_constant(
+                            &producer.get_signal_start_address_in_component().to_string(),
+                        ));
+                        instructions.push(add32());
+                        instructions.push(load32(None)); //subcomponent start_of_signals
+                    }
+                }
+                instructions.push(add32());
+		if producer.needs_comments() {
+                    instructions.push(";; end of load bucket".to_string());
+		}
+            }
+            LocationRule::Mapped { signal_code, indexes} => {
+                assert!(false);
+            }
+        }
+        (instructions,"".to_string())
     }
 }
