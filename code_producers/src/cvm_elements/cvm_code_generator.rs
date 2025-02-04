@@ -1697,10 +1697,26 @@ mod tests {
 
 // FUNCTIONS FOR GENERATING CVM
 
+pub fn declare_variable(vtype: Option<usize>, dimensions: &Vec<usize>) -> String{
+    let stype = match vtype{
+        Option::None => "ff".to_string(),
+        Option::Some(node_id) => format!("bus_{}", node_id)
+    };
+    let mut s_dimensions = "".to_string();
+    for d in dimensions{
+        s_dimensions = format!("{}{} ", s_dimensions, d);
+    }
+    if dimensions.len() > 0{
+        s_dimensions.pop();
+    }
+    format!("{} {} {}", stype, dimensions.len(), s_dimensions)
+}
+
 pub fn generate_prime(producer: &CVMProducer)-> Vec<CVMInstruction>{
     let mut instr = Vec::new();
     instr.push(";; Prime value".to_string());
     instr.push(format!("%% prime {}", producer.get_prime()));
+    instr.push("\n".to_string());
     instr
 }
 
@@ -1709,6 +1725,8 @@ pub fn generate_signals_memory(producer: &CVMProducer) -> Vec<CVMInstruction>{
     let mut instr = Vec::new();
     instr.push(";; Memory of signals".to_string());
     instr.push(format!("%% signals {}", producer.get_total_number_of_signals()));
+    instr.push("\n".to_string());
+
     instr
 }
 
@@ -1718,13 +1736,15 @@ pub fn generate_components_heap(producer: &CVMProducer)-> Vec<CVMInstruction>{
     let mut instr = Vec::new();
     instr.push(";; Heap of components".to_string());
     instr.push(format!("%% components {}", producer.get_size_of_component_tree()));// ???
+    instr.push("\n".to_string());
+
     instr
 }
 
 
 pub fn generate_types(producer: &CVMProducer) -> Vec<CVMInstruction>{
     let mut instr = Vec::new();
-    instr.push(";; Types".to_string());
+    instr.push(";; Types (for each field we store name type offset size nDims dims)".to_string());
     let mut node_id = 0;
     for bus in producer.get_busid_field_info(){
         instr.push(format!("%% type $bus_{}", node_id));
@@ -1753,53 +1773,46 @@ pub fn generate_types(producer: &CVMProducer) -> Vec<CVMInstruction>{
         node_id += 1;
 
     }
+    instr.push("\n".to_string());
+
     instr
 }
 
 
 
 pub fn generate_main_template(producer: &CVMProducer) -> Vec<CVMInstruction>{
-    Vec::new()
+    let mut instr = Vec::new();
+    instr.push(";; Main template".to_string());
+    instr.push(format!("%% start {}", producer.get_main_header()));// ???
+    instr.push("\n".to_string());
+
+    instr
 }
 
 
 pub fn generate_components(producer: &CVMProducer) -> Vec<CVMInstruction>{
-    Vec::new()
+    let mut instr = Vec::new();
+    instr.push(";; Component creation mode (implicit/explicit)".to_string());
+    let creation_mode = match producer.get_implicit_component_creation(){
+        true => "implicit",
+        false => "explicit",
+    };
+    instr.push(format!("%% components {}", creation_mode));
+    instr.push("\n".to_string());
 
+    instr
 }
 
 
-pub fn generate_witness(producer: &CVMProducer) -> Vec<CVMProducer>{
-    Vec::new()
+pub fn generate_witness(producer: &CVMProducer) -> Vec<CVMInstruction>{
+    let mut instr = Vec::new();
+    instr.push(";; Witness (signal list)".to_string());
+    let mut witness = "".to_string();
+    for s in producer.get_witness_to_signal_list(){
+        witness = format!("{} {}", witness, s)
+    }
+    instr.push(format!("%% witness{}", witness));
+    instr.push("\n".to_string());
 
+    instr
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

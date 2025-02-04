@@ -62,6 +62,7 @@ pub struct CVMProducer {
     pub num_of_bus_instances: usize,  //total number of different bus instances
 //    pub size_of_bus_fields: usize,  //total number of fields in all differen bus intances ???
     pub busid_field_info: FieldMap, //for every busId (0..num-1) provides de offset, the dimensions and size of each field (0..n-1) in it
+    implicit_component_creation: bool,
 }
 
 impl Default for CVMProducer {
@@ -144,6 +145,7 @@ impl Default for CVMProducer {
 	    num_of_bus_instances: 0,
 //	    size_of_bus_fields: 0,
 	    busid_field_info: Vec::new(), 
+        implicit_component_creation: false
        }
     }
 }
@@ -497,5 +499,9 @@ impl CVMProducer {
 
     pub fn set_string_table(&mut self, string_table: Vec<String>) {
         self.string_table = string_table;
+    }
+
+    pub fn get_implicit_component_creation(&self) -> bool{
+        self.implicit_component_creation
     }
 }
