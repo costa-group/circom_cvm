@@ -4,12 +4,8 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::path::PathBuf;
 
-pub fn wasm_hexa(nbytes: usize, num: &BigInt) -> String {
+pub fn cvm_hexa(nbytes: usize, num: &BigInt) -> String {
     let inbytes = num.to_str_radix(16).to_string();
-    assert!(
-        2 * nbytes >= inbytes.len(),
-        "the size of memory needs addresses beyond 32 bits long. This circuit cannot be run on WebAssembly\n Try to run circom --c in order to generate c++ code instead"
-    );
     let mut temp = "0".repeat(2 * nbytes - inbytes.len());
     temp.push_str(&inbytes);
     let mut res: String = "".to_string();
@@ -27,58 +23,51 @@ pub fn merge_code(instructions: Vec<String>) -> String {
     code
 }
 
-pub fn set_constant(value: &str) -> CVMInstruction {
-    format!("i32.const {}", value)
-}
-pub fn set_constant_64(value: &str) -> CVMInstruction {
+pub fn constant_i64(value: &str) -> CVMInstruction {
     format!("i64.const {}", value)
 }
-pub fn get_local(value: &str) -> CVMInstruction {
-    format!("local.get {}", value)
+pub fn constant_ff(value: &str) -> CVMInstruction {
+    format!("ff.const {}", value)
 }
-pub fn set_local(value: &str) -> CVMInstruction {
-    format!("local.set {}", value)
+
+pub fn add64() -> CVMInstruction {
+    "i64.add".to_string()
 }
-pub fn tee_local(value: &str) -> CVMInstruction {
-    format!("local.tee {}", value)
+pub fn addff() -> CVMInstruction {
+    "ff.add".to_string()
 }
-pub fn add32() -> CVMInstruction {
-    "i32.add".to_string()
+pub fn sub64() -> CVMInstruction {
+    "i64.sub".to_string()
 }
-pub fn sub32() -> CVMInstruction {
-    "i32.sub".to_string()
+pub fn subff() -> CVMInstruction {
+    "ff.sub".to_string()
 }
-pub fn mul32() -> CVMInstruction {
-    "i32.mul".to_string()
+pub fn mul64() -> CVMInstruction {
+    "i64.mul".to_string()
 }
-pub fn div32_u() -> CVMInstruction {
-    "i32.div_u".to_string()
+pub fn mulff() -> CVMInstruction {
+    "ff.mul".to_string()
 }
-pub fn rem32_u() -> CVMInstruction {
-    "i32.rem_u".to_string()
+pub fn div64() -> CVMInstruction {
+    "i64.div".to_string()
 }
-pub fn extend_i32_u64() -> CVMInstruction {
-    "i64.extend_i32_u".to_string()
+pub fn rem64() -> CVMInstruction {
+    "i64.rem".to_string()
 }
-pub fn wrap_i6432() -> CVMInstruction {
-    "i32.wrap_i64".to_string()
+pub fn divff() -> CVMInstruction {
+    "ff.div".to_string()
 }
-pub fn load32_8u(offset: Option<&str>) -> CVMInstruction {
-    let code = "i32.load8_u".to_string();
-    if let Option::Some(o) = offset {
-        format!("{} offset={}", code, o)
-    } else {
-        code
-    }
+pub fn remff() -> CVMInstruction {
+    "ff.rem".to_string()
 }
-pub fn load32(offset: Option<&str>) -> CVMInstruction {
-    let code = "i32.load".to_string();
-    if let Option::Some(o) = offset {
-        format!("{} offset={}", code, o)
-    } else {
-        code
-    }
+
+pub fn extend_i64_ff() -> CVMInstruction {
+    "i64.extend_ff".to_string()
 }
+pub fn wrap_ff_i64() -> CVMInstruction {
+    "ff.wrap_i64".to_string()
+}
+
 pub fn load64(offset: Option<&str>) -> CVMInstruction {
     let code = "i64.load".to_string();
     if let Option::Some(o) = offset {
@@ -87,22 +76,17 @@ pub fn load64(offset: Option<&str>) -> CVMInstruction {
         code
     }
 }
-pub fn store32_8(offset: Option<&str>) -> CVMInstruction {
-    let code = "i32.store8".to_string();
+
+pub fn loadff(offset: Option<&str>) -> CVMInstruction {
+    let code = "ff.load".to_string();
     if let Option::Some(o) = offset {
         format!("{} offset={}", code, o)
     } else {
         code
     }
 }
-pub fn store32(offset: Option<&str>) -> CVMInstruction {
-    let code = "i32.store".to_string();
-    if let Option::Some(o) = offset {
-        format!("{} offset={}", code, o)
-    } else {
-        code
-    }
-}
+
+
 pub fn store64(offset: Option<&str>) -> CVMInstruction {
     let code = "i64.store".to_string();
     if let Option::Some(o) = offset {
@@ -111,6 +95,17 @@ pub fn store64(offset: Option<&str>) -> CVMInstruction {
         code
     }
 }
+
+pub fn storeff(offset: Option<&str>) -> CVMInstruction {
+    let code = "ff.store".to_string();
+    if let Option::Some(o) = offset {
+        format!("{} offset={}", code, o)
+    } else {
+        code
+    }
+}
+
+/*
 //The 𝗆𝖾𝗆𝗈𝗋𝗒.𝗌𝗂𝗓𝖾 instruction returns the current size of a memory.
 pub fn memory_size() -> CVMInstruction {
     "memory.size".to_string()
@@ -119,59 +114,62 @@ pub fn memory_size() -> CVMInstruction {
 pub fn memory_grow() -> CVMInstruction {
     "memory.grow".to_string()
 }
+ */
 
-pub fn shr32_u() -> CVMInstruction {
-    "i32.shr_u".to_string()
-}
-pub fn shl32() -> CVMInstruction {
-    "i32.shl".to_string()
+pub fn shr64() -> CVMInstruction {
+    "i64.shr_u".to_string()
 }
 pub fn shl64() -> CVMInstruction {
     "i64.shl".to_string()
 }
+pub fn shrff() -> CVMInstruction {
+    "ff.shr_u".to_string()
+}
+pub fn shlff() -> CVMInstruction {
+    "ff.shl".to_string()
+}
 pub fn call(to: &str) -> CVMInstruction {
     format!("call {}", to)
 }
-pub fn call_indirect(table_name: &str, type_name: &str) -> CVMInstruction {
-    format!("call_indirect {} {}", table_name, type_name)
-}
-pub fn and32() -> CVMInstruction {
-    "i32.and".to_string()
+
+pub fn and64() -> CVMInstruction {
+    "i64.and".to_string()
 }
 pub fn or64() -> CVMInstruction {
     "i64.or".to_string()
 }
-pub fn gt32_u() -> CVMInstruction {
-    "i32.gt_u".to_string()
+pub fn andff() -> CVMInstruction {
+    "ff.and".to_string()
 }
-pub fn ge32_u() -> CVMInstruction {
-    "i32.ge_u".to_string()
+pub fn orff() -> CVMInstruction {
+    "ff.or".to_string()
 }
-pub fn lt32_u() -> CVMInstruction {
-    "i32.lt_u".to_string()
+
+pub fn gt64() -> CVMInstruction {
+    "i64.gt".to_string()
 }
-pub fn le32_u() -> CVMInstruction {
-    "i32.le_u".to_string()
+pub fn ge64() -> CVMInstruction {
+    "i64.ge".to_string()
 }
-pub fn eq32() -> CVMInstruction {
-    "i32.eq".to_string()
+pub fn lt64() -> CVMInstruction {
+    "i64.lt".to_string()
+}
+pub fn le64() -> CVMInstruction {
+    "i64.le".to_string()
 }
 pub fn eq64() -> CVMInstruction {
     "i64.eq".to_string()
 }
-pub fn eqz32() -> CVMInstruction {
-    "i32.eqz".to_string()
-}
 pub fn eqz64() -> CVMInstruction {
     "i64.eqz".to_string()
 }
-pub fn drop() -> CVMInstruction {
-    "drop".to_string()
-}
-pub fn add_block() -> CVMInstruction {
-    "block".to_string()
-}
 pub fn add_loop() -> CVMInstruction {
+    "loop".to_string()
+}
+pub fn add_break() -> CVMInstruction {
+    "loop".to_string()
+}
+pub fn add_continue() -> CVMInstruction {
     "loop".to_string()
 }
 pub fn br_if(value: &str) -> CVMInstruction {
@@ -193,6 +191,7 @@ pub fn add_return() -> CVMInstruction {
     "return".to_string()
 }
 
+/*
 pub fn create_if_selection(
     values: &Vec<(usize, usize)>,
     local: &str
@@ -212,10 +211,10 @@ pub fn create_if_selection(
     }
     instructions
 }
-
+*/
 
 // ----- exception codes and other constants -----------------
-
+/*
 pub fn default_memory_for_stack_kib() -> usize {
     10
 }
@@ -243,16 +242,17 @@ pub fn exception_code_not_enough_memory() -> usize {
 pub fn exception_code_input_array_access_exeeds_size() -> usize {
     6
 }
-
+*/
 //------------------ compute initial size of memory ---------------
-
+/*
 pub fn get_initial_size_of_memory(producer: &CVMProducer) -> usize {
     let n = (producer.get_var_stack_memory_start() + 65535) / 65536;
     n + default_memory_for_stack_kib()
 }
-
+*/
 //------------------- generate all kinds of Data ------------------
 
+/*
 pub fn generate_hash_map(signal_name_list: &Vec<InputInfo>, size: usize) -> Vec<(u64, usize, usize)> {
     assert!(signal_name_list.len() <= size);
     let mut hash_map = vec![(0, 0, 0); size];
@@ -518,161 +518,11 @@ pub fn generate_data_constants(producer: &CVMProducer, constant_list: &Vec<Strin
     }
     constant_list_data
 }
-
-/*
-
-                if min_int <= nn && nn <= max_int {
-                    instructions.push(get_local(producer.get_expaux_tag()));
-                    let size = self.op_aux_no * producer.get_size_32_bits_in_memory() * 4;
-                    instructions.push(set_constant(&size.to_string()));
-                    instructions.push(add32());
-                    instructions.push(set_local(producer.get_temp_tag()));
-                    instructions.push(get_local(producer.get_temp_tag()));
-                    instructions.push(set_constant(&nn.to_string()));
-                    instructions.push(store32(None));
-                    instructions.push(get_local(producer.get_temp_tag()));
-                    instructions.push(set_constant("0"));
-                    instructions.push(store32(Some("4")));
-                    let mut offset = 8;
-                    if (producer.get_size_32_bit() & 1) == 0 {
-                        // is even
-                        for _i in 0..producer.get_size_32_bit() / 2 {
-                            instructions.push(get_local(producer.get_temp_tag()));
-                            instructions.push(set_constant_64("0"));
-                            instructions.push(store64(Some(&offset.to_string())));
-                            offset += 8;
-                        }
-                    } else {
-                        for _i in 0..producer.get_size_32_bit() {
-                            instructions.push(get_local(producer.get_temp_tag()));
-                            instructions.push(set_constant("0"));
-                            instructions.push(store32(Some(&offset.to_string())));
-                            offset += 4;
-                        }
-                    }
-                } else {
-                    instructions.push(get_local(producer.get_expaux_tag()));
-                    let size = self.op_aux_no * producer.get_size_32_bits_in_memory() * 4;
-                    instructions.push(set_constant(&size.to_string()));
-                    instructions.push(add32());
-                    instructions.push(set_local(producer.get_temp_tag()));
-                    instructions.push(get_local(producer.get_temp_tag()));
-                    instructions.push(set_constant("0"));
-                    instructions.push(store32(None));
-                    instructions.push(get_local(producer.get_temp_tag()));
-                    instructions.push(set_constant("-2147483648"));
-                    instructions.push(store32(Some("4")));
-                    let mut offset = 8;
-                    if (producer.get_size_32_bit() & 1) == 0 {
-                        // is even
-                        let in64_hex = to_array_hex(&n, producer.get_size_32_bit() / 2, 16);
-                        for b in in64_hex {
-                            instructions.push(get_local(producer.get_temp_tag()));
-                            instructions.push(set_constant_64(&b));
-                            instructions.push(store64(Some(&offset.to_string())));
-                            offset += 8;
-                        }
-                    } else {
-                        let in32_hex = to_array_hex(&n, producer.get_size_32_bit(), 8);
-                        for b in in32_hex {
-                            instructions.push(get_local(producer.get_temp_tag()));
-                            instructions.push(set_constant(&b));
-                            instructions.push(store32(Some(&offset.to_string())));
-                            offset += 4;
-                        }
-                    }
-                }
-
-
-pub fn to_array_hex(num: &BigInt, size: usize, group_size: usize) -> Vec<String> {
-    debug_assert!(group_size % 2 == 0);
-    let in_hex = num.to_str_radix(16).to_string();
-    let mut temp ="0".repeat(size*group_size-in_hex.len());
-    temp.push_str(&in_hex);
-    let mut res:Vec<String> = vec!["".to_string();size];
-    for i in 0..size {
-        let mut aux = "0x".to_string();
-        aux.push_str(&temp[group_size*i..group_size*(i+1)]);
-        res[size-i-1] = aux;
-/*
-        let mut aux = "0x".to_string();
-        let mut j = group_size*(i+1);
-        while j > group_size*i {
-            aux.push_str(&temp[j-2..j]);
-            j -= 2;
-        }
-        res[size-i-1] = aux;
-*/
-    }
-    res
-}
-
-
 */
 
 // ------ fix elements --------------------------
 
-pub fn generate_imports_list() -> Vec<CVMInstruction> {
-    let mut imports = vec![];
-    imports.push(
-        "(import \"runtime\" \"exceptionHandler\" (func $exceptionHandler (type $_t_i32)))"
-            .to_string(),
-    );
-    imports.push(
-        "(import \"runtime\" \"printErrorMessage\" (func $printErrorMessage (type $_t_void)))"
-            .to_string(),
-    );
-    imports.push(
-        "(import \"runtime\" \"writeBufferMessage\" (func $writeBufferMessage (type $_t_void)))"
-            .to_string(),
-    );
-    imports.push(
-        "(import \"runtime\" \"showSharedRWMemory\" (func $showSharedRWMemory (type $_t_void)))"
-            .to_string(),
-    );
-    imports
-}
-
-pub fn generate_memory_def_list(producer: &CVMProducer) -> Vec<CVMInstruction> {
-    let mut wmemory = vec![];
-    wmemory.push(format!("(memory {})", get_initial_size_of_memory(&producer)));
-    wmemory
-}
-
-pub fn generate_types_list() -> Vec<CVMInstruction> {
-    let mut types = vec![];
-    types.push("(type $_t_void (func ))".to_string());
-    types.push("(type $_t_ri32 (func  (result i32)))".to_string());
-    types.push("(type $_t_i32 (func  (param i32)))".to_string());
-    types.push("(type $_t_i32ri32 (func  (param i32) (result i32)))".to_string());
-    types.push("(type $_t_i64ri32 (func  (param i64) (result i32)))".to_string());
-    types.push("(type $_t_i32i32 (func  (param i32 i32)))".to_string());
-    types.push("(type $_t_i32i32ri32 (func  (param i32 i32) (result i32)))".to_string());
-    types.push("(type $_t_i32i32i32  (func  (param i32 i32 i32)))".to_string());
-    types
-}
-
-pub fn generate_exports_list() -> Vec<CVMInstruction> {
-    let mut exports = vec![];
-    exports.push("(export \"memory\" (memory 0))".to_string());
-    exports.push("(export \"getVersion\" (func $getVersion))".to_string());
-    exports.push("(export \"getMinorVersion\" (func $getMinorVersion))".to_string());
-    exports.push("(export \"getPatchVersion\" (func $getPatchVersion))".to_string());
-    exports.push("(export \"getSharedRWMemoryStart\" (func $getSharedRWMemoryStart))".to_string());
-    exports.push("(export \"readSharedRWMemory\" (func $readSharedRWMemory))".to_string());
-    exports.push("(export \"writeSharedRWMemory\" (func $writeSharedRWMemory))".to_string());
-    exports.push("(export \"init\" (func $init))".to_string());
-    exports.push("(export \"setInputSignal\" (func $setInputSignal))".to_string());
-    exports.push("(export \"getInputSignalSize\" (func $getInputSignalSize))".to_string());
-    exports.push("(export \"getRawPrime\" (func $getRawPrime))".to_string());
-    exports.push("(export \"getFieldNumLen32\" (func $getFieldNumLen32))".to_string());
-    exports.push("(export \"getWitnessSize\" (func $getWitnessSize))".to_string());
-    exports.push("(export \"getInputSize\" (func $getInputSize))".to_string());
-    exports.push("(export \"getWitness\" (func $getWitness))".to_string());
-    exports.push("(export \"getMessageChar\" (func $getMessageChar))".to_string());
-    exports
-}
-
+/*
 pub fn generate_data_list(producer: &CVMProducer) -> Vec<CVMInstruction> {
     let mut wdata = vec![];
     wdata.push(format!(
@@ -786,9 +636,9 @@ pub fn generate_data_list(producer: &CVMProducer) -> Vec<CVMInstruction> {
     ));
     wdata
 }
-
+*/
 // ------ stack handling operations
-
+/*
 pub fn reserve_stack_fr(producer: &CVMProducer, nbytes: usize) -> Vec<CVMInstruction> {
     let mut instructions = vec![];
     instructions.push(set_constant(&nbytes.to_string()));
@@ -853,9 +703,9 @@ pub fn free_stack(producer: &CVMProducer) -> Vec<CVMInstruction> {
     instructions.push(store32(Option::None));
     instructions
 }
-
+*/
 // ---------------------- functions ------------------------
-
+/*
 pub fn desp_io_subcomponent_generator(producer: &CVMProducer) -> Vec<CVMInstruction> {
     let mut instructions = vec![];
     let header = "(func $getOffsetIOSubComponet (type $_t_i32i32ri32)".to_string();
@@ -1617,77 +1467,6 @@ pub fn generate_table_of_template_runs(producer: &CVMProducer) -> Vec<CVMInstruc
 //  (elem $map (i32.const 0) $mmmm_run $mmmm_run    )
 //  data...
 
-/*
-pub fn main_sample_generator(producer: &CVMProducer) -> Vec<CVMInstruction> {
-    let mut instructions = vec![];
-    let header = "(func $main (type $_t_i32)".to_string();
-    instructions.push(header);
-    instructions.push(format!(" (param {} i32)",producer.get_offset_tag()));
-    instructions.push(" (local $i i32)".to_string());
-    instructions.push(" (local $im1 i32)".to_string());
-    instructions.push(format!(" (local {} i32)",producer.get_cstack_tag()));
-    let mut reserve_stack_fr_code = reserve_stack_fr(producer,1);
-    instructions.append(&mut reserve_stack_fr_code);
-    let o1 = producer.get_signal_memory_start()+1*40;
-    let o2 = o1+40;
-    let i1 = o2+40;
-    let i2 = i1+40;
-    let i3 = i2+40;
-    let i4 = i3+40;
-    instructions.push(set_constant(&o1.to_string())); // first output
-    instructions.push(set_constant(&i1.to_string())); // first input
-    instructions.push(set_constant(&i2.to_string())); // second input
-    instructions.push(call("$Fr_add"));
-    instructions.push(set_constant(&o2.to_string())); // second output
-    instructions.push(set_constant(&i3.to_string())); // third input
-    instructions.push(set_constant(&i4.to_string())); // forth input
-    instructions.push(call("$Fr_add"));
-    // put a one in the stack
-    instructions.push(get_local(producer.get_cstack_tag()));
-    instructions.push(set_constant(&producer.get_signal_memory_start().to_string())); // one
-    instructions.push(call("$Fr_copy"));
-    instructions.push(set_constant(&i4.to_string())); // forth input
-    instructions.push(set_local("$im1"));
-    let first_no_input = i4 + 40;
-    instructions.push(set_constant(&first_no_input.to_string()));
-    instructions.push(set_local("$i"));
-    instructions.push(add_block()); // block 1
-    instructions.push(add_loop());  // loop 1
-    instructions.push(get_local("$i"));
-    let end_of_signals = producer.get_signal_memory_start()+producer.get_total_number_of_signals()*40;
-    instructions.push(set_constant(&end_of_signals.to_string()));
-    instructions.push(eq32());
-    instructions.push(br_if("1")); // jump to end of block 1
-/*
-    //works!
-    //testing error messages
-    instructions.push(set_constant("0"));
-    instructions.push(set_constant("104"));
-    instructions.push(call("$buildBufferMessage"));
-    instructions.push(set_constant("4"));
-    instructions.push(call("$exceptionHandler"));
-*/
-    instructions.push(get_local("$i"));
-    instructions.push(get_local("$im1"));
-    instructions.push(get_local(producer.get_cstack_tag()));
-    instructions.push(call("$Fr_add"));
-    instructions.push(get_local("$im1"));
-    instructions.push(set_constant("40"));
-    instructions.push(add32());
-    instructions.push(set_local("$im1"));
-    instructions.push(get_local("$i"));
-    instructions.push(set_constant("40"));
-    instructions.push(add32());
-    instructions.push(set_local("$i"));
-    instructions.push(br("0")); // jump to begin of loop 2
-    instructions.push(add_end()); // end of loop 2
-    instructions.push(add_end()); // end of block 1
-    let mut free_stack_code = free_stack(producer);
-    instructions.append(&mut free_stack_code);
-    instructions.push(")".to_string());
-    instructions
-}
- */
 
 fn get_file_instructions(name: &str) -> Vec<CVMInstruction> {
     use std::io::BufReader;
@@ -1722,7 +1501,7 @@ pub fn fr_code(prime: &String) -> Vec<CVMInstruction> {
     // TODO
     Vec::new()
 }
-
+*/
 /*
 pub fn generate_utils_js_file(js_folder: &PathBuf) -> std::io::Result<()> {
     use std::io::BufWriter;
@@ -1740,7 +1519,7 @@ pub fn generate_utils_js_file(js_folder: &PathBuf) -> std::io::Result<()> {
     js_file.flush()?;
     Ok(())
 }
- */
+
 
 pub fn generate_generate_witness_js_file(js_folder: &PathBuf) -> std::io::Result<()> {
     use std::io::BufWriter;
@@ -1775,7 +1554,10 @@ pub fn generate_witness_calculator_js_file(js_folder: &PathBuf) -> std::io::Resu
     js_file.flush()?;
     Ok(())
 }
+ */
 
+
+/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1791,28 +1573,9 @@ mod tests {
         if !Path::new(LOCATION).is_dir() {
             std::fs::create_dir(LOCATION).unwrap();
         }
-        let path = format!("{}/code.wat", LOCATION);
+        let path = format!("{}/code.cvm", LOCATION);
         let file = File::create(path).unwrap();
         BufWriter::new(file)
-    }
-
-    fn get_instructions_from_file(name: &str) -> Vec<CVMInstruction> {
-        //return content of LOCATION/name.wat
-        let mut instructions = vec![];
-        let path = format!("{}/{}.wat", LOCATION, name);
-        if Path::new(&path).exists() {
-            let file = File::open(path).unwrap();
-            let reader = BufReader::new(file);
-            for rline in reader.lines() {
-                if let Result::Ok(line) = rline {
-                    instructions.push(line);
-                    //                    println!("line added");
-                }
-            }
-        } else {
-            eprintln!("NO FILE FOUND");
-        }
-        instructions
     }
 
     /*
@@ -1930,8 +1693,7 @@ mod tests {
         assert!(true);
     }
 }
-
-
+*/
 
 // FUNCTIONS FOR GENERATING CVM
 
