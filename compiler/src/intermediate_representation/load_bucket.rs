@@ -467,7 +467,7 @@ impl WriteCVM for LoadBucket{
                 let res = producer.fresh_var();
                 match &self.address_type {
                     AddressType::Variable => {
-                        instructions.push(get_var();
+                        instructions.push(get_var());
                     }
                     AddressType::Signal => {
                         instructions.push(get_local(producer.get_signal_start_tag()).to_string());
@@ -480,21 +480,21 @@ impl WriteCVM for LoadBucket{
                         instructions.push(set_constant(
                             &producer.get_sub_component_start_in_component().to_string(),
                         ));
-                        instructions.push(add32());
+                        instructions.push(add64());
                         let mut instructions_sci = cmp_address.produce_wasm(producer);
                         instructions.append(&mut instructions_sci);
                         instructions.push(set_constant("4")); //size in byte of i32
-                        instructions.push(mul32());
-                        instructions.push(add32());
-                        instructions.push(load32(None)); //subcomponent block
+                        instructions.push(mul64());
+                        instructions.push(add64());
+                        instructions.push(load64(None)); //subcomponent block
                         instructions.push(set_constant(
                             &producer.get_signal_start_address_in_component().to_string(),
                         ));
-                        instructions.push(add32());
-                        instructions.push(load32(None)); //subcomponent start_of_signals
+                        instructions.push(add64());
+                        instructions.push(load64(None)); //subcomponent start_of_signals
                     }
                 }
-                instructions.push(add32());
+                instructions.push(add64());
 		if producer.needs_comments() {
                     instructions.push(";; end of load bucket".to_string());
 		}

@@ -28,6 +28,7 @@ pub struct CVMProducer {
     pub major_version: usize,
     pub minor_version: usize,
     pub patch_version: usize,
+    var_no: usize,
     stack_free_pos: usize,
     local_info_size_u32: usize,
     size_of_message_buffer_in_bytes: usize,
@@ -110,6 +111,7 @@ impl Default for CVMProducer {
             major_version: 0,
             minor_version: 0,
             patch_version: 0,
+            var_no: 0,
             stack_free_pos: 0,
             local_info_size_u32: 0, // in the future we can add some info like pointer to run father or text father
             size_of_message_buffer_in_bytes: 256,
@@ -194,6 +196,11 @@ impl CVMProducer {
     }
     pub fn get_prime(&self) -> &str {
         &self.prime
+    }
+    pub fn get_var(&mut self) -> String {
+        let s = format!("x_{}",self.var_no);
+        self.var_no += 1;
+        s
     }
     pub fn get_number_of_main_outputs(&self) -> usize {
         self.number_of_main_outputs

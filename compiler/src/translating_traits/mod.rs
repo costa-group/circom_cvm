@@ -31,7 +31,7 @@ pub trait WriteWasm {
 }
 
 pub trait WriteCVM {
-    fn produce_cvm(&self, producer: &CVMProducer) -> Vec<String>;
+    fn produce_cvm(&self, producer: &CVMProducer) -> (Vec<String>, String);
     fn write_cvm<T: Write>(&self, writer: &mut T, producer: &CVMProducer) -> Result<(), ()> {
         let wasm_instructions = self.produce_cvm(producer);
         let code = cvm_code_generator::merge_code(wasm_instructions);
