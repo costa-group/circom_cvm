@@ -27,9 +27,9 @@ pub struct Circuit {
 impl Default for Circuit {
     fn default() -> Self {
         Circuit {
+            cvm_producer: CVMProducer::default(),
             c_producer: CProducer::default(),
             wasm_producer: WASMProducer::default(),
-            cvm_producer: CVMProducer::default(),
             templates: Vec::new(),
             functions: Vec::new(),
         }
@@ -574,7 +574,7 @@ impl WriteCVM for Circuit {
         (Vec::new(),"".to_string())
     }
 
-    fn write_cvm<T: Write>(&mut self, writer: &mut T) -> Result<(), ()> {
+    fn write_cvm<T: Write>(&self, writer: &mut T, producer: &mut CVMProducer) -> Result<(), ()> {
         use code_producers::cvm_elements::cvm_code_generator::*;
 
         let mut code_aux = generate_prime(&producer);
@@ -607,12 +607,12 @@ impl WriteCVM for Circuit {
         writer.write_all(code.as_bytes()).map_err(|_| {})?;
 
         for f in &self.functions {
-            f.write_cvm(writer, self.producer)?;
+            f.write_cvm(writer, producer)?;
             //writer.flush().map_err(|_| {})?;
         }
 
         for t in &self.templates {
-            t.write_cvm(writer, self.producer)?;
+            t.write_cvm(writer, producer)?;
             //writer.flush().map_err(|_| {})?;
         }
 
@@ -675,9 +675,13 @@ impl Circuit {
 
     pub fn produce_cvm<W: Write>(&mut self, cvm_folder: &str, _cvm_name: &str, writer: &mut W) -> Result<(), ()> {
         use std::path::Path;
+        use std::mem;
         let cvm_folder_path = Path::new(cvm_folder).to_path_buf();
             //cvm_code_generator::generate_generate_witness_js_file(&cvm_folder_path).map_err(|_err| {})?;
             //cvm_code_generator::generate_witness_calculator_js_file(&cvm_folder_path).map_err(|_err| {})?;
-        self.write_cvm(writer)
+        let mut extracted_producer = mem::replace(&mut self.cvm_producer, CVMProducer::default());
+        self.write_cvm(writer, &mut extracted_producer)?;
+        self.cvm_producer = extracted_producer;
+        Ok(())
     }
 }

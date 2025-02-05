@@ -34,7 +34,7 @@ pub fn compile(config: CompilerConfig) -> Result<(), ()> {
 
 
     if config.c_flag || config.wat_flag || config.wasm_flag || config.cvm_flag{
-        let circuit = compiler_interface::run_compiler(
+        let mut circuit = compiler_interface::run_compiler(
             config.vcp,
             Config { 
                 debug_output: config.debug_output, 
@@ -105,7 +105,7 @@ pub fn compile(config: CompilerConfig) -> Result<(), ()> {
             (false, false) => {}
         }
         if config.cvm_flag{
-            compiler_interface::write_cvm(&circuit, &config.cvm_folder, &config.cvm_name, &config.cvm_file)?;
+            compiler_interface::write_cvm(&mut circuit, &config.cvm_folder, &config.cvm_name, &config.cvm_file)?;
             println!(
                 "{} {}",
                 Colour::Green.paint("Written successfully:"),

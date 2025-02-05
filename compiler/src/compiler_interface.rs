@@ -50,7 +50,7 @@ pub fn write_c(circuit: &Circuit, c_folder: &str, c_run_name: &str, c_file: &str
 }
 
 
-pub fn write_cvm(circuit: &Circuit, cvm_folder: &str, cvm_name: &str, cvm_file: &str) -> Result<(), ()> {
+pub fn write_cvm(circuit: &mut Circuit, cvm_folder: &str, cvm_name: &str, cvm_file: &str) -> Result<(), ()> {
     use std::path::Path;
     if Path::new(cvm_folder).is_dir() {
         std::fs::remove_dir_all(cvm_folder).map_err(|_err| {})?;
