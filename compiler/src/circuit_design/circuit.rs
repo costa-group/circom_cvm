@@ -571,102 +571,7 @@ impl WriteC for Circuit {
 impl WriteCVM for Circuit {
     fn produce_cvm(&self, producer: &CVMProducer) -> (Vec<String>, String) {
         use code_producers::cvm_elements::cvm_code_generator::*;
-        let mut code = vec![];
-        code.push("(module".to_string());
-        let mut code_aux = generate_imports_list();
-        code.append(&mut code_aux);
-        code_aux = generate_memory_def_list(&producer);
-        code.append(&mut code_aux);
-
-        code_aux = fr_types(&producer.prime_str);
-        code.append(&mut code_aux);
-
-        code_aux = generate_types_list();
-        code.append(&mut code_aux);
-        code_aux = generate_exports_list();
-        code.append(&mut code_aux);
-
-        code_aux = fr_code(&producer.prime_str);
-        code.append(&mut code_aux);
-
-        code_aux = desp_io_subcomponent_generator(&producer);
-        code.append(&mut code_aux);
-
-        code_aux = get_version_generator(&producer);
-        code.append(&mut code_aux);
-
-        code_aux = get_shared_rw_memory_start_generator(&producer);
-        code.append(&mut code_aux);
-
-        code_aux = read_shared_rw_memory_generator(&producer);
-        code.append(&mut code_aux);
-
-        code_aux = write_shared_rw_memory_generator(&producer);
-        code.append(&mut code_aux);
-
-        code_aux = reserve_stack_fr_function_generator();
-        code.append(&mut code_aux);
-
-        code_aux = init_generator(&producer);
-        code.append(&mut code_aux);
-
-        code_aux = set_input_signal_generator(&producer);
-        code.append(&mut code_aux);
-
-        code_aux = get_input_signal_size_generator(&producer);
-        code.append(&mut code_aux);
-
-        code_aux = get_raw_prime_generator(&producer);
-        code.append(&mut code_aux);
-
-        code_aux = get_field_num_len32_generator(&producer);
-        code.append(&mut code_aux);
-
-        code_aux = get_input_size_generator(&producer);
-        code.append(&mut code_aux);	
-
-        code_aux = get_witness_size_generator(&producer);
-        code.append(&mut code_aux);
-
-        code_aux = get_witness_generator(&producer);
-        code.append(&mut code_aux);
-
-        code_aux = copy_32_in_shared_rw_memory_generator(&producer);
-        code.append(&mut code_aux);
-
-        code_aux = copy_fr_in_shared_rw_memory_generator(&producer);
-        code.append(&mut code_aux);
-
-        code_aux = get_message_char_generator(&producer);
-        code.append(&mut code_aux);
-
-        code_aux = build_buffer_message_generator(&producer);
-        code.append(&mut code_aux);
-
-        code_aux = build_log_message_generator(&producer);
-        code.append(&mut code_aux);
-
-        // Actual code from the program
-
-        for f in &self.functions {
-            code.append(&mut f.produce_cvm(producer).0);
-        }
-
-        for t in &self.templates {
-            code.append(&mut t.produce_cvm(producer).0);
-        }
-
-        code_aux = generate_table_of_template_runs(&producer);
-        code.append(&mut code_aux);
-
-        code_aux = fr_data(&producer.prime_str);
-        code.append(&mut code_aux);
-
-        code_aux = generate_data_list(&producer);
-        code.append(&mut code_aux);
-
-        code.push(")".to_string());
-        code
+        Vec::new()
     }
 
     fn write_cvm<T: Write>(&self, writer: &mut T, producer: &CVMProducer) -> Result<(), ()> {
@@ -686,6 +591,18 @@ impl WriteCVM for Circuit {
         writer.write_all(code.as_bytes()).map_err(|_| {})?;
 
         code_aux = generate_types(&producer);
+        code = merge_code(code_aux);
+        writer.write_all(code.as_bytes()).map_err(|_| {})?;
+
+        code_aux = generate_main_template(&producer);
+        code = merge_code(code_aux);
+        writer.write_all(code.as_bytes()).map_err(|_| {})?;
+
+        code_aux = generate_components(&producer);
+        code = merge_code(code_aux);
+        writer.write_all(code.as_bytes()).map_err(|_| {})?;
+
+        code_aux = generate_witness(&producer);
         code = merge_code(code_aux);
         writer.write_all(code.as_bytes()).map_err(|_| {})?;
 
@@ -759,8 +676,8 @@ impl Circuit {
     pub fn produce_cvm<W: Write>(&self, cvm_folder: &str, _cvm_name: &str, writer: &mut W) -> Result<(), ()> {
         use std::path::Path;
         let cvm_folder_path = Path::new(cvm_folder).to_path_buf();
-            cvm_code_generator::generate_generate_witness_js_file(&cvm_folder_path).map_err(|_err| {})?;
-            cvm_code_generator::generate_witness_calculator_js_file(&cvm_folder_path).map_err(|_err| {})?;
+            //cvm_code_generator::generate_generate_witness_js_file(&cvm_folder_path).map_err(|_err| {})?;
+            //cvm_code_generator::generate_witness_calculator_js_file(&cvm_folder_path).map_err(|_err| {})?;
             self.write_cvm(writer, &self.cvm_producer)
         }
 }
