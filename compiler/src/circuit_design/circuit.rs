@@ -569,12 +569,12 @@ impl WriteC for Circuit {
 }
 
 impl WriteCVM for Circuit {
-    fn produce_cvm(&self, producer: &CVMProducer) -> (Vec<String>, String) {
+    fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<String>, String) {
         use code_producers::cvm_elements::cvm_code_generator::*;
-        Vec::new()
+        (Vec::new(),"".to_string())
     }
 
-    fn write_cvm<T: Write>(&self, writer: &mut T, producer: &CVMProducer) -> Result<(), ()> {
+    fn write_cvm<T: Write>(&mut self, writer: &mut T) -> Result<(), ()> {
         use code_producers::cvm_elements::cvm_code_generator::*;
 
         let mut code_aux = generate_prime(&producer);
@@ -607,12 +607,12 @@ impl WriteCVM for Circuit {
         writer.write_all(code.as_bytes()).map_err(|_| {})?;
 
         for f in &self.functions {
-            f.write_cvm(writer, producer)?;
+            f.write_cvm(writer, self.producer)?;
             //writer.flush().map_err(|_| {})?;
         }
 
         for t in &self.templates {
-            t.write_cvm(writer, producer)?;
+            t.write_cvm(writer, self.producer)?;
             //writer.flush().map_err(|_| {})?;
         }
 
@@ -673,11 +673,11 @@ impl Circuit {
         self.write_wasm(writer, &self.wasm_producer)
     }
 
-    pub fn produce_cvm<W: Write>(&self, cvm_folder: &str, _cvm_name: &str, writer: &mut W) -> Result<(), ()> {
+    pub fn produce_cvm<W: Write>(&mut self, cvm_folder: &str, _cvm_name: &str, writer: &mut W) -> Result<(), ()> {
         use std::path::Path;
         let cvm_folder_path = Path::new(cvm_folder).to_path_buf();
             //cvm_code_generator::generate_generate_witness_js_file(&cvm_folder_path).map_err(|_err| {})?;
             //cvm_code_generator::generate_witness_calculator_js_file(&cvm_folder_path).map_err(|_err| {})?;
-            self.write_cvm(writer, &self.cvm_producer)
-        }
+        self.write_cvm(writer)
+    }
 }

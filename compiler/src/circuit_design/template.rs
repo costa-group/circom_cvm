@@ -153,7 +153,7 @@ impl WriteWasm for TemplateCodeInfo {
 }
 
 impl WriteCVM for TemplateCodeInfo {
-    fn produce_cvm(&self, producer: &CVMProducer) -> Vec<String> {
+    fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<String>, String) {
         use code_producers::cvm_elements::cvm_code_generator::*;
         // create function code
         let mut instructions = vec![];
@@ -172,11 +172,11 @@ impl WriteCVM for TemplateCodeInfo {
         ));
 
         for t in &self.body {
-            let mut instructions_body = t.produce_cvm(producer);
+            let (mut instructions_body,_) = t.produce_cvm(producer);
             instructions.append(&mut instructions_body);
         }
         
-        instructions
+        (instructions, "".to_string())
     }
 }
 

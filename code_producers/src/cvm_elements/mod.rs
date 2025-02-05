@@ -199,7 +199,7 @@ impl CVMProducer {
     pub fn get_prime(&self) -> &str {
         &self.prime
     }
-    pub fn get_var(&mut self) -> String {
+    pub fn fresh_var(&mut self) -> String {
         let s = format!("x_{}",self.var_no);
         self.var_no += 1;
         s

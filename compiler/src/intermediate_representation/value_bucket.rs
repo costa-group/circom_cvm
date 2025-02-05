@@ -94,7 +94,7 @@ impl WriteC for ValueBucket {
 
 
 impl WriteCVM for ValueBucket{
-    fn produce_cvm(&self, producer: &CVMProducer) -> Vec<String> {
-        Vec::new()
+    fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<String>, String) {
+        (Vec::new(),"".to_string())
     }
 }

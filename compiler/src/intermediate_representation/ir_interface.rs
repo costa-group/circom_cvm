@@ -135,7 +135,7 @@ impl WriteWasm for Instruction {
 }
 
 impl WriteCVM for Instruction {
-    fn produce_cvm(&self, producer: &CVMProducer) -> Vec<String> {
+    fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<String>,String) {
         use Instruction::*;
         match self {
             Value(v) => v.produce_cvm(producer),

@@ -105,6 +105,9 @@ pub fn storeff(offset: Option<&str>) -> CVMInstruction {
     }
 }
 
+pub fn get_signal(inx: &str) -> CVMInstruction {
+    format!("get_signal {}", inx)
+}
 /*
 //The 𝗆𝖾𝗆𝗈𝗋𝗒.𝗌𝗂𝗓𝖾 instruction returns the current size of a memory.
 pub fn memory_size() -> CVMInstruction {
