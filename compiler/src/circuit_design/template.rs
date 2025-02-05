@@ -3,6 +3,7 @@ use crate::translating_traits::*;
 use code_producers::c_elements::*;
 use code_producers::wasm_elements::*;
 use code_producers::cvm_elements::*;
+use crate::hir::very_concrete_program::Wire;
 
 
 type TemplateID = usize;
@@ -19,6 +20,8 @@ pub struct TemplateCodeInfo {
     pub has_parallel_sub_cmp: bool,
     pub number_of_inputs: usize,
     pub number_of_outputs: usize, 
+    pub inputs: Vec<Wire>,
+    pub outputs: Vec<Wire>,
     pub number_of_intermediates: usize, // Not used now
     pub body: InstructionList,
     pub var_stack_depth: usize,
@@ -158,8 +161,32 @@ impl WriteCVM for TemplateCodeInfo {
         // create function code
         let mut instructions = vec![];
 
-        let outputs = self.number_of_outputs;// TODO: number outputs for now, change to list of types?
-        let inputs = self.number_of_inputs;
+        let mut outputs = "".to_string();
+        for s in &self.outputs{
+            let out_info = match s{
+                Wire::TSignal(signal) =>{
+                    declare_variable(None, &signal.lengths)
+                },
+                Wire::TBus(bus) =>{
+                    declare_variable(Some(bus.bus_id), &bus.lengths)
+
+                }
+            };
+            outputs = format!("{} {}", outputs, out_info);
+        } 
+        let mut inputs = "".to_string();
+        for s in &self.inputs{
+            let in_info = match s{
+                Wire::TSignal(signal) =>{
+                    declare_variable(None, &signal.lengths)
+                },
+                Wire::TBus(bus) =>{
+                    declare_variable(Some(bus.bus_id), &bus.lengths)
+
+                }
+            };
+            inputs = format!("{} {}", inputs, in_info);
+        }        
         let signals = self.number_of_intermediates + self.number_of_outputs + self.number_of_inputs;
         let subcomponents = self.number_of_components; // TODO: number of components for now, change to list?
         

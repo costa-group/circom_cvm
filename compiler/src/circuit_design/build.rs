@@ -7,6 +7,7 @@ use crate::intermediate_representation::translate::{CodeInfo, FieldTracker, Temp
 use code_producers::c_elements::*;
 use code_producers::wasm_elements::*;
 use code_producers::cvm_elements::*;
+use program_structure::ast::SignalType;
 
 use program_structure::file_definition::FileLibrary;
 use std::collections::{BTreeMap, HashMap};
@@ -82,6 +83,26 @@ fn build_template_instances(
                 },
             }
         }
+
+        let mut outputs_info = Vec::new();
+        let mut inputs_info = Vec::new();
+        let mut index = 0;
+        while index < template.wires.len(){
+            let wire = template.wires.get(index).unwrap();
+            match wire.xtype() {
+                SignalType::Input => {
+                    outputs_info.push(wire.clone());
+                }
+                SignalType::Output =>{
+                    inputs_info.push(wire.clone());
+                }
+                SignalType::Intermediate =>{
+                    break;
+                }
+            }
+            index += 1;
+        }
+        
         
         let code_info = CodeInfo {
             cmp_to_type,
@@ -114,7 +135,9 @@ fn build_template_instances(
             is_parallel_component: template.is_parallel_component,
             is_not_parallel_component: template.is_not_parallel_component,
             number_of_inputs: template.number_of_inputs,
+            inputs: inputs_info,
             number_of_outputs: template.number_of_outputs,
+            outputs: outputs_info,
             number_of_intermediates: template.number_of_intermediates,
             has_parallel_sub_cmp: template.has_parallel_sub_cmp,
             ..TemplateCodeInfo::default()
