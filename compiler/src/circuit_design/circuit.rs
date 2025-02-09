@@ -569,8 +569,8 @@ impl WriteC for Circuit {
 }
 
 impl WriteCVM for Circuit {
-    fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<String>, String) {
-        use code_producers::cvm_elements::cvm_code_generator::*;
+    fn produce_cvm(&self, _producer: &mut CVMProducer) -> (Vec<String>, String) {
+        //use code_producers::cvm_elements::cvm_code_generator::*;
         (Vec::new(),"".to_string())
     }
 
@@ -673,12 +673,12 @@ impl Circuit {
         self.write_wasm(writer, &self.wasm_producer)
     }
 
-    pub fn produce_cvm<W: Write>(&mut self, cvm_folder: &str, _cvm_name: &str, writer: &mut W) -> Result<(), ()> {
-        use std::path::Path;
+    pub fn produce_cvm<W: Write>(&mut self, _cvm_folder: &str, _cvm_name: &str, writer: &mut W) -> Result<(), ()> {
+        //use std::path::Path;
         use std::mem;
-        let cvm_folder_path = Path::new(cvm_folder).to_path_buf();
-            //cvm_code_generator::generate_generate_witness_js_file(&cvm_folder_path).map_err(|_err| {})?;
-            //cvm_code_generator::generate_witness_calculator_js_file(&cvm_folder_path).map_err(|_err| {})?;
+        //let cvm_folder_path = Path::new(cvm_folder).to_path_buf();
+        //cvm_code_generator::generate_generate_witness_js_file(&cvm_folder_path).map_err(|_err| {})?;
+        //cvm_code_generator::generate_witness_calculator_js_file(&cvm_folder_path).map_err(|_err| {})?;
         let mut extracted_producer = mem::replace(&mut self.cvm_producer, CVMProducer::default());
         self.write_cvm(writer, &mut extracted_producer)?;
         self.cvm_producer = extracted_producer;

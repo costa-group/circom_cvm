@@ -165,7 +165,7 @@ impl WriteC for LogBucket {
 
 
 impl WriteCVM for LogBucket{
-    fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<String>, String) {
-        (Vec::new(),"".to_string())
+    fn produce_cvm(&self, _producer: &mut CVMProducer) -> (Vec<String>, String) {
+        (vec![";; log bucket not implemented".to_string()],"".to_string())
     }
 }

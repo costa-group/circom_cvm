@@ -178,12 +178,13 @@ impl WriteCVM for FunctionCodeInfo {
         let outputs = declare_variable(None, &self.returns);
         
 
-        instructions.push(format!("%%function {} [{}] [{}]\n",
+        instructions.push(format!("%%function {} [{}] [{}]",
             self.header, 
             outputs,
             inputs,
         ));
-
+        let size = producer.get_local_info_size_u32() * 4 + self.max_number_of_vars;
+        instructions.push(format!("local.memory {}",size));
         for t in &self.body {
             let (mut instructions_body,_) = t.produce_cvm(producer);
             instructions.append(&mut instructions_body);

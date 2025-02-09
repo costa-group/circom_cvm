@@ -111,12 +111,13 @@ pub fn compile(config: CompilerConfig) -> Result<(), ()> {
                 Colour::Green.paint("Written successfully:"),
                 config.cvm_file,
             );
-            println!(
+/*            println!(
                 "{} {}/{}",
                 Colour::Green.paint("Written successfully:"),
                 &config.c_folder,
                 "main.cvm".to_string(),
             );
+*/
         }
     }
     

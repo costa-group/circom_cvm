@@ -850,7 +850,8 @@ impl WriteC for CallBucket {
 }
 
 impl WriteCVM for CallBucket{
-    fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<String>, String) {
-        (Vec::new(),"".to_string())
+    fn produce_cvm(&self, _producer: &mut CVMProducer) -> (Vec<String>, String) {
+        unreachable!();
+        //(Vec::new(),"".to_string())
     }
 }

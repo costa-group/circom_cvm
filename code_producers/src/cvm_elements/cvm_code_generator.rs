@@ -1,8 +1,8 @@
 use super::*;
 use num_bigint_dig::BigInt;
-use std::fs::File;
-use std::io::prelude::*;
-use std::path::PathBuf;
+//use std::fs::File;
+//use std::io::prelude::*;
+//use std::path::PathBuf;
 
 pub fn cvm_hexa(nbytes: usize, num: &BigInt) -> String {
     let inbytes = num.to_str_radix(16).to_string();
@@ -54,11 +54,21 @@ pub fn div64() -> CVMInstruction {
 pub fn rem64() -> CVMInstruction {
     "i64.rem".to_string()
 }
+pub fn idivff() -> CVMInstruction {
+    "ff.idiv".to_string()
+}
 pub fn divff() -> CVMInstruction {
     "ff.div".to_string()
 }
 pub fn remff() -> CVMInstruction {
     "ff.rem".to_string()
+}
+
+pub fn powff() -> CVMInstruction {
+    "ff.pow".to_string()
+}
+pub fn pow64() -> CVMInstruction {
+    "64.pow".to_string()
 }
 
 pub fn extend_i64_ff() -> CVMInstruction {
@@ -68,45 +78,44 @@ pub fn wrap_ff_i64() -> CVMInstruction {
     "ff.wrap_i64".to_string()
 }
 
-pub fn load64(offset: Option<&str>) -> CVMInstruction {
-    let code = "i64.load".to_string();
-    if let Option::Some(o) = offset {
-        format!("{} offset={}", code, o)
-    } else {
-        code
-    }
+pub fn load64() -> CVMInstruction {
+    "i64.load".to_string()
 }
 
-pub fn loadff(offset: Option<&str>) -> CVMInstruction {
-    let code = "ff.load".to_string();
-    if let Option::Some(o) = offset {
-        format!("{} offset={}", code, o)
-    } else {
-        code
-    }
+pub fn loadff() -> CVMInstruction {
+    "ff.load".to_string()
 }
 
-
-pub fn store64(offset: Option<&str>) -> CVMInstruction {
-    let code = "i64.store".to_string();
-    if let Option::Some(o) = offset {
-        format!("{} offset={}", code, o)
-    } else {
-        code
-    }
+pub fn store64() -> CVMInstruction {
+    "i64.store".to_string()
 }
 
-pub fn storeff(offset: Option<&str>) -> CVMInstruction {
-    let code = "ff.store".to_string();
-    if let Option::Some(o) = offset {
-        format!("{} offset={}", code, o)
-    } else {
-        code
-    }
+pub fn storeff() -> CVMInstruction {
+    "ff.store".to_string()
 }
 
 pub fn get_signal(inx: &str) -> CVMInstruction {
     format!("get_signal {}", inx)
+}
+
+pub fn get_cmp_signal(cinx: &str, sinx: &str) -> CVMInstruction {
+    format!("get_cmp_signal {} {}", cinx, sinx)
+}
+
+pub fn set_signal(inx: &str, value: &str) -> CVMInstruction {
+    format!("set_signal {} {}", inx, value)
+}
+pub fn set_cmp_input_no_dec_no_last(cinx: &str, sinx: &str, value: &str) -> CVMInstruction {
+    format!("set_cmp_input {} {} {}", cinx, sinx, value)
+}
+pub fn set_cmp_input_dec_no_last(cinx: &str, sinx: &str, value: &str) -> CVMInstruction {
+    format!("set_cmp_input_cnt {} {} {}", cinx, sinx, value)
+}
+pub fn set_cmp_input_and_run(cinx: &str, sinx: &str, value: &str) -> CVMInstruction {
+    format!("set_cmp_input_run {} {} {}", cinx, sinx, value)
+}
+pub fn set_cmp_input_dec_and_check_run(cinx: &str, sinx: &str, value: &str) -> CVMInstruction {
+    format!("set_cmp_input_cnt_check {} {} {}", cinx, sinx, value)
 }
 /*
 //The 𝗆𝖾𝗆𝗈𝗋𝗒.𝗌𝗂𝗓𝖾 instruction returns the current size of a memory.
@@ -148,23 +157,72 @@ pub fn orff() -> CVMInstruction {
     "ff.or".to_string()
 }
 
+pub fn band64() -> CVMInstruction {
+    "i64.band".to_string()
+}
+pub fn bor64() -> CVMInstruction {
+    "i64.bor".to_string()
+}
+pub fn bxor64() -> CVMInstruction {
+    "i64.bxor".to_string()
+}
+pub fn bnot64() -> CVMInstruction {
+    "i64.bnot".to_string()
+}
+pub fn bandff() -> CVMInstruction {
+    "ff.band".to_string()
+}
+pub fn borff() -> CVMInstruction {
+    "ff.bor".to_string()
+}
+pub fn bxorff() -> CVMInstruction {
+    "ff.bxor".to_string()
+}
+pub fn bnotff() -> CVMInstruction {
+    "ff.bnot".to_string()
+}
+
 pub fn gt64() -> CVMInstruction {
     "i64.gt".to_string()
+}
+pub fn gtff() -> CVMInstruction {
+    "ff.gt".to_string()
 }
 pub fn ge64() -> CVMInstruction {
     "i64.ge".to_string()
 }
+pub fn geff() -> CVMInstruction {
+    "ff.ge".to_string()
+}
 pub fn lt64() -> CVMInstruction {
     "i64.lt".to_string()
+}
+pub fn ltff() -> CVMInstruction {
+    "ff.lt".to_string()
 }
 pub fn le64() -> CVMInstruction {
     "i64.le".to_string()
 }
+pub fn leff() -> CVMInstruction {
+    "ff.le".to_string()
+}
 pub fn eq64() -> CVMInstruction {
     "i64.eq".to_string()
 }
+pub fn eqff() -> CVMInstruction {
+    "ff.eq".to_string()
+}
+pub fn neq64() -> CVMInstruction {
+    "i64.neq".to_string()
+}
+pub fn neqff() -> CVMInstruction {
+    "ff.neq".to_string()
+}
 pub fn eqz64() -> CVMInstruction {
     "i64.eqz".to_string()
+}
+pub fn eqzff() -> CVMInstruction {
+    "ff.eqz".to_string()
 }
 pub fn add_loop() -> CVMInstruction {
     "loop".to_string()
@@ -192,6 +250,10 @@ pub fn add_end() -> CVMInstruction {
 }
 pub fn add_return() -> CVMInstruction {
     "return".to_string()
+}
+
+pub fn exception(code: &str) -> CVMInstruction {
+    format!("error {}",code)
 }
 
 /*

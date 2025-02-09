@@ -125,6 +125,44 @@ impl WriteC for BranchBucket {
 
 impl WriteCVM for BranchBucket{
     fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<String>, String) {
-        (Vec::new(),"".to_string())
+        use code_producers::cvm_elements::cvm_code_generator::*;
+        let mut instructions = vec![];
+        if producer.needs_comments() {
+            instructions.push(";; branch bucket".to_string());
+	}
+        if self.if_branch.len() > 0 {
+            let (mut instructions_cond, vcond) = self.cond.produce_cvm(producer);
+            instructions.append(&mut instructions_cond);
+            instructions.push(format!("{} {}", add_if(), vcond));
+            for ins in &self.if_branch {
+                let (mut instructions_if, _) = ins.produce_cvm(producer);
+                instructions.append(&mut instructions_if);
+            }
+            if self.else_branch.len() > 0 {
+                instructions.push(add_else());
+                for ins in &self.else_branch {
+                    let (mut instructions_else, _) = ins.produce_cvm(producer);
+                    instructions.append(&mut instructions_else);
+                }
+            }
+	    instructions.push(add_end());
+        } else {
+            if self.else_branch.len() > 0 {
+                let (mut instructions_cond, vcond) = self.cond.produce_cvm(producer);
+                instructions.append(&mut instructions_cond);
+                let res = producer.fresh_var();
+                instructions.push(format!("{} = {} {}", res, eqzff(), vcond));
+                instructions.push(format!("{} {}", add_if(), res));
+                for ins in &self.else_branch {
+                    let (mut instructions_else, _) = ins.produce_cvm(producer);
+                    instructions.append(&mut instructions_else);
+                }
+		instructions.push(add_end());
+            }
+        }
+        if producer.needs_comments() {
+            instructions.push(";; end of branch bucket".to_string());
+	}
+        (instructions,"".to_string())
     }
 }

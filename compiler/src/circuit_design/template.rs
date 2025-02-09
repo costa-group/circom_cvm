@@ -190,7 +190,7 @@ impl WriteCVM for TemplateCodeInfo {
         let signals = self.number_of_intermediates + self.number_of_outputs + self.number_of_inputs;
         let subcomponents = self.number_of_components; // TODO: number of components for now, change to list?
         
-        instructions.push(format!("%%template {} [{}] [{}] [{}] [{}]\n",
+        instructions.push(format!("%%template {} [{}] [{}] [{}] [{}]",
             self.header, 
             outputs,
             inputs,
@@ -202,7 +202,7 @@ impl WriteCVM for TemplateCodeInfo {
             let (mut instructions_body,_) = t.produce_cvm(producer);
             instructions.append(&mut instructions_body);
         }
-        
+        instructions.push("".to_string());
         (instructions, "".to_string())
     }
 }

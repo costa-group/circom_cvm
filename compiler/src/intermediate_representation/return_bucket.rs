@@ -123,7 +123,8 @@ impl WriteC for ReturnBucket {
 
 
 impl WriteCVM for ReturnBucket{
-    fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<String>,String) {
-        (Vec::new(),"".to_string())
+    fn produce_cvm(&self, _producer: &mut CVMProducer) -> (Vec<String>,String) {
+        unreachable!();
+        //(Vec::new(),"".to_string())
     }
 }

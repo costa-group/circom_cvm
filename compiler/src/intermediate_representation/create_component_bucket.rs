@@ -331,7 +331,7 @@ impl WriteC for CreateCmpBucket {
 }
 
 impl WriteCVM for CreateCmpBucket{
-    fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<String>, String) {
+    fn produce_cvm(&self, _producer: &mut CVMProducer) -> (Vec<String>, String) {
         (Vec::new(),"".to_string())
     }
 }

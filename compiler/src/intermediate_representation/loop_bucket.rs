@@ -96,6 +96,25 @@ impl WriteC for LoopBucket {
 
 impl WriteCVM for LoopBucket{
     fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<String>, String) {
-        (Vec::new(),"".to_string())
+        use code_producers::cvm_elements::cvm_code_generator::*;
+        let mut instructions = vec![];
+        if producer.needs_comments() {
+            instructions.push(format!(";; loop bucket. Line {}", self.line)); //.to_string()
+	}
+        instructions.push(add_loop());
+        let (mut instructions_continue, vcond) = self.continue_condition.produce_cvm(producer);
+        instructions.append(&mut instructions_continue);
+        instructions.push(format!("{} {}", add_if(), vcond));
+        for ins in &self.body {
+            let (mut instructions_loop, _) = ins.produce_cvm(producer);
+            instructions.append(&mut instructions_loop);
+        }
+        instructions.push(add_continue());
+        instructions.push(add_end());
+        instructions.push(add_end());
+        if producer.needs_comments() {
+            instructions.push(";; end of loop bucket".to_string());
+	}
+        (instructions,"".to_string())
     }
 }

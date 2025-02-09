@@ -42,12 +42,6 @@ impl ToString for AssertBucket {
     }
 }
 
-impl WriteCVM for AssertBucket{
-    fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<String>, String) {
-        (Vec::new(),"".to_string())
-    }
-}
-
 impl WriteWasm for AssertBucket {
     fn produce_wasm(&self, producer: &WASMProducer) -> Vec<String> {
         use code_producers::wasm_elements::wasm_code_generator::*;
@@ -85,5 +79,26 @@ impl WriteC for AssertBucket {
         assert_c.push(if_condition);
         assert_c.push(assertion);
         (assert_c, "".to_string())
+    }
+}
+
+impl WriteCVM for AssertBucket{
+    fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<String>, String) {
+        use code_producers::cvm_elements::cvm_code_generator::*;
+        let mut instructions = vec![];
+        if producer.needs_comments() {
+            instructions.push(";; assert bucket".to_string());
+	}
+        let (mut instructions_eval, avar) = self.evaluate.produce_cvm(producer);
+        instructions.append(&mut instructions_eval);
+        let cvar = producer.fresh_var();
+        instructions.push(format!("{} = {} {}", cvar, eqzff(), avar));
+        instructions.push(format!("{} {}", add_if(), cvar));
+        instructions.push(exception(&"0".to_string()));
+        instructions.push(add_end());
+        if producer.needs_comments() {
+            instructions.push(";; end of assert bucket".to_string());
+	}
+        (instructions,"".to_string())
     }
 }

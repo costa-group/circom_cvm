@@ -470,6 +470,123 @@ impl WriteC for ComputeBucket {
 
 impl WriteCVM for ComputeBucket{
     fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<String>, String) {
-        (Vec::new(),"".to_string())
+        use code_producers::cvm_elements::cvm_code_generator::*;
+        let mut instructions = vec![];
+        if producer.needs_comments() {
+            instructions.push(";; compute bucket".to_string());
+	}
+        let mut vresults = vec![];
+        for e in &self.stack {
+            let (mut instructions_exp, res) = e.produce_cvm(producer);
+            instructions.append(&mut instructions_exp);
+            vresults.push(res);
+        }
+        if producer.needs_comments() {
+            instructions.push(format!(";; OP({})", self.op.to_string()));
+	}
+        let res = producer.fresh_var();
+        let params = vresults.join("_");
+        match &self.op {
+            OperatorType::AddAddress => {
+                instructions.push(format!("{} = {} {}", res, add64(), params));
+            }
+            OperatorType::MulAddress => {
+                instructions.push(format!("{} = {} {}", res, mul64(), params));
+            }
+            OperatorType::ToAddress => {
+                instructions.push(format!("{} = {} {}", res, wrap_ff_i64(), params));
+            }
+            OperatorType::Add => {
+                instructions.push(format!("{} = {} {}", res, addff(), params));
+            }
+            OperatorType::Div => {
+                instructions.push(format!("{} = {} {}", res, divff(), params));
+            }
+            OperatorType::Mul => {
+                instructions.push(format!("{} = {} {}", res, mulff(), params));
+            }
+            OperatorType::Sub => {
+                instructions.push(format!("{} = {} {}", res, subff(), params));
+            }
+            OperatorType::Pow => {
+                instructions.push(format!("{} = {} {}", res, powff(), params));
+            }
+            OperatorType::IntDiv => {
+                instructions.push(format!("{} = {} {}", res, idivff(), params));
+            }
+            OperatorType::Mod => {
+                instructions.push(format!("{} = {} {}", res, remff(), params));
+            }
+            OperatorType::ShiftL => {
+                instructions.push(format!("{} = {} {}", res, shlff(), params));
+            }
+            OperatorType::ShiftR => {
+                instructions.push(format!("{} = {} {}", res, shrff(), params));
+            }
+            OperatorType::LesserEq => {
+                instructions.push(format!("{} = {} {}", res, leff(), params));
+                instructions.push(call("$Fr_leq"));
+            }
+            OperatorType::GreaterEq => {
+                instructions.push(format!("{} = {} {}", res, geff(), params));
+                instructions.push(call("$Fr_geq"));
+            }
+            OperatorType::Lesser => {
+                instructions.push(format!("{} = {} {}", res, ltff(), params));
+                instructions.push(call("$Fr_lt"));
+            }
+            OperatorType::Greater => {
+                instructions.push(format!("{} = {} {}", res, gtff(), params));
+                instructions.push(call("$Fr_gt"));
+            }
+            OperatorType::Eq(n) => {
+                let mut is_multiple = false;
+                let (length,_values) = match n{
+                    SizeOption::Single(v) => (*v,vec![]),
+                    SizeOption::Multiple(v) => {
+                        is_multiple = true;
+                        (v.len(),v.clone())
+                    }
+                };
+		assert!(length != 0);
+		if !is_multiple && length == 1 {
+                    instructions.push(format!("{} = {} {}", res, eqff(), params));
+                } else {
+                    assert!(false);
+                }
+            }
+            OperatorType::NotEq => {
+                instructions.push(format!("{} = {} {}", res, neqff(), params));
+            }
+            OperatorType::BoolOr => {
+                instructions.push(format!("{} = {} {}", res, orff(), params));
+            }
+            OperatorType::BoolAnd => {
+                instructions.push(format!("{} = {} {}", res, andff(), params));
+            }
+            OperatorType::BitOr => {
+                instructions.push(format!("{} = {} {}", res, borff(), params));
+            }
+            OperatorType::BitAnd => {
+                instructions.push(format!("{} = {} {}", res, bandff(), params));
+            }
+            OperatorType::BitXor => {
+                instructions.push(format!("{} = {} {}", res, bxorff(), params));
+            }
+            OperatorType::PrefixSub => {
+                instructions.push(format!("{} = {} 0 {}", res, subff(), params));
+           }
+            OperatorType::BoolNot => {
+                instructions.push(format!("{} = {} {}", res, eqzff(), params));
+            }
+            OperatorType::Complement => {
+                instructions.push(format!("{} = {} {}", res, bnotff(), params));
+            }
+            //_ => (),
+        }
+        if producer.needs_comments() {
+            instructions.push(";; end of compute bucket".to_string());
+	}
+        (instructions,res)
     }
 }

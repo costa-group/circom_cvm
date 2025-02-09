@@ -68,7 +68,8 @@ impl WriteC for LoadConstantBucket {
 }
 
 impl WriteCVM for LoadConstantBucket{
-    fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<String>, String) {
-        (Vec::new(),"".to_string())
+    fn produce_cvm(&self, _producer: &mut CVMProducer) -> (Vec<String>, String) {
+        unreachable!();
+        //(Vec::new(),"".to_string())
     }
 }

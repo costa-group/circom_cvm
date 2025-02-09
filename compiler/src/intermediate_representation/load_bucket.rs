@@ -460,36 +460,37 @@ impl WriteCVM for LoadBucket{
         if producer.needs_comments() {
             instructions.push(";; load bucket".to_string());
 	}
+        let res = producer.fresh_var();
         match &self.src {
             LocationRule::Indexed { location, .. } => {
                 let (mut instructions_src, dir) = location.produce_cvm(producer);
                 instructions.append(&mut instructions_src);
-                let res = producer.fresh_var();
                 match &self.address_type {
                     AddressType::Variable => {
-                        instructions.push(format!("{} = {} {}", res, load64(None), dir));
+                        instructions.push(format!("{} = {} {}", res, load64(), dir));
                     }
                     AddressType::Signal => {
-                        instructions.push(get_signal(producer.get_signal_start_tag()).to_string());
+                        instructions.push(format!("{} = {}",res, &get_signal(&dir)));
                     }
                     AddressType::SubcmpSignal { cmp_address, .. } => {
 			if producer.needs_comments() {
 			    instructions.push(";; is subcomponent".to_string());
 			}
-                        let (mut  instructions_sci, _cvar) = cmp_address.produce_cvm(producer);
+                        let (mut  instructions_sci, cvar) = cmp_address.produce_cvm(producer);
                         instructions.append(&mut instructions_sci);
-                        // ????
+                        instructions.push(format!("{} = {}",res, &get_cmp_signal(&cvar,&dir)));
                     }
+                    
                 }
                 //instructions.push(add64());
 		if producer.needs_comments() {
                     instructions.push(";; end of load bucket".to_string());
 		}
             }
-            LocationRule::Mapped { signal_code, indexes} => {
+            LocationRule::Mapped { signal_code:_, indexes:_} => {
                 assert!(false);
             }
         }
-        (instructions,"".to_string())
+        (instructions,res)
     }
 }

@@ -817,6 +817,102 @@ impl WriteC for StoreBucket {
 
 impl WriteCVM for StoreBucket{
     fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<String>, String) {
-        (Vec::new(),"".to_string())
-    }
+        use code_producers::cvm_elements::cvm_code_generator::*;
+        let mut instructions = vec![];
+
+        // We check if we have to compute the possible sizes, case multiple size
+	let mut is_multiple_dest = false;
+        let (size_dest,_values_dest) = match &self.context.size{
+            SizeOption::Single(value) => (*value,vec![]),
+            SizeOption::Multiple(values) => {
+		is_multiple_dest = true;
+                (values.len(),values.clone())
+            }
+        };
+	let mut is_multiple_src = false;
+        let (size_src,_values_src) = match &self.src_context.size{
+            SizeOption::Single(value) => (*value,vec![]),
+            SizeOption::Multiple(values) => {
+		is_multiple_src = true;
+                (values.len(),values.clone())
+            }
+        };
+        if size_dest == 0 || size_src == 0 {
+            return (vec![],"".to_string());
+        }
+        if producer.needs_comments() {
+	    instructions.push(format!(";; store bucket. Line {}", self.line)); //.to_string()
+	}
+        let mut _sizeexp = "".to_string();
+        let mut sizeone = true;
+        if (is_multiple_dest || size_dest > 1) && (is_multiple_src || size_src > 1) {
+	    if !is_multiple_dest && !is_multiple_src {
+                let n = std::cmp::min(size_dest, size_src);
+                sizeone = n == 1;
+                if !sizeone {
+                    _sizeexp = n.to_string();
+                }    
+	    } else {
+	        assert!(false);
+            }
+        }
+        //let mut my_template_header = Option::<String>::None;
+        if sizeone {
+            if producer.needs_comments() {
+                instructions.push(";; getting src".to_string());
+	    }
+            let (mut instructions_src, vsrc) = self.src.produce_cvm(producer); // compute the source
+            instructions.append(&mut instructions_src);
+            if producer.needs_comments() {
+                instructions.push(";; getting dest".to_string());
+	    }
+            match &self.dest {
+                LocationRule::Indexed { location, .. } => {
+                    let (mut instructions_dest, vdest) = location.produce_cvm(producer);
+                    instructions.append(&mut instructions_dest);
+                    match &self.dest_address_type {
+                        AddressType::Variable => {
+                            instructions.push(format!("{} {} {}", storeff(), vdest, vsrc));
+                        }
+                        AddressType::Signal => {
+                            instructions.push(set_signal(&vdest, &vsrc));
+                        }
+                        AddressType::SubcmpSignal {cmp_address, input_information, .. } => {
+                            let (mut instructions_cmp, vcmp) = cmp_address.produce_cvm(producer);
+                            instructions.append(&mut instructions_cmp);
+                            if let InputInformation::Input{status, needs_decrement} = input_information {
+		                if let StatusInput::NoLast = status {
+			            // no need to run subcomponent
+                                    if *needs_decrement{
+                                        instructions.push(set_cmp_input_dec_no_last(&vcmp,&vdest, &vsrc));
+                                    } else {
+                                        instructions.push(set_cmp_input_no_dec_no_last(&vcmp,&vdest, &vsrc));
+                                    }
+                                } else if let StatusInput::Last = status {
+                                        instructions.push(set_cmp_input_and_run(&vcmp,&vdest, &vsrc));
+                                } else {
+                                        instructions.push(set_cmp_input_dec_and_check_run(&vcmp,&vdest, &vsrc));                                    
+                                }
+                            } else {
+                                assert!(false);
+                            }
+                        }
+                    }
+                }
+                LocationRule::Mapped { signal_code: _, .. } => {
+                    assert!(false);
+                }
+            }
+        } else {
+            if let Instruction::Load(_load) = &*self.src {
+                assert!(false);
+            } else {
+                assert!(false);
+            }
+        }
+        if producer.needs_comments() {
+            instructions.push(";; end of store bucket".to_string());
+	}
+        (instructions,"".to_string())
+    }        
 }
