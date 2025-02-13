@@ -129,13 +129,13 @@ pub fn memory_grow() -> CVMInstruction {
  */
 
 pub fn shr64() -> CVMInstruction {
-    "i64.shr_u".to_string()
+    "i64.shr".to_string()
 }
 pub fn shl64() -> CVMInstruction {
     "i64.shl".to_string()
 }
 pub fn shrff() -> CVMInstruction {
-    "ff.shr_u".to_string()
+    "ff.shr".to_string()
 }
 pub fn shlff() -> CVMInstruction {
     "ff.shl".to_string()
