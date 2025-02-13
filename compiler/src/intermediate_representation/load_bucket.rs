@@ -467,7 +467,7 @@ impl WriteCVM for LoadBucket{
                 instructions.append(&mut instructions_src);
                 match &self.address_type {
                     AddressType::Variable => {
-                        instructions.push(format!("{} = {} {}", res, load64(), dir));
+                        instructions.push(format!("{} = {} {}", res, loadff(), dir));
                     }
                     AddressType::Signal => {
                         instructions.push(format!("{} = {}",res, &get_signal(&dir)));

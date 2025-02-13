@@ -228,10 +228,10 @@ pub fn add_loop() -> CVMInstruction {
     "loop".to_string()
 }
 pub fn add_break() -> CVMInstruction {
-    "loop".to_string()
+    "break".to_string()
 }
 pub fn add_continue() -> CVMInstruction {
-    "loop".to_string()
+    "continue".to_string()
 }
 pub fn br_if(value: &str) -> CVMInstruction {
     format!("br_if {}", value)

@@ -485,7 +485,7 @@ impl WriteCVM for ComputeBucket{
             instructions.push(format!(";; OP({})", self.op.to_string()));
 	}
         let res = producer.fresh_var();
-        let params = vresults.join("_");
+        let params = vresults.join(" ");
         match &self.op {
             OperatorType::AddAddress => {
                 instructions.push(format!("{} = {} {}", res, add64(), params));
@@ -525,19 +525,15 @@ impl WriteCVM for ComputeBucket{
             }
             OperatorType::LesserEq => {
                 instructions.push(format!("{} = {} {}", res, leff(), params));
-                instructions.push(call("$Fr_leq"));
             }
             OperatorType::GreaterEq => {
                 instructions.push(format!("{} = {} {}", res, geff(), params));
-                instructions.push(call("$Fr_geq"));
             }
             OperatorType::Lesser => {
                 instructions.push(format!("{} = {} {}", res, ltff(), params));
-                instructions.push(call("$Fr_lt"));
             }
             OperatorType::Greater => {
                 instructions.push(format!("{} = {} {}", res, gtff(), params));
-                instructions.push(call("$Fr_gt"));
             }
             OperatorType::Eq(n) => {
                 let mut is_multiple = false;
