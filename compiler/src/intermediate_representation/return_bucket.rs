@@ -123,8 +123,25 @@ impl WriteC for ReturnBucket {
 
 
 impl WriteCVM for ReturnBucket{
-    fn produce_cvm(&self, _producer: &mut CVMProducer) -> (Vec<String>,String) {
-        unreachable!();
-        //(Vec::new(),"".to_string())
+    fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<String>,String) {
+        use cvm_code_generator::*;
+        let mut instructions = vec![];
+        instructions.push("// return bucket".to_string());
+        let (mut instructions_src, src) = self.value.produce_cvm(producer); // compute the source
+        instructions.append(&mut instructions_src);
+        if self.with_size == 1 {
+            instructions.push(format!("{} {} {}", add_return(), src, "1".to_string() ));
+        } else {
+            let vcond = producer.fresh_var();
+            instructions.push(format!("{} = {} {} {}", vcond, "i64.le".to_string(), self.with_size, FUNCTION_DESTINATION_SIZE));
+            let final_size = producer.fresh_var();
+            instructions.push(format!("{} {}", add_if(), vcond));
+            instructions.push(format!("{} = {}",final_size, self.with_size));
+            instructions.push(add_else());
+            instructions.push(format!("{} = {}", final_size, FUNCTION_DESTINATION_SIZE));
+            instructions.push(add_end());
+            instructions.push(format!("{} {} {}", add_return(), src, final_size));
+        }
+        (instructions,"".to_string())
     }
 }

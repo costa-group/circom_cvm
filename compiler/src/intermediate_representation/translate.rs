@@ -194,14 +194,13 @@ impl State {
 }
 
 struct Context<'a> {
-    translating: String,
+    _translating: String,
     files: &'a FileLibrary,
     tmp_database: &'a TemplateDB,
     _functions: &'a HashMap<String, Vec<Length>>,
     cmp_to_type: HashMap<String, ClusterType>,
     buses: &'a Vec<BusInstance>,
-    constraint_assert_disabled_flag: bool,
-    constant_variables: BTreeMap<String, (Vec<usize>, Vec<BigInt>)>
+    constraint_assert_dissabled_flag: bool,
 }
 
 fn initialize_parameters(state: &mut State, params: Vec<Param>) {
@@ -296,19 +295,6 @@ fn initialize_constants(state: &mut State, constants: Vec<Argument>) {
             index += 1;
         }
     }
-}
-
-fn initialize_constant_variables(state: &mut State, constants: &BTreeMap<String, (Vec<usize>, Vec<BigInt>)>)->Vec<(String, Vec<usize>)> {
-    let mut result = Vec::new();
-    for (name, (_, values)) in constants {
-        let mut cid_values = Vec::new();
-        for value in values {
-            let cid = bigint_to_cid(&mut state.field_tracker, &value);
-            cid_values.push(cid);
-        }
-        result.push((name.clone(), cid_values));
-    }
-    result
 }
 
 fn initialize_signals(state: &mut State, wires: Vec<Wire>) {
@@ -691,8 +677,8 @@ fn translate_constraint_equality(stmt: Statement, state: &mut State, context: &C
     use Statement::ConstraintEquality;
     use Expression::Variable;
     if let ConstraintEquality { meta, lhe, rhe } = stmt {
-        // if constraint_assert_disabled is active then do not translate
-        if !context.constraint_assert_disabled_flag{
+        // if constraint_assert_dissabled is active then do not translate
+        if !context.constraint_assert_dissabled_flag{
             let starts_at = context.files.get_line(meta.start, meta.get_file_id()).unwrap();
 
             let length = if let Variable { meta, name, access} = rhe.clone() {
@@ -938,18 +924,6 @@ fn translate_variable(
         let tag_access = check_tag_access(&name, &access, state);
         if tag_access.is_some(){
             translate_number( Expression::Number(meta.clone(), tag_access.unwrap()), state, context)
-        } else if context.constant_variables.contains_key(&name){
-            let (dim, values) = context.constant_variables.get(&name).unwrap();
-            let var_name = format!("{}_{}", context.translating, name);
-            translate_constant_variable(
-                meta,
-                var_name, 
-                dim.clone(), 
-                values.len(),
-                access,
-                state,
-                context
-            )
         } else {
             let def = SymbolDef { meta, symbol: name, acc: access };
             ProcessedSymbol::new(def, state, context).into_load(state, context)
@@ -957,80 +931,6 @@ fn translate_variable(
     } else {
         unreachable!()
     }
-}
-
-fn translate_constant_variable(
-    meta: Meta,
-    name: String,
-    mut dims: Vec<usize>,
-    mut linear_length: usize,
-    access: Vec<Access>,
-    state: &mut State,
-    context: &Context
-) -> InstructionPointer {
-    // add the initial indexing
-    let mut stack = vec![];
-    dims.reverse();
-
-    let line = context.files.get_line(meta.start, meta.get_file_id()).unwrap();
-    let message_id =  state.message_id;
-
-    let index = if !access.is_empty(){
-        let mut access_to_instr = Vec::new();
-        for acc in access {
-            match acc{
-                Access::ArrayAccess(expr) =>{
-                    access_to_instr.push(translate_expression(
-                        expr,
-                        state,
-                        context
-                    ));
-                }
-                _ => unreachable!()
-            }
-        }
-
-
-        let index_stack = indexing_instructions_filter(access_to_instr, state);
-        for instruction in index_stack {
-            let dimension_length = dims.pop().unwrap();
-            linear_length /= dimension_length;
-            let inst = ValueBucket {
-                line,
-                message_id,
-                parse_as: ValueType::U32,
-                op_aux_no: 0,
-                value: linear_length,
-            }
-            .allocate();
-            let jump = ComputeBucket {
-                line,
-                message_id,
-                op_aux_no: 0,
-                op: OperatorType::MulAddress,
-                stack: vec![inst, instruction],
-            }
-            .allocate();
-            stack.push(jump);
-        }
-        fold(OperatorType::AddAddress, stack, state)
-    } else{
-        ValueBucket {
-            line,
-            message_id,
-            parse_as: ValueType::U32,
-            op_aux_no: 0,
-            value: 0,
-        }.allocate()
-    };
-
-    
-    LoadConstantBucket{
-        line,
-        message_id,
-        variable_name: name,
-        location: index
-    }.allocate()
 }
 
 fn translate_number(
@@ -2006,8 +1906,7 @@ pub struct CodeInfo<'a> {
     pub string_table: HashMap<String, usize>,
     pub signals_to_tags: HashMap<Vec<String>, BigInt>,
     pub buses: &'a Vec<BusInstance>,
-    pub constraint_assert_disabled_flag: bool,
-    pub constant_variables: BTreeMap<String, (Vec<usize>, Vec<BigInt>)>
+    pub constraint_assert_dissabled_flag: bool
 }
 
 pub struct CodeOutput {
@@ -2018,8 +1917,6 @@ pub struct CodeOutput {
     pub code: InstructionList,
     pub constant_tracker: FieldTracker,
     pub string_table: HashMap<String, usize>,
-    pub constant_variables: Vec<(String, Vec<usize>)>
-
 }
 
 pub fn translate_code(body: Statement, code_info: CodeInfo) -> CodeOutput {
@@ -2036,20 +1933,15 @@ pub fn translate_code(body: Statement, code_info: CodeInfo) -> CodeOutput {
     initialize_signals(&mut state, code_info.wires);
     initialize_constants(&mut state, code_info.constants);
     initialize_parameters(&mut state, code_info.params);
-    let constant_variables = initialize_constant_variables(
-        &mut state, 
-        &code_info.constant_variables
-    );
 
     let context = Context {
         files: code_info.files,
-        translating: code_info.header,
+        _translating: code_info.header,
         _functions: code_info.functions,
         cmp_to_type: code_info.cmp_to_type,
         tmp_database: code_info.template_database,
         buses: code_info.buses,
-        constraint_assert_disabled_flag: code_info.constraint_assert_disabled_flag,
-        constant_variables: code_info.constant_variables
+        constraint_assert_dissabled_flag: code_info.constraint_assert_dissabled_flag,
     };
 
     create_components(&mut state, &code_info.triggers, code_info.clusters);
@@ -2068,8 +1960,7 @@ pub fn translate_code(body: Statement, code_info: CodeInfo) -> CodeOutput {
         stack_depth: state.max_stack_depth,
         signal_depth: state.signal_stack,
         constant_tracker: state.field_tracker,
-        string_table : state.string_table,
-        constant_variables
+        string_table : state.string_table
     }
 }
 

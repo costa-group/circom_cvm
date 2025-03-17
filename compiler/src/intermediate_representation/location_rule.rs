@@ -1,4 +1,5 @@
 use super::ir_interface::*;
+use code_producers::cvm_elements::*;
 
 #[derive(Clone)]
 pub struct IndexedInfo{
@@ -50,5 +51,11 @@ impl ToString for LocationRule {
                 format!("MAPPED: ({}, {:?})", code_msg, index_mgs)
             }
         }
+    }
+}
+
+impl  LocationRule {
+    pub fn produce_cvm(&self, address_type: & AddressType, context: & InstrContext, producer: &mut CVMProducer) -> (Vec<String>, String) {
+        (vec![], "".to_string())
     }
 }

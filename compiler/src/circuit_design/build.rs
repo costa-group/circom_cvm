@@ -28,7 +28,7 @@ fn build_template_instances(
     c_info: &CircuitInfo,
     ti: Vec<TemplateInstance>,
     mut field_tracker: FieldTracker,
-    constraint_assert_disabled_flag: bool
+    constraint_assert_dissabled_flag: bool
 ) -> (FieldTracker, HashMap<String,usize>) {
 
     fn compute_jump(lengths: &Vec<usize>, indexes: &[usize]) -> usize {
@@ -123,8 +123,7 @@ fn build_template_instances(
             template_database: &c_info.template_database,
             string_table : string_table,
             signals_to_tags: template.signals_to_tags,
-            constraint_assert_disabled_flag,
-            constant_variables: template.constant_variables
+            constraint_assert_dissabled_flag
         };
         let mut template_info = TemplateCodeInfo {
             name,
@@ -149,8 +148,6 @@ fn build_template_instances(
         template_info.expression_stack_depth = out.expression_depth;
         template_info.var_stack_depth = out.stack_depth;
         template_info.signal_stack_depth = out.signal_depth;
-        template_info.constant_variables = out.constant_variables;
-
         string_table = out.string_table;
         cmp_id = out.next_cmp_id;
         circuit.add_template_code(template_info);
@@ -165,7 +162,7 @@ fn build_function_instances(
     instances: Vec<VCF>,
     mut field_tracker: FieldTracker,
     mut string_table : HashMap<String,usize>,
-    constraint_assert_disabled_flag: bool,
+    constraint_assert_dissabled_flag: bool,
 ) -> (FieldTracker, HashMap<String, usize>, HashMap<String, usize>) {
     let mut function_to_arena_size = HashMap::new();
     for instance in instances {
@@ -195,8 +192,7 @@ fn build_function_instances(
             string_table : string_table,
             signals_to_tags: HashMap::new(),
             buses: &c_info.buses,
-            constraint_assert_disabled_flag,
-            constant_variables: instance.constant_variables
+            constraint_assert_dissabled_flag
         };
         let mut function_info = FunctionCodeInfo {
             name,
@@ -212,8 +208,6 @@ fn build_function_instances(
         function_info.body = out.code;
         function_info.max_number_of_ops_in_expression = out.expression_depth;
         function_info.max_number_of_vars = out.stack_depth;
-        function_info.constant_variables = out.constant_variables;
-
         function_to_arena_size.insert(header, function_info.max_number_of_vars);
         circuit.add_function_code(function_info);
     }

@@ -904,8 +904,8 @@ impl WriteCVM for StoreBucket{
                 }
             }
         } else {
-            if let Instruction::Load(_load) = &*self.src {
-                assert!(false);
+            if let Instruction::Load(load) = &*self.src {
+                let (mut _instructions_src, _vsrc) = load.src.produce_cvm(&load.address_type, &load.context,producer);    
             } else {
                 assert!(false);
             }

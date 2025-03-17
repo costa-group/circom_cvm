@@ -171,6 +171,8 @@ impl WriteCVM for FunctionCodeInfo {
 
 
         let mut inputs = "".to_string();
+        //let mut inputs = format!("{} {}", "i64".to_string(), FUNCTION_DESTINATION_SIZE); 
+
         for param in &self.params{
             inputs = format!("{} {}", inputs, declare_variable(None, &param.length));
         }

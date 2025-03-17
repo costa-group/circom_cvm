@@ -256,6 +256,9 @@ pub fn exception(code: &str) -> CVMInstruction {
     format!("error {}",code)
 }
 
+pub const FUNCTION_DESTINATION: &str = "destination"; 
+pub const FUNCTION_DESTINATION_SIZE: &str = "destination_size"; 
+
 /*
 pub fn create_if_selection(
     values: &Vec<(usize, usize)>,

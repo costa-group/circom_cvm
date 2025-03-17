@@ -13,7 +13,6 @@ pub use super::loop_bucket::LoopBucket;
 pub use super::return_bucket::ReturnBucket;
 pub use super::store_bucket::StoreBucket;
 pub use super::log_bucket::LogBucketArg;
-pub use super::load_constant_bucket::LoadConstantBucket;
 pub use super::types::{InstrContext, ValueType, SizeOption};
 pub use super::value_bucket::ValueBucket;
 
@@ -46,7 +45,6 @@ pub type InstructionPointer = Box<Instruction>;
 pub enum Instruction {
     Value(ValueBucket),
     Load(LoadBucket),
-    LoadConstant(LoadConstantBucket),
     Store(StoreBucket),
     Compute(ComputeBucket),
     Call(CallBucket),
@@ -79,7 +77,6 @@ impl ObtainMeta for Instruction {
             Assert(v) => v.get_line(),
             CreateCmp(v) => v.get_line(),
             Log(v) => v.get_line(),
-            LoadConstant(v) => v.get_line(),
         }
     }
 
@@ -88,7 +85,6 @@ impl ObtainMeta for Instruction {
         match self {
             Value(v) => v.get_message_id(),
             Load(v) => v.get_message_id(),
-            LoadConstant(v) => v.get_message_id(),
             Store(v) => v.get_message_id(),
             Compute(v) => v.get_message_id(),
             Call(v) => v.get_message_id(),
@@ -120,7 +116,6 @@ impl WriteWasm for Instruction {
         match self {
             Value(v) => v.produce_wasm(producer),
             Load(v) => v.produce_wasm(producer),
-            LoadConstant(v) => v.produce_wasm(producer),
             Store(v) => v.produce_wasm(producer),
             Compute(v) => v.produce_wasm(producer),
             Call(v) => v.produce_wasm(producer),
@@ -140,7 +135,6 @@ impl WriteCVM for Instruction {
         match self {
             Value(v) => v.produce_cvm(producer),
             Load(v) => v.produce_cvm(producer),
-            LoadConstant(v) => v.produce_cvm(producer),
             Store(v) => v.produce_cvm(producer),
             Compute(v) => v.produce_cvm(producer),
             Call(v) => v.produce_cvm(producer),
@@ -161,7 +155,6 @@ impl WriteC for Instruction {
         match self {
             Value(v) => v.produce_c(producer, parallel),
             Load(v) => v.produce_c(producer, parallel),
-            LoadConstant(v) => v.produce_c(producer, parallel),
             Store(v) => v.produce_c(producer, parallel),
             Compute(v) => v.produce_c(producer, parallel),
             Call(v) => v.produce_c(producer, parallel),
@@ -181,7 +174,6 @@ impl ToString for Instruction {
         match self {
             Value(v) => v.to_string(),
             Load(v) => v.to_string(),
-            LoadConstant(v) => v.to_string(),
             Store(v) => v.to_string(),
             Compute(v) => v.to_string(),
             Call(v) => v.to_string(),
