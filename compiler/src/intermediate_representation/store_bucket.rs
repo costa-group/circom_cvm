@@ -818,6 +818,7 @@ impl WriteC for StoreBucket {
 impl WriteCVM for StoreBucket{
     fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<String>, String) {
         use code_producers::cvm_elements::cvm_code_generator::*;
+        use super::location_rule::*;
         let mut instructions = vec![];
 
         // We check if we have to compute the possible sizes, case multiple size
@@ -866,41 +867,37 @@ impl WriteCVM for StoreBucket{
             if producer.needs_comments() {
                 instructions.push(";; getting dest".to_string());
 	    }
-            match &self.dest {
-                LocationRule::Indexed { location, .. } => {
-                    let (mut instructions_dest, vdest) = location.produce_cvm(producer);
-                    instructions.append(&mut instructions_dest);
-                    match &self.dest_address_type {
-                        AddressType::Variable => {
-                            instructions.push(format!("{} {} {}", storeff(), vdest, vsrc));
-                        }
-                        AddressType::Signal => {
-                            instructions.push(set_signal(&vdest, &vsrc));
-                        }
-                        AddressType::SubcmpSignal {cmp_address, input_information, .. } => {
-                            let (mut instructions_cmp, vcmp) = cmp_address.produce_cvm(producer);
-                            instructions.append(&mut instructions_cmp);
-                            if let InputInformation::Input{status, needs_decrement} = input_information {
-		                if let StatusInput::NoLast = status {
-			            // no need to run subcomponent
-                                    if *needs_decrement{
-                                        instructions.push(set_cmp_input_dec_no_last(&vcmp,&vdest, &vsrc));
-                                    } else {
-                                        instructions.push(set_cmp_input_no_dec_no_last(&vcmp,&vdest, &vsrc));
-                                    }
-                                } else if let StatusInput::Last = status {
-                                        instructions.push(set_cmp_input_and_run(&vcmp,&vdest, &vsrc));
-                                } else {
-                                        instructions.push(set_cmp_input_dec_and_check_run(&vcmp,&vdest, &vsrc));                                    
-                                }
-                            } else {
-                                assert!(false);
-                            }
-                        }
-                    }
+            let (mut instructions_dest, ldest) = self.dest.produce_cvm(&self.dest_address_type,&self.context, producer);
+            instructions.append(&mut instructions_dest);
+            match ldest {
+                ComputedAddress::Variable(rvar) => {
+                    instructions.push(format!("{} {} {}", storeff(), rvar, vsrc));
                 }
-                LocationRule::Mapped { signal_code: _, .. } => {
-                    assert!(false);
+                ComputedAddress::Signal(rvar) => {
+                    instructions.push(set_signal(&rvar,&vsrc));
+                }
+                ComputedAddress::SubcmpSignal(rcmp,rsig) => {
+                    
+                    if let AddressType::SubcmpSignal {input_information, .. } = &self.dest_address_type {
+                        if let InputInformation::Input{status, needs_decrement} = input_information {
+		            if let StatusInput::NoLast = status {
+			        // no need to run subcomponent
+                                if *needs_decrement{
+                                    instructions.push(set_cmp_input_dec_no_last(&rcmp,&rsig, &vsrc));
+                                } else {
+                                    instructions.push(set_cmp_input_no_dec_no_last(&rcmp,&rsig, &vsrc));
+                                }
+                            } else if let StatusInput::Last = status {
+                                instructions.push(set_cmp_input_and_run(&rcmp,&rsig, &vsrc));
+                            } else {
+                                instructions.push(set_cmp_input_dec_and_check_run(&rcmp,&rsig, &vsrc));    
+                            }
+                        } else {
+                        assert!(false);
+                        }
+                    } else {
+                        assert!(false);
+                    }
                 }
             }
         } else {

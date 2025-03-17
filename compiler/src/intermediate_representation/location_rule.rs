@@ -1,5 +1,6 @@
 use super::ir_interface::*;
 use code_producers::cvm_elements::*;
+use crate::translating_traits::*;
 
 #[derive(Clone)]
 pub struct IndexedInfo{
@@ -12,6 +13,13 @@ pub enum AccessType{
     Indexed(IndexedInfo), // Case accessing an array
     Qualified(usize), // Case accessing a field -> id field
 }
+
+pub enum ComputedAddress{
+    Variable(String),
+    Signal(String),
+    SubcmpSignal(String,String)
+}
+
 
 impl ToString for AccessType {
     fn to_string(&self) -> String {
@@ -55,7 +63,29 @@ impl ToString for LocationRule {
 }
 
 impl  LocationRule {
-    pub fn produce_cvm(&self, address_type: & AddressType, context: & InstrContext, producer: &mut CVMProducer) -> (Vec<String>, String) {
-        (vec![], "".to_string())
+    pub fn produce_cvm(&self, address_type: & AddressType, _context: & InstrContext, producer: &mut CVMProducer) -> (Vec<String>, ComputedAddress) {
+        use LocationRule::*;
+        match &self {
+                Indexed { location, .. } => {
+                    let (mut instructions, vloc) = location.produce_cvm(producer);
+                    match &address_type {
+                        AddressType::Variable => {
+                            (instructions, ComputedAddress::Variable(vloc));
+                        }
+                        AddressType::Signal => {
+                            (instructions, ComputedAddress::Signal(vloc));
+                        }
+                        AddressType::SubcmpSignal {cmp_address, .. } => {
+                            let (mut instructions_cmp, vcmp) = cmp_address.produce_cvm(producer);
+                            instructions.append(&mut instructions_cmp);
+                            (instructions, ComputedAddress::SubcmpSignal(vcmp,vloc));
+                        }
+                    }
+                }
+                Mapped { signal_code: _, .. } => {
+                    assert!(false);
+                }
+            }
+        (vec![], ComputedAddress::Variable("".to_string()))
     }
 }
