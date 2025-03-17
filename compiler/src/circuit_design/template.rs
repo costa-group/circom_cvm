@@ -359,35 +359,6 @@ impl TemplateCodeInfo {
         run_body.push(format!("{};", declare_index_multiple_eq()));
         run_body.push(format!("int cmp_index_ref_load = -1;"));
 
-        for (var, values) in &self.constant_variables{
-            let name_constant = format!("{}_{}", self.header, var);
-            let mut pointers_to_values = Vec::new();
-            if producer.prime_str != "goldilocks" {
-                for v in values{
-                    pointers_to_values.push(format!("&{}", circuit_constants(v.to_string())));
-                }
-                run_body.push(
-                    format!("static FrElement* {}[{}] = {{ {} }};",
-                            name_constant,
-                            values.len(),
-                            argument_list(pointers_to_values)
-                    )
-                );
-            } else {
-                for v in values{
-                    pointers_to_values.push(format!("{}ull", producer.get_field_constant_list()[*v]));
-                }
-                run_body.push(
-                    format!("static u64 {}[{}] = {{ {} }};",
-                            name_constant,
-                            values.len(),
-                            argument_list(pointers_to_values)
-                    )
-                );                
-            }
-        }
-
-        
         for t in &self.body {
             let (mut instructions_body, _) = t.produce_c(producer, Some(parallel));
             run_body.append(&mut instructions_body);

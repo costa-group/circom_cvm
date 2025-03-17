@@ -46,15 +46,6 @@ Circom_Circuit* loadCircuit(std::string const &datFileName) {
     uint inisize = dsize;    
     dsize = get_size_of_witness()*sizeof(u64);
     memcpy((void *)(circuit->witness2SignalList), (void *)(bdata+inisize), dsize);
-
-    /* in 64 bit constants are not in a map
-    circuit->circuitConstants = new u64[get_size_of_constants()];
-    if (get_size_of_constants()>0) {
-      inisize += dsize;
-      dsize = get_size_of_constants()*sizeof(u64);
-      memcpy((void *)(circuit->circuitConstants), (void *)(bdata+inisize), dsize);
-    }
-    */
     
     std::map<u32,IOFieldDefPair> templateInsId2IOSignalInfo1;
     IOFieldDefPair* busInsId2FieldInfo1;
@@ -143,6 +134,17 @@ bool check_valid_number(std::string & s, uint base){
   return is_valid;
 }
 
+u64 str2u64(const char *s, uint base) {
+  static mpz_t q;
+  mpz_init_set_ui(q,{{prime}});
+  mpz_t mr;
+  mpz_init_set_str(mr, s, base);
+  mpz_fdiv_r(mr, mr, q);
+  u64 v = mpz_get_ui(mr);
+  mpz_clear(mr);
+  return v;
+}
+
 void json2FrElements (json val, std::vector<u64> & vval){
   if (!val.is_array()) {
     u64 v;
@@ -180,7 +182,8 @@ void json2FrElements (json val, std::vector<u64> & vval){
         errStrStream << "Invalid JSON type\n";
 	      throw std::runtime_error(errStrStream.str() );
     }
-    vval.push_back(strtoull(s.c_str(), NULL, base));
+    vval.push_back(str2u64(s.c_str(), base));
+    // vval.push_back(strtoull(s.c_str(), NULL, base)); // use this instead if you are sure the input is in 64 bits
   } else {
     for (uint i = 0; i < val.size(); i++) {
       json2FrElements (val[i], vval);
@@ -237,6 +240,26 @@ void qualify_input(std::string prefix, json &in, json &in1) {
   } else {
     in1[prefix] = in;
   }
+}
+
+void loadBinary(Circom_CalcWit *ctx, std::string filename) {
+    int fd;
+    struct stat sb;
+
+    fd = open(filename.c_str(), O_RDONLY);
+    if (fd == -1) {
+        std::cout << ".dat file not found: " << filename << "\n";
+        throw std::system_error(errno, std::generic_category(), "open");
+    }
+    
+    if (fstat(fd, &sb) == -1) {          /* To obtain file size */
+        throw std::system_error(errno, std::generic_category(), "fstat");
+    }
+    assert(sb.st_size / sizeof(u64) == get_main_input_signal_no());
+    u8* bdata = (u8*)mmap(NULL, sb.st_size, PROT_READ , MAP_PRIVATE, fd, 0);
+    close(fd);
+    uint dsize = get_main_input_signal_no()*sizeof(u64);
+    memcpy((void *)(ctx->signalValues+get_main_input_signal_start()), (void *)bdata, dsize);
 }
 
 void loadJson(Circom_CalcWit *ctx, std::string filename) {
@@ -324,11 +347,12 @@ void writeBinWitness(Circom_CalcWit *ctx, std::string wtnsFileName) {
     u64 idSection2length = (u64)n8*(u64)Nwtns;
     fwrite(&idSection2length, 8, 1, write_ptr);
 
-    u64 v;
+    u64 *v = new u64[Nwtns];
     for (int i=0;i<Nwtns;i++) {
-        ctx->getWitness(i, v);
-        fwrite(&v, 8, 1, write_ptr);
+        ctx->getWitness(i, v[i]);
     }
+    fwrite(v, 8, Nwtns, write_ptr);
+
     fclose(write_ptr);
 }
 
@@ -338,7 +362,7 @@ int main (int argc, char *argv[]) {
         std::cout << "Usage: " << cl << " <input.json> <output.wtns>\n";
   } else {
     std::string datfile = cl + ".dat";
-    std::string jsonfile(argv[1]);
+    std::string inputfile(argv[1]);
     std::string wtnsfile(argv[2]);
   
     // auto t_start = std::chrono::high_resolution_clock::now();
@@ -347,16 +371,21 @@ int main (int argc, char *argv[]) {
 
    Circom_CalcWit *ctx = new Circom_CalcWit(circuit);
   
-   loadJson(ctx, jsonfile);
-   if (ctx->getRemaingInputsToBeSet()!=0) {
-     std::cerr << "Not all inputs have been set. Only " << get_main_input_signal_no()-ctx->getRemaingInputsToBeSet() << " out of " << get_main_input_signal_no() << std::endl;
-     assert(false);
+    if (inputfile.substr(inputfile.find_last_of(".") + 1) == "json") { 
+      loadJson(ctx, inputfile);
+      if (ctx->getRemaingInputsToBeSet()!=0) {
+        std::cerr << "Not all inputs have been set. Only " << get_main_input_signal_no()-ctx->getRemaingInputsToBeSet() << " out of " << get_main_input_signal_no() << std::endl;
+        assert(false);
+      }
+    } else {
+      loadBinary(ctx, inputfile);
+      ctx->runCircuit();
    }
    /*
      for (uint i = 0; i<get_size_of_witness(); i++){
-     FrElement x;
-     ctx->getWitness(i, &x);
-     std::cout << i << ": " << Fr_element2str(&x) << std::endl;
+     u64 x;
+     ctx->getWitness(i, x);
+     std::cout << i << ": " << x << std::endl;
      }
    */
   
