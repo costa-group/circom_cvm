@@ -212,20 +212,29 @@ impl WriteC for CreateCmpBucket {
         instructions.append(&mut scmp_idx_instructions);
         std::mem::drop(scmp_idx_instructions);
         instructions.push("{".to_string());
-        let (aux_cmp_num, csoffset) = if self.number_of_cmp != 1{
-            instructions.push(format!("int aux_cmp_num = {}+{}+1;", self.component_offset, CTX_INDEX));
-            instructions.push(format!("uint csoffset = {}+{};", MY_SIGNAL_START.to_string(), self.signal_offset));
-            ("aux_cmp_num".to_string(), "csoffset".to_string())
-        } else{
-            (
-                format!("{}+{}+1", self.component_offset, CTX_INDEX),
-                format!("{}+{}", MY_SIGNAL_START.to_string(), self.signal_offset)
-            )
-        };
 
-        if self.number_of_cmp != 1{
+        let aux_create;
+        let aux_cmp_num;
+        let csoffset;
+        let index;
+
+        if self.number_of_cmp > 1{
+            instructions.push(format!("uint aux_create = {};", scmp_idx));
+            aux_create = "aux_create".to_string();
+            instructions.push(format!("int aux_cmp_num = {}+{}+1;", self.component_offset, CTX_INDEX));
+            aux_cmp_num = "aux_cmp_num".to_string();
+            instructions.push(format!("uint csoffset = {}+{};", MY_SIGNAL_START.to_string(), self.signal_offset));
+            csoffset = "csoffset".to_string();
+            index = "+ i".to_string();
             instructions.push(format!("uint aux_dimensions[{}] = {};", self.dimensions.len(), set_list(self.dimensions.clone())));
+        } else{
+            aux_create = scmp_idx;
+            aux_cmp_num = format!("{}+{}+1", self.component_offset, CTX_INDEX);
+            csoffset = format!("{}+{}", MY_SIGNAL_START.to_string(), self.signal_offset);
+            index = "".to_string();
         }
+
+
         // if the array is not uniform with respect to parallelism
         if self.uniform_parallel.is_none(){
             instructions.push(format!("bool aux_parallel[{}] = {};",
@@ -235,53 +244,65 @@ impl WriteC for CreateCmpBucket {
         }
         // if the array is complete traverse all its positions
         if complete_array {
-            if self.number_of_cmp > 1{
+            if self.number_of_cmp != 1{
                 instructions.push(format!("for (uint i = 0; i < {}; i++) {{", self.number_of_cmp));
                 // update the value of the the parallel status if it is not uniform parallel using the array aux_parallel
                 if self.uniform_parallel.is_none(){
                     instructions.push(format!("bool status_parallel = aux_parallel[i];"));
                 }
             } else{
+                // update the value of the the parallel status if it is not uniform parallel using the array aux_parallel
                 if self.uniform_parallel.is_none(){
                     instructions.push(format!("bool status_parallel = aux_parallel[0];"));
                 }
             }
-
         }
         // generate array with the positions that are actually created if there are empty components
         // if not only traverse the defined positions, but i gets the value of the indexed accessed position
         else{
             instructions.push(format!("uint aux_positions [{}]= {};", self.defined_positions.len(), set_list(self.defined_positions.iter().map(|(x, _y)| *x).collect())));
-            instructions.push(format!("for (uint i_aux = 0; i_aux < {}; i_aux++) {{",  self.defined_positions.len()));
-            instructions.push(format!("uint i = aux_positions[i_aux];"));
-            // update the value of the the parallel status if it is not uniform parallel using the array aux_parallel
-            if self.uniform_parallel.is_none(){
-                instructions.push(format!("bool status_parallel = aux_parallel[i_aux];"));
+            if self.number_of_cmp != 1{
+                instructions.push(format!("for (uint i_aux = 0; i_aux < {}; i_aux++) {{",  self.defined_positions.len()));
+                instructions.push(format!("uint i = aux_positions[i_aux];"));
+                // update the value of the the parallel status if it is not uniform parallel using the array aux_parallel
+                if self.uniform_parallel.is_none(){
+                    instructions.push(format!("bool status_parallel = aux_parallel[i_aux];"));
+                }
+            } else{
+                instructions.push(format!("uint i = aux_positions[0];"));
+                // update the value of the the parallel status if it is not uniform parallel using the array aux_parallel
+                if self.uniform_parallel.is_none(){
+                    instructions.push(format!("bool status_parallel = aux_parallel[0];"));
+                }
             }
         }
 
-        let new_comp_name = if self.number_of_cmp > 1{
-            format!("\"{}\"+{}",
-                self.name_subcomponent.to_string(),
-                generate_my_array_position("aux_dimensions".to_string(), self.dimensions.len().to_string(), "i".to_string())
-            )
+        if self.number_of_cmp > 1{
+            instructions.push(
+                format!("std::string new_cmp_name = \"{}\"+{};",
+                 self.name_subcomponent.to_string(),
+                 generate_my_array_position("aux_dimensions".to_string(), self.dimensions.len().to_string(), "i".to_string())
+                )
+            );
         }
         else {
-            format!("\"{}\"", self.name_subcomponent.to_string())
-        };
+            instructions.push(format!("std::string new_cmp_name = \"{}\";", self.name_subcomponent.to_string()));
+        }
+
         let create_args = vec![
             csoffset, 
-            aux_cmp_num.clone(), 
+            aux_cmp_num.to_string(), 
             CIRCOM_CALC_WIT.to_string(), 
-            new_comp_name,
+            "new_cmp_name".to_string(),
             MY_ID.to_string()
         ];
 
         // if it is not uniform parallel check the value of status parallel to create the component
         if self.uniform_parallel.is_none(){
-            instructions.push(format!("{}[{}+i] = status_parallel;", 
+            instructions.push(format!("{}[{}{}] = status_parallel;", 
                 MY_SUBCOMPONENTS_PARALLEL,
-                scmp_idx
+                aux_create,
+                index
             ));
             instructions.push(format!(
                 "if (status_parallel) {}_create_parallel({});", 
@@ -298,9 +319,10 @@ impl WriteC for CreateCmpBucket {
         else{
             if self.is_part_mixed_array_not_uniform_parallel{
                 instructions.push(format!(
-                    "{}[{}+i] = {};",
+                    "{}[{}{}] = {};",
                     MY_SUBCOMPONENTS_PARALLEL, 
-                    scmp_idx,
+                    aux_create,
+                    index,
                     self.uniform_parallel.unwrap()
                 ));
             }
@@ -314,18 +336,19 @@ impl WriteC for CreateCmpBucket {
             instructions.push(format!("{};", create_call));
         }
 
-        if self.number_of_cmp != 1{
-            instructions.push(format!("{}[{}+i] = aux_cmp_num;", MY_SUBCOMPONENTS, scmp_idx));
-            instructions.push(format!("csoffset += {} ;", self.signal_offset_jump));
-            instructions.push(format!("aux_cmp_num += {};",self.component_offset_jump));
-            instructions.push("}".to_string());
-            instructions.push("}".to_string());
-        } else{
-            instructions.push(format!("{}[{}] = {};", MY_SUBCOMPONENTS, scmp_idx, aux_cmp_num));
-            instructions.push("}".to_string());
+        instructions.push(format!("{}[{}{}] = {};", 
+            MY_SUBCOMPONENTS,
+            aux_create,
+            index,
+            aux_cmp_num
+        ));
 
+        if self.number_of_cmp != 1{
+            instructions.push(format!("csoffset += {} ;", self.signal_offset_jump));
+	        instructions.push(format!("aux_cmp_num += {};",self.component_offset_jump));
+            instructions.push("}".to_string());
         }
-	    
+        instructions.push("}".to_string());
         (instructions, "".to_string())
     }
 }
