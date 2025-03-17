@@ -8,6 +8,22 @@ description: >-
 
 ## Type definitions
 
+## Predefined registers
+
+#### Function destination address
+
+```
+i64 destination
+```
+This is a local register availabe in the code of any function. This register contains the address given in the call to the fuction, when the call is made giving the address to place the result and the size of the result.
+
+#### Function destination size
+
+```
+i64 destination_size
+```
+This is a local register availabe in the code of any function. This register contains the size given in the call to the fuction, when the call is made giving the address to place the result and the size of the result.
+
 ## Instruction Set (opcodes)
 
 ### Arithmetic
@@ -151,7 +167,43 @@ else
 
 end
 
-return
+#### Function call  operations
+
+```text
+ff.call <function-name> [<local-memory-address>, <size>] <parameters list>
+i64.call <function-name> [<local-memory-address>, <size>] <parameters list>
+```
+The parameter list contains element of the form:
+<value> | signal(indx,size) | i64.memory(indx,size) | ff.memory(indx,size) 
+
+The return address (and size) is optional. If not incuded the result of the call should be assigned to  a register. Otherwise, the call is not assigned and the result is saved in the provided local memory address with (at most) the provided size. Note that if the call is not asigned then the first two parameters are the result address and the size. Examples:
+
+```text
+x = ff.call $foo y signal(s,3) ff.memory(0,1)
+```
+which calls the function $foo with the value in the register y, the tree signals starting from the signal index in the register s and with one field value at position 0 of the local memory and leaves the result in the register x.
+
+```text
+ff.call $mfoo r s y signal(s,3) ff.memory(0,1)
+```
+which calls the function $mfoo with the same parameter as above but the result will be stored at the local memory from address given by register r on.
+Note taht the fact that the call is assigned or not determines whether the first data after the function name is the return address or not.
+
+#### Return operations
+
+```text
+ff.return <value>
+i32.return <value>
+```
+
+It copies value to the address given in the call (it can be in the local memory of the callee or in signals)
+
+`return <address-of-the-result> <size of return>`
+
+It compares the given size with the size provided in the function call and copies as many element given in size from the provided address to the address given in the call (it can be in the local memory of the callee or in signals).
+
+
+
 
 ### Other operations
 
