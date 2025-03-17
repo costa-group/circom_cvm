@@ -964,7 +964,7 @@ pub fn generate_fr_hpp_file(c_folder: &PathBuf, prime: &String, producer: &CProd
             "pallas" => include_str!("pallas/fr.hpp"),
             "vesta" => include_str!("vesta/fr.hpp"),
             "secq256r1" => include_str!("secq256r1/fr.hpp"),
-            "bls12-377" => include_str!("bls12-377/fr.hpp"),
+            "bls12377" => include_str!("bls12377/fr.hpp"),
             _ => unreachable!(),
         };
         for line in file.lines() {
@@ -994,14 +994,19 @@ pub fn generate_calcwit_hpp_file(c_folder: &PathBuf, producer: &CProducer) -> st
     Ok(())
 }
 
-fn get_vector_of_u64(bytes: &Vec<u8>) -> Vec<String> {
-    assert!(bytes.len()%8 == 0);
-    //println!("{:?}\n", bytes);
+fn get_vector_of_u64(bytes: &Vec<u8>, n64: usize ) -> Vec<String> {
+    let mut bytes1 = vec![];
+    assert!(bytes.len() <= n64*8);
+    for _i in 0..n64*8-bytes.len() {
+        bytes1.push(0 as u8);
+    }
+    bytes1.append(&mut bytes.clone());
+    // println!("{:?}\n", bytes1);
     let mut v = vec![];
-    let n = bytes.len()/8;
+    let n = bytes1.len()/8;
     for i in (0..n).rev() {
         let mut buf = [0u8; 8];
-        buf.copy_from_slice(&bytes[i*8..i*8+8]);
+        buf.copy_from_slice(&bytes1[i*8..i*8+8]);
         v.push(format!("0x{:x}",u64::from_be_bytes(buf)));
     }
     v
@@ -1019,7 +1024,7 @@ pub fn generate_fr_cpp_file(c_folder: &PathBuf, prime: &String,  producer: &CPro
         if producer.no_asm {
             use circom_algebra::num_traits::ToPrimitive;
             //use circom_algebra::modular_arithmetic;
-            use circom_algebra::num_bigint::{ModInverse};
+            use circom_algebra::num_bigint::ModInverse;
             let p = producer.get_prime().parse::<BigInt>().unwrap();
             let pbits = p.bits();
             let half = p.clone() / BigInt::from(2);
@@ -1055,10 +1060,10 @@ pub fn generate_fr_cpp_file(c_folder: &PathBuf, prime: &String,  producer: &CPro
                     "qbits": pbits,
                     "lboMask": format!("0x{:x}",lbo_mask),
                     "fr_np": format!("0x{:x}",np),
-                    "fr_q_list":get_vector_of_u64(&p.to_bytes_be().1),
-                    "fr_r2_list": get_vector_of_u64(&r2.to_bytes_be().1),
-                    "fr_r3_list": get_vector_of_u64(&r3.to_bytes_be().1),
-                    "half_list": get_vector_of_u64(&half.to_bytes_be().1),
+                    "fr_q_list":get_vector_of_u64(&p.to_bytes_be().1,n64),
+                    "fr_r2_list": get_vector_of_u64(&r2.to_bytes_be().1,n64),
+                    "fr_r3_list": get_vector_of_u64(&r3.to_bytes_be().1,n64),
+                    "half_list": get_vector_of_u64(&half.to_bytes_be().1,n64),
                 }),
             )
             .expect("must render");
@@ -1073,7 +1078,7 @@ pub fn generate_fr_cpp_file(c_folder: &PathBuf, prime: &String,  producer: &CPro
                 "pallas" => include_str!("pallas/fr.cpp"),
                 "vesta" => include_str!("vesta/fr.cpp"),
                 "secq256r1" => include_str!("secq256r1/fr.cpp"),
-                "bls12-377" => include_str!("bls12-377/fr.cpp"),
+                "bls12377" => include_str!("bls12377/fr.cpp"),
                 _ => unreachable!(),
             };
             for line in file.lines() {
@@ -1121,7 +1126,7 @@ pub fn generate_fr_asm_file(c_folder: &PathBuf, prime: &String, producer: &CProd
             "pallas" => include_str!("pallas/fr.asm"),
             "vesta" => include_str!("vesta/fr.asm"),
             "secq256r1" => include_str!("secq256r1/fr.asm"),
-            "bls12-377" => include_str!("bls12-377/fr.asm"),
+            "bls12377" => include_str!("bls12377/fr.asm"),
             
             _ => unreachable!(),
         };    
@@ -1164,6 +1169,25 @@ pub fn generate_make_file(
     c_file.flush()?;
     Ok(())
 }
+
+pub fn generate_json2bin64(c_folder: &PathBuf, producer: &CProducer) -> std::io::Result<()> {
+    use std::io::BufWriter;
+    let mut file_path = c_folder.clone();
+    file_path.push("json2bin64");
+    file_path.set_extension("cpp");
+    let file_name = file_path.to_str().unwrap();
+    let mut c_file = BufWriter::new(File::create(file_name).unwrap());
+    let mut code = "".to_string();
+    assert!(producer.prime_str == "goldilocks");
+    let file = include_str!("common64/json2bin64.cpp");
+    for line in file.lines() {
+        code = format!("{}{}\n", code, line);
+    }
+    c_file.write_all(code.as_bytes())?;
+    c_file.flush()?;
+    Ok(())
+}
+
 
 pub fn generate_c_file(name: String, producer: &CProducer) -> std::io::Result<()> {
     let full_name = name + ".cpp";

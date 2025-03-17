@@ -67,6 +67,7 @@ fn start() -> Result<(), ()> {
         cvm_folder: user_input.cvm_folder().to_string(),
         cvm_name: user_input.cvm_name().to_string(),
         cvm_file: user_input.cvm_file().to_string(),
+        prime: user_input.prime(),        
     };
     compilation_user::compile(compilation_config)?;
     Result::Ok(())

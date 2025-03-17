@@ -343,6 +343,9 @@ impl WriteC for LoadBucket {
             // we store the value of the cmp index
             prologue.push(format!("cmp_index_ref_load = {};",cmp_index_ref.clone()));
 
+            // we store the value of the cmp index
+            prologue.push(format!("cmp_index_ref_load = {};",cmp_index_ref.clone()));
+
 		if *is_output {
             if uniform_parallel_value.is_some(){
                 if uniform_parallel_value.unwrap(){

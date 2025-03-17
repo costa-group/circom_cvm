@@ -384,7 +384,7 @@ mod input_processing {
                       || prime_value == "pallas"
                       || prime_value == "vesta"
                       || prime_value == "secq256r1"
-                      || prime_value == "bls12-377"
+                      || prime_value == "bls12377"
                       {
                         Ok(String::from(matches.value_of("prime").unwrap()))
                     }
@@ -517,9 +517,8 @@ mod input_processing {
                 Arg::with_name("no_asm")
                     .long("no_asm")
                     .takes_value(false)
-                    .hidden(true)
                     .display_order(990)
-                    .help("Does not use asm files for witness generation in C, uses new version"),
+                    .help("Does not use asm files in witness generation code in C++"),
             )
             .arg(
                 Arg::with_name("link_libraries")
@@ -536,7 +535,7 @@ mod input_processing {
                     .short("c")
                     .takes_value(false)
                     .display_order(150)
-                    .help("Compiles the circuit to c"),
+                    .help("Compiles the circuit to C++"),
             )
             .arg(
                 Arg::with_name("parallel_simplification")
@@ -552,7 +551,7 @@ mod input_processing {
                     .takes_value(false)
                     .hidden(false)
                     .display_order(810)
-                    .help("Does not add asserts in the generated code for === constraint equalities"),
+                    .help("Does not add asserts in the witness generation code to check constraints introduced with \"===\""),
             )
             .arg(
                 Arg::with_name("main_inputs_log")
@@ -574,7 +573,7 @@ mod input_processing {
                     .long("no_init")
                     .takes_value(false)
                     .display_order(999)
-                    .help("Removes initializations to 0 of variables"),
+                    .help("Removes initializations to 0 of variables (\"var\") in the witness generation code"),
             )
             .arg(
                 Arg::with_name("flag_old_heuristics")
@@ -590,7 +589,7 @@ mod input_processing {
                     .takes_value(true)
                     .default_value("bn128")
                     .display_order(300)
-                    .help("To choose the prime number to use to generate the circuit. Receives the name of the curve (bn128, bls12381, goldilocks, grumpkin, pallas, vesta, secq256r1, bls12-377)"),
+                    .help("To choose the prime number to use to generate the circuit. Receives the name of the curve (bn128, bls12377, bls12381, goldilocks, grumpkin, pallas, secq256r1, vesta)"),
             )
             .get_matches()
     }

@@ -123,35 +123,6 @@ impl WriteC for FunctionCodeInfo {
         }            
         body.push(format!("{};", declare_my_template_name_function(&self.name)));
         body.push(format!("u64 {} = {};", my_id(), component_father()));
-        
-        // We declare here the constants, TODO: move outside function
-        for (var, values) in &self.constant_variables{
-            let name_constant = format!("{}_{}", self.header, var);
-            let mut pointers_to_values = Vec::new();
-            if producer.prime_str != "goldilocks" {
-                for v in values{
-                    pointers_to_values.push(format!("&{}", circuit_constants(v.to_string())));
-                }
-                body.push(
-                    format!("static FrElement* {}[{}] = {{ {} }};",
-                            name_constant,
-                            values.len(),
-                            argument_list(pointers_to_values)
-                    )
-                );
-            } else {
-                for v in values{
-                    pointers_to_values.push(format!("{}ull", producer.get_field_constant_list()[*v]));
-                }
-                body.push(
-                    format!("static u64 {}[{}] = {{ {} }};",
-                            name_constant,
-                            values.len(),
-                            argument_list(pointers_to_values)
-                    )
-                );                
-            }
-        }
         for t in &self.body {
             let (mut instructions_body, _) = t.produce_c(producer, Some(false));
             body.append(&mut instructions_body);
