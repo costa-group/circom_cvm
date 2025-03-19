@@ -850,8 +850,136 @@ impl WriteC for CallBucket {
 }
 
 impl WriteCVM for CallBucket{
-    fn produce_cvm(&self, _producer: &mut CVMProducer) -> (Vec<String>, String) {
-        unreachable!();
-        //(Vec::new(),"".to_string())
+    fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<String>, String) {
+        use cvm_code_generator::*;
+        use super::location_rule::*;
+        let mut instructions = vec![];
+        instructions.push(";; start of call bucket".to_string());
+        // create lvar parameter
+        let mut params = "".to_string();
+        let mut i = 0;
+        for p in &self.arguments {
+            //instructions.push(format!(";; evaluating argument {}", i));
+            let size = match &self.argument_types[i].size{
+                SizeOption::Single(value) => *value,
+                SizeOption::Multiple(_values) => {
+		    assert!(false); //should never be the case!
+		    0
+                }
+            };
+            if size > 1 {
+                if let Instruction::Load(load) = &**p {
+                    let (mut instructions_p, lp) = load.src.produce_cvm(&load.address_type, &load.context,producer);
+                    match lp {
+                        ComputedAddress::Variable(rvar) => {
+                            params = format!("{} i64.memory({},{})", params, rvar, size);
+                        }
+                        ComputedAddress::Signal(rsig) => {
+                            params = format!("{} signal({},{})", params, rsig, size);
+                        }
+                        ComputedAddress::SubcmpSignal(rcmp,rsig) => {
+                            params = format!("{} subcmpsignal({},{},{})", params, rcmp, rsig, size);
+                        }
+                    }
+                } else {
+                    assert!(false); //should never be the case!
+                }
+            } else {
+                let (mut instructions_value, src) = p.produce_cvm(producer);
+                instructions.append(&mut instructions_value);
+                params = format!("{} {}", params, src);
+            }
+            instructions.push(format!("// end copying argument {}", i));
+            i += 1;
+        }
+        let result_position = "spr".to_string();
+        //call_arguments.push(result_ref);
+        //call_arguments.push(size.clone());
+        //prologue.push(format!("{};", build_call(self.symbol.clone(), call_arguments)));
+        let result = "".to_string();;
+        match &self.return_info {
+            ReturnType::Intermediate { op_aux_no } => {
+                assert!(false);
+            }
+            ReturnType::Final(data) => {
+                let (mut instructions_dest, ldest) = data.dest.produce_cvm(&data.dest_address_type, &data.context,producer);
+                instructions.append(&mut instructions_dest);
+                let return_dest = producer.fresh_var();
+                let src_value = producer.fresh_var();
+                let dest_location;
+                let mut instruction_set_dest = "".to_string();
+                let mut last_out = false;
+                let mut last_instructions = vec![];
+                match ldest {
+                    ComputedAddress::Variable(rvar) => {
+                        dest_location = rvar;
+                        instruction_set_dest = format!("{} {} {}", storeff(), dest_location, src_value);                       
+                    }
+                    ComputedAddress::Signal(rsig) => {
+                        dest_location = rsig;
+                        instruction_set_dest = set_signal(&dest_location,&src_value);
+                    }
+                    ComputedAddress::SubcmpSignal(rcmp,rsig) => {
+                        dest_location = rsig;
+                        if let AddressType::SubcmpSignal {input_information, .. } = &data.dest_address_type {
+                            if let InputInformation::Input{status, needs_decrement} = input_information {
+		                if let StatusInput::NoLast = status {
+			            // no need to run subcomponent
+                                    if *needs_decrement{
+                                        instruction_set_dest = set_cmp_input_dec_no_last(&rcmp,&dest_location, &src_value);
+                                    } else {
+                                        instruction_set_dest = set_cmp_input_no_dec_no_last(&rcmp,&dest_location, &src_value);
+                                    }
+                                } else if let StatusInput::Last = status {
+                                    last_out = true;
+                                    instruction_set_dest = set_cmp_input_no_dec_no_last(&rcmp,&dest_location, &src_value);
+                                    //last_instructions.push(instruction_get_src.clone());
+                                    last_instructions.push(set_cmp_input_and_run(&rcmp,&dest_location, &src_value));
+                                } else {
+                                    last_out = true;
+                                    instruction_set_dest = set_cmp_input_dec_no_last(&rcmp,&dest_location, &src_value);
+                                    //last_instructions.push(instruction_get_src.clone());
+                                    last_instructions.push(set_cmp_input_dec_and_check_run(&rcmp,&dest_location, &src_value));
+                                }
+                            } else {
+                                assert!(false);
+                            }
+                        } else {
+                            assert!(false);
+                        }
+                    }
+                }
+                let counter = producer.fresh_var();
+                match &data.context.size{
+	            SizeOption::Single(value) => {
+		        instructions.push(format!("{} = i64.{}", counter, value.to_string()));
+	            }
+	            SizeOption::Multiple(values) => { //create a nested if-else with all cases
+                        assert!(false);
+	            }
+	        };
+                if last_out {
+                    instructions.push(format!("{} = {} {} i64.1", counter, sub64(), counter)); 
+                }
+                instructions.push(add_loop());
+                instructions.push(format!("{} {} ", add_if(), &counter));
+                instructions.push(add_break());
+                instructions.push(add_end());
+                //instructions.push(instruction_get_src);
+                instructions.push(instruction_set_dest);
+                instructions.push(format!("{} = {} {} i64.1", &counter, sub64(), &counter));
+                //instructions.push(format!("{} = {} {} i64.1", &src_location, add64(), &src_location));
+                instructions.push(format!("{} = {} {} i64.1", &dest_location ,add64(), &dest_location));
+                instructions.push(add_continue());
+                instructions.push(add_end());
+                instructions.append(&mut last_instructions);
+                //result = "".to_string();
+            }
+        }
+        //make the call with lvar dest, size)
+        instructions.push("// end call bucket".to_string());
+        (instructions,result)
     }
 }
+
+

@@ -843,17 +843,14 @@ impl WriteCVM for StoreBucket{
         if producer.needs_comments() {
 	    instructions.push(format!(";; store bucket. Line {}", self.line)); //.to_string()
 	}
-        let mut _sizeexp = "".to_string();
         let mut sizeone = true;
+        let mut n = 0; 
         if (is_multiple_dest || size_dest > 1) && (is_multiple_src || size_src > 1) {
 	    if !is_multiple_dest && !is_multiple_src {
-                let n = std::cmp::min(size_dest, size_src);
+                n = std::cmp::min(size_dest, size_src);
                 sizeone = n == 1;
-                if !sizeone {
-                    _sizeexp = n.to_string();
-                }    
 	    } else {
-	        assert!(false);
+	        sizeone = false;
             }
         }
         //let mut my_template_header = Option::<String>::None;
@@ -899,12 +896,103 @@ impl WriteCVM for StoreBucket{
                     }
                 }
             }
-        } else {
+        } else {            
+            if producer.needs_comments() {
+                instructions.push(";; getting src".to_string());
+	    }
             if let Instruction::Load(load) = &*self.src {
-                let (mut _instructions_src, _vsrc) = load.src.produce_cvm(&load.address_type, &load.context,producer);    
-            } else {
-                assert!(false);
+                let (mut instructions_src, lsrc) = load.src.produce_cvm(&load.address_type, &load.context,producer); 
+                instructions.append(&mut instructions_src);
+                let src_value = producer.fresh_var();
+                let src_location;
+                let instruction_get_src;
+                match lsrc {
+                    ComputedAddress::Variable(rvar) => {
+                        src_location = rvar;
+                        instruction_get_src = format!("{} = {} {}", src_value, loadff(), src_location);
+                    }
+                    ComputedAddress::Signal(rsig) => {
+                        src_location = rsig;
+                        instruction_get_src = format!("{} = {}",src_value, &get_signal(&src_location));
+                    }
+                    ComputedAddress::SubcmpSignal(rcmp,rsig) => {
+                        src_location = rsig;
+                        instruction_get_src = format!("{} = {}",src_value, &get_cmp_signal(&rcmp,&src_location));
+                    }
+                }
+                if producer.needs_comments() {
+                    instructions.push(";; getting dest".to_string());
+	        }
+                let (mut instructions_dest, ldest) = self.dest.produce_cvm(&self.dest_address_type,&self.context, producer);
+                instructions.append(&mut instructions_dest);                     let counter = producer.fresh_var();           
+                let dest_location;
+                let mut instruction_set_dest = "".to_string();
+                let mut last_out = false;
+                let mut last_instructions = vec![];
+                match ldest {
+                    ComputedAddress::Variable(rvar) => {
+                        dest_location = rvar;
+                        instruction_set_dest = format!("{} {} {}", storeff(), dest_location, src_value);                       
+                    }
+                    ComputedAddress::Signal(rsig) => {
+                        dest_location = rsig;
+                        instruction_set_dest = set_signal(&dest_location,&src_value);
+                    }
+                    ComputedAddress::SubcmpSignal(rcmp,rsig) => {
+                        dest_location = rsig;
+                        if let AddressType::SubcmpSignal {input_information, .. } = &self.dest_address_type {
+                            if let InputInformation::Input{status, needs_decrement} = input_information {
+		                if let StatusInput::NoLast = status {
+			            // no need to run subcomponent
+                                    if *needs_decrement{
+                                        instruction_set_dest = set_cmp_input_dec_no_last(&rcmp,&dest_location, &src_value);
+                                    } else {
+                                        instruction_set_dest = set_cmp_input_no_dec_no_last(&rcmp,&dest_location, &src_value);
+                                    }
+                                } else if let StatusInput::Last = status {
+                                    last_out = true;
+                                    instruction_set_dest = set_cmp_input_no_dec_no_last(&rcmp,&dest_location, &src_value);
+                                    last_instructions.push(instruction_get_src.clone());
+                                    last_instructions.push(set_cmp_input_and_run(&rcmp,&dest_location, &src_value));
+                                } else {
+                                    last_out = true;
+                                    instruction_set_dest = set_cmp_input_dec_no_last(&rcmp,&dest_location, &src_value);
+                                    last_instructions.push(instruction_get_src.clone());
+                                    last_instructions.push(set_cmp_input_dec_and_check_run(&rcmp,&dest_location, &src_value));
+                                }
+                            } else {
+                                assert!(false);
+                            }
+                        } else {
+                            assert!(false);
+                        }
+                    }
+                }
+	        if !is_multiple_dest && !is_multiple_src {
+                    if last_out {
+                        instructions.push(format!("{} = i64.{}", &counter,n-1)); 
+                    } else {
+                        instructions.push(format!("{} = i64.{}", &counter,n)); 
+                    }
+                } else {
+                    assert!(false);
+                }
+                instructions.push(add_loop());
+                instructions.push(format!("{} {} ", add_if(), &counter));
+                instructions.push(add_break());
+                instructions.push(add_end());
+                instructions.push(instruction_get_src);
+                instructions.push(instruction_set_dest);
+                instructions.push(format!("{} = {} {} i64.1", &counter, sub64(), &counter));
+                instructions.push(format!("{} = {} {} i64.1", &src_location, add64(), &src_location));
+                instructions.push(format!("{} = {} {} i64.1", &dest_location ,add64(), &dest_location));
+                instructions.push(add_continue());
+                instructions.push(add_end());
+                instructions.append(&mut last_instructions);
             }
+            else {
+                assert!(false);
+            }    
         }
         if producer.needs_comments() {
             instructions.push(";; end of store bucket".to_string());

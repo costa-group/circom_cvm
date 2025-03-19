@@ -97,8 +97,8 @@ impl WriteCVM for ValueBucket{
     fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<String>, String) {
         //use cvm_code_generator::*;
         match self.parse_as {
-            ValueType::U32 => (vec![], self.value.to_string()),
-            ValueType::BigInt => (vec![], format!("{}", producer.get_field_constant_list()[self.value]))
+            ValueType::U32 => (vec![], format!("i64.{}",self.value)),
+            ValueType::BigInt => (vec![], format!("ff.{}", producer.get_field_constant_list()[self.value]))
         }
     }
 }
