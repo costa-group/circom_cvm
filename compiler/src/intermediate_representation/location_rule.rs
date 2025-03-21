@@ -65,27 +65,119 @@ impl ToString for LocationRule {
 impl  LocationRule {
     pub fn produce_cvm(&self, address_type: & AddressType, _context: & InstrContext, producer: &mut CVMProducer) -> (Vec<String>, ComputedAddress) {
         use LocationRule::*;
+        use cvm_code_generator::*;
         match &self {
-                Indexed { location, .. } => {
-                    let (mut instructions, vloc) = location.produce_cvm(producer);
-                    match &address_type {
-                        AddressType::Variable => {
-                            (instructions, ComputedAddress::Variable(vloc));
-                        }
-                        AddressType::Signal => {
-                            (instructions, ComputedAddress::Signal(vloc));
-                        }
-                        AddressType::SubcmpSignal {cmp_address, .. } => {
-                            let (mut instructions_cmp, vcmp) = cmp_address.produce_cvm(producer);
-                            instructions.append(&mut instructions_cmp);
-                            (instructions, ComputedAddress::SubcmpSignal(vcmp,vloc));
-                        }
+            Indexed { location, .. } => {
+                let (mut instructions, vloc) = location.produce_cvm(producer);
+                match &address_type {
+                    AddressType::Variable => {
+                        (instructions, ComputedAddress::Variable(vloc))
+                    }
+                    AddressType::Signal => {
+                        (instructions, ComputedAddress::Signal(vloc))
+                    }
+                    AddressType::SubcmpSignal {cmp_address, .. } => {
+                        let (mut instructions_cmp, vcmp) = cmp_address.produce_cvm(producer);
+                        instructions.append(&mut instructions_cmp);
+                        (instructions, ComputedAddress::SubcmpSignal(vcmp,vloc))
                     }
                 }
-                Mapped { signal_code: _, .. } => {
-                    assert!(false);
+            }
+            Mapped { signal_code, indexes} => {
+                let mut instructions = vec![];
+                match address_type {
+                    AddressType::SubcmpSignal { cmp_address, .. } => {
+			if producer.needs_comments() {
+                            instructions.push(";; is subcomponent mapped".to_string());
+			}
+                        let (mut instructions_cmp, vcmp) = cmp_address.produce_cvm(producer);
+                        instructions.append(&mut instructions_cmp);
+                        let tid = producer.fresh_var();
+                        instructions.push(format!("{} = get_template_id {}", tid, vcmp));
+                        let sp = producer.fresh_var();
+                        instructions.push(format!("{} = get_template_signal_position {} {}", sp, tid, signal_code));
+			if indexes.len() == 0 {
+			    if producer.needs_comments() {
+                                instructions.push(";; end of load bucket".to_string());
+			    }
+                            (instructions, ComputedAddress::SubcmpSignal(vcmp,sp))
+			} else {
+                            let mut accsize = sp;
+                            let mut idxpos = 0;
+                            if let AccessType::Indexed(index_info) = &indexes[0] {
+                                let index_list = &index_info.indexes;
+                                let dimensions = index_info.symbol_dim;
+                                assert!(index_list.len() > 0);
+                                let (mut instructions_idx0, vidx0) = index_list[0].produce_cvm(producer);
+                                instructions.append(&mut instructions_idx0);
+                                let mut prevsize = vidx0;
+				for i in 1..index_list.len() {
+                                    let dimi = producer.fresh_var();
+                                    instructions.push(format!("{} = get_template_signal_dimension {} {} {}", dimi, tid, signal_code, i));
+                                    let (mut instructions_idxi, vidxi) = index_list[i].produce_cvm(producer);
+                                    instructions.append(&mut instructions_idxi);
+                                    let curmul = producer.fresh_var();
+                                    instructions.push(format!("{} = {} {} {}", curmul, mul64(), prevsize, dimi));
+                                    let cursize = producer.fresh_var();
+                                    instructions.push(format!("{} = {} {} {}", cursize, add64(), curmul, vidxi));
+                                    prevsize = cursize;
+                                }
+                                assert!(index_list.len() <= dimensions);
+				let diff = dimensions - index_list.len();
+				if diff > 0 {
+				    //println!("There is difference: {}",diff);
+				    // must be last access
+				    assert!(idxpos+1 == indexes.len());
+				    for i in 0..diff-1 {
+                                        let dimi = producer.fresh_var();
+                                        instructions.push(format!("{} = get_template_signal_dimension {} {} {}", dimi, tid, signal_code, indexes.len() + i));                                        
+                                        let cursize = producer.fresh_var();
+                                        instructions.push(format!("{} = {} {} {}", cursize, mul64(), prevsize, dimi));
+                                        prevsize = cursize;
+				    }
+				} // after this we have the product of the remaining dimensions
+                                let vsize = producer.fresh_var();
+                                instructions.push(format!("{} = get_template_signal_size {} {}", vsize, tid, signal_code));
+                                let finalsize = producer.fresh_var();
+                                instructions.push(format!("{} = {} {} {}", finalsize, mul64(), prevsize, vsize));
+                                let access = producer.fresh_var();
+                                instructions.push(format!("{} = {} {} {}", access, add64(), accsize, prevsize));
+                                accsize = access;
+                                idxpos = 1;
+			    }
+                            else{
+                                idxpos = 0;
+                            }
+                            let mut get_bus_id_call = format!("get_template_signal_type {} {}", tid, signal_code);
+			    while idxpos < indexes.len() {
+				if let AccessType::Qualified(field_no) = &indexes[idxpos] {
+                                    let bid = producer.fresh_var();
+                                    instructions.push(format!("{} = {}", bid, get_bus_id_call));
+                                    let sfield = producer.fresh_var();
+                                    instructions.push(format!("{} = get_bus_signal_position {} {}", sfield, bid, field_no));
+                                    let access = producer.fresh_var();
+                                    instructions.push(format!("{} = {} {} {}", access, add64(), accsize, sfield));
+                                    accsize = access;
+				} else if let AccessType::Indexed(index_info) = &indexes[idxpos] {				    
+				    assert!(false);  
+				} else {
+				    assert!(false);
+				}
+                                idxpos += 1;
+			    }
+			    if producer.needs_comments() {
+                                instructions.push(";; end of load bucket".to_string());
+			    }
+                            (instructions, ComputedAddress::SubcmpSignal(vcmp,accsize))
+			}
+                        //after this we have  the offset on top of the stack and the subcomponent start_of_signals just below
+                    }
+                    _ => {
+                        assert!(false);
+                        (vec![], ComputedAddress::Variable("".to_string()))
+                    }
                 }
             }
-        (vec![], ComputedAddress::Variable("".to_string()))
+        }
     }
 }

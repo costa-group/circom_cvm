@@ -459,39 +459,23 @@ impl WriteC for LoadBucket {
 impl WriteCVM for LoadBucket{
     fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<String>, String) {
         use code_producers::cvm_elements::cvm_code_generator::*;
+        use super::location_rule::*;
         let mut instructions = vec![];
         if producer.needs_comments() {
             instructions.push(";; load bucket".to_string());
 	}
+        let (mut instructions_src, lsrc) = self.src.produce_cvm(&self.address_type, &self.context,producer); 
+        instructions.append(&mut instructions_src);
         let res = producer.fresh_var();
-        match &self.src {
-            LocationRule::Indexed { location, .. } => {
-                let (mut instructions_src, dir) = location.produce_cvm(producer);
-                instructions.append(&mut instructions_src);
-                match &self.address_type {
-                    AddressType::Variable => {
-                        instructions.push(format!("{} = {} {}", res, loadff(), dir));
-                    }
-                    AddressType::Signal => {
-                        instructions.push(format!("{} = {}",res, &get_signal(&dir)));
-                    }
-                    AddressType::SubcmpSignal { cmp_address, .. } => {
-			if producer.needs_comments() {
-			    instructions.push(";; is subcomponent".to_string());
-			}
-                        let (mut  instructions_sci, cvar) = cmp_address.produce_cvm(producer);
-                        instructions.append(&mut instructions_sci);
-                        instructions.push(format!("{} = {}",res, &get_cmp_signal(&cvar,&dir)));
-                    }
-                    
-                }
-                //instructions.push(add64());
-		if producer.needs_comments() {
-                    instructions.push(";; end of load bucket".to_string());
-		}
+        match lsrc {
+            ComputedAddress::Variable(dir) => {
+                instructions.push(format!("{} = {} {}", res, loadff(), dir));
             }
-            LocationRule::Mapped { signal_code:_, indexes:_} => {
-                assert!(false);
+            ComputedAddress::Signal(dir) => {
+                instructions.push(format!("{} = {}",res, &get_signal(&dir)));
+            }
+            ComputedAddress::SubcmpSignal(rcmp,dir) => {
+                instructions.push(format!("{} = {}",res, &get_cmp_signal(&rcmp,&dir)));
             }
         }
         (instructions,res)

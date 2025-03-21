@@ -870,6 +870,7 @@ impl WriteCVM for CallBucket{
             if size > 1 {
                 if let Instruction::Load(load) = &**p {
                     let (mut instructions_p, lp) = load.src.produce_cvm(&load.address_type, &load.context,producer);
+                    instructions.append(&mut instructions_p);
                     match lp {
                         ComputedAddress::Variable(rvar) => {
                             params = format!("{} i64.memory({},{})", params, rvar, size);
@@ -892,21 +893,28 @@ impl WriteCVM for CallBucket{
             instructions.push(format!("// end copying argument {}", i));
             i += 1;
         }
-        let result_position = "spr".to_string();
-        //call_arguments.push(result_ref);
-        //call_arguments.push(size.clone());
-        //prologue.push(format!("{};", build_call(self.symbol.clone(), call_arguments)));
-        let result = "".to_string();;
+        let result = "".to_string();
         match &self.return_info {
-            ReturnType::Intermediate { op_aux_no } => {
+            ReturnType::Intermediate { .. } => {
                 assert!(false);
             }
             ReturnType::Final(data) => {
+                let size = match &data.context.size{
+                    SizeOption::Single(value) => value.to_string(),
+                    SizeOption::Multiple(_values) => {
+                        assert!(false);
+                        "0".to_string()
+                    }
+                };
+                let result_position = "spr".to_string();
+                let call_dest = producer.fresh_var();
+                instructions.push(format!("{} = {}", call_dest, result_position));
+                instructions.push(format!("ff.call ${} {} {} {}",self.symbol.clone(), call_dest, size.clone(), params));
                 let (mut instructions_dest, ldest) = data.dest.produce_cvm(&data.dest_address_type, &data.context,producer);
                 instructions.append(&mut instructions_dest);
-                let return_dest = producer.fresh_var();
                 let src_value = producer.fresh_var();
                 let dest_location;
+                let instruction_get_src = format!("{} = {} {}", src_value, loadff(), call_dest);
                 let mut instruction_set_dest = "".to_string();
                 let mut last_out = false;
                 let mut last_instructions = vec![];
@@ -933,12 +941,12 @@ impl WriteCVM for CallBucket{
                                 } else if let StatusInput::Last = status {
                                     last_out = true;
                                     instruction_set_dest = set_cmp_input_no_dec_no_last(&rcmp,&dest_location, &src_value);
-                                    //last_instructions.push(instruction_get_src.clone());
+                                    last_instructions.push(instruction_get_src.clone());
                                     last_instructions.push(set_cmp_input_and_run(&rcmp,&dest_location, &src_value));
                                 } else {
                                     last_out = true;
                                     instruction_set_dest = set_cmp_input_dec_no_last(&rcmp,&dest_location, &src_value);
-                                    //last_instructions.push(instruction_get_src.clone());
+                                    last_instructions.push(instruction_get_src.clone());
                                     last_instructions.push(set_cmp_input_dec_and_check_run(&rcmp,&dest_location, &src_value));
                                 }
                             } else {
@@ -954,7 +962,7 @@ impl WriteCVM for CallBucket{
 	            SizeOption::Single(value) => {
 		        instructions.push(format!("{} = i64.{}", counter, value.to_string()));
 	            }
-	            SizeOption::Multiple(values) => { //create a nested if-else with all cases
+	            SizeOption::Multiple(_values) => { //create a nested if-else with all cases
                         assert!(false);
 	            }
 	        };
@@ -965,10 +973,10 @@ impl WriteCVM for CallBucket{
                 instructions.push(format!("{} {} ", add_if(), &counter));
                 instructions.push(add_break());
                 instructions.push(add_end());
-                //instructions.push(instruction_get_src);
+                instructions.push(instruction_get_src);
                 instructions.push(instruction_set_dest);
                 instructions.push(format!("{} = {} {} i64.1", &counter, sub64(), &counter));
-                //instructions.push(format!("{} = {} {} i64.1", &src_location, add64(), &src_location));
+                instructions.push(format!("{} = {} {} i64.1", &call_dest, add64(), &call_dest));
                 instructions.push(format!("{} = {} {} i64.1", &dest_location ,add64(), &dest_location));
                 instructions.push(add_continue());
                 instructions.push(add_end());
