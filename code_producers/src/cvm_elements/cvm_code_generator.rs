@@ -259,27 +259,27 @@ pub fn exception(code: &str) -> CVMInstruction {
 pub const FUNCTION_DESTINATION: &str = "destination"; 
 pub const FUNCTION_DESTINATION_SIZE: &str = "destination_size"; 
 
-/*
 pub fn create_if_selection(
     values: &Vec<(usize, usize)>,
-    local: &str
+    rcmpid: &str,
+    rresult: &str,
+    producer: &mut CVMProducer
 ) -> Vec<CVMInstruction> {
     let mut instructions = vec![];
     for i in 0..values.len() {
-	instructions.push(get_local(local));
-	instructions.push(set_constant(&values[i].0.to_string())); //Add id in list	
-	instructions.push(eq32());
-	instructions.push(format!("{} (result i32)", add_if()));
-	instructions.push(set_constant(&values[i].1.to_string())); //Add corresponding size in list
+        let comp = producer.fresh_var();
+	instructions.push(format!("{} = {} {} {}", comp, eq64(), rcmpid, values[i].0));
+	instructions.push(format!("{} {}", add_if(), comp));
+	instructions.push(format!("{} = i64{}", rresult, values[i].1)); //Add corresponding size in list
 	instructions.push(add_else());
     }
-    instructions.push(set_constant("0")); //default o complete the last else
+    instructions.push(format!("{} = i64{}", rresult, 0)); //default o complete the last else
     for _i in 0..values.len() {
 	instructions.push(add_end());
     }
     instructions
 }
-*/
+
 
 // ----- exception codes and other constants -----------------
 /*

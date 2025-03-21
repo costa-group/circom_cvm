@@ -822,7 +822,7 @@ impl WriteCVM for StoreBucket{
 
         // We check if we have to compute the possible sizes, case multiple size
 	let mut is_multiple_dest = false;
-        let (size_dest,_values_dest) = match &self.context.size{
+        let (size_dest, mut values_dest) = match &self.context.size{
             SizeOption::Single(value) => (*value,vec![]),
             SizeOption::Multiple(values) => {
 		is_multiple_dest = true;
@@ -830,7 +830,7 @@ impl WriteCVM for StoreBucket{
             }
         };
 	let mut is_multiple_src = false;
-        let (size_src,_values_src) = match &self.src_context.size{
+        let (size_src, mut values_src) = match &self.src_context.size{
             SizeOption::Single(value) => (*value,vec![]),
             SizeOption::Multiple(values) => {
 		is_multiple_src = true;
@@ -896,16 +896,17 @@ impl WriteCVM for StoreBucket{
                     }
                 }
             }
-        } else {            
+        } else {
             if producer.needs_comments() {
                 instructions.push(";; getting src".to_string());
 	    }
             if let Instruction::Load(load) = &*self.src {
-                let (mut instructions_src, lsrc) = load.src.produce_cvm(&load.address_type, &load.context,producer); 
+                let (mut instructions_src, lsrc) = load.src.produce_cvm(&load.address_type, &load.context, producer); 
                 instructions.append(&mut instructions_src);
                 let src_value = producer.fresh_var();
                 let src_location;
                 let instruction_get_src;
+                let mut cmp_src = "".to_string();
                 match lsrc {
                     ComputedAddress::Variable(rvar) => {
                         src_location = rvar;
@@ -916,6 +917,7 @@ impl WriteCVM for StoreBucket{
                         instruction_get_src = format!("{} = {}",src_value, &get_signal(&src_location));
                     }
                     ComputedAddress::SubcmpSignal(rcmp,rsig) => {
+                        cmp_src = rcmp.clone();
                         src_location = rsig;
                         instruction_get_src = format!("{} = {}",src_value, &get_cmp_signal(&rcmp,&src_location));
                     }
@@ -924,11 +926,13 @@ impl WriteCVM for StoreBucket{
                     instructions.push(";; getting dest".to_string());
 	        }
                 let (mut instructions_dest, ldest) = self.dest.produce_cvm(&self.dest_address_type,&self.context, producer);
-                instructions.append(&mut instructions_dest);                     let counter = producer.fresh_var();           
+                instructions.append(&mut instructions_dest);
+                let counter = producer.fresh_var(); 
                 let dest_location;
                 let mut instruction_set_dest = "".to_string();
                 let mut last_out = false;
                 let mut last_instructions = vec![];
+                let mut cmp_dest = "".to_string();
                 match ldest {
                     ComputedAddress::Variable(rvar) => {
                         dest_location = rvar;
@@ -939,6 +943,7 @@ impl WriteCVM for StoreBucket{
                         instruction_set_dest = set_signal(&dest_location,&src_value);
                     }
                     ComputedAddress::SubcmpSignal(rcmp,rsig) => {
+                        cmp_dest = rcmp.clone();
                         dest_location = rsig;
                         if let AddressType::SubcmpSignal {input_information, .. } = &self.dest_address_type {
                             if let InputInformation::Input{status, needs_decrement} = input_information {
@@ -970,12 +975,45 @@ impl WriteCVM for StoreBucket{
                 }
 	        if !is_multiple_dest && !is_multiple_src {
                     if last_out {
-                        instructions.push(format!("{} = i64.{}", &counter,n-1)); 
+                        instructions.push(format!("{} = i64.{}", counter,n-1)); 
                     } else {
-                        instructions.push(format!("{} = i64.{}", &counter,n)); 
+                        instructions.push(format!("{} = i64.{}", counter,n)); 
                     }
                 } else {
-                    assert!(false);
+                    if !is_multiple_dest {
+                        if last_out {
+                            values_dest = values_dest.iter().map(|&(x,y)| (x, y - 1)).collect();
+                        }
+                        let mut intructions_if_dest = create_if_selection(&values_dest, &cmp_dest, &counter, producer);
+                        instructions.append(&mut intructions_if_dest);
+                    }
+                    else {
+                        if last_out {
+                            instructions.push(format!("{} = i64.{}", counter.clone(), size_dest-1)); 
+                        } else {
+                            instructions.push(format!("{} = i64.{}", counter.clone(), size_dest)); 
+                        }
+                    }
+                    let counter2 = producer.fresh_var();
+                    if !is_multiple_src {
+                        if last_out {
+                            values_src = values_dest.iter().map(|&(x,y)| (x, y - 1)).collect();
+                        }
+                        let mut intructions_if_src = create_if_selection(&values_src, &cmp_src, &counter2, producer);
+                        instructions.append(&mut intructions_if_src);
+                    }
+                    else {
+                        if last_out {
+                            instructions.push(format!("{} = i64.{}", counter2.clone(), size_src-1)); 
+                        } else {
+                            instructions.push(format!("{} = i64.{}", counter2.clone(), size_src)); 
+                        }
+                    }
+                    let check = producer.fresh_var();
+                    instructions.push(format!("{} = {} {} {}", check, lt64(), counter2, counter));
+                    instructions.push(format!("{} {}", add_if(), check));
+                    instructions.push(format!("{} = {}",  counter, counter2));
+                    instructions.push(add_end());
                 }
                 instructions.push(add_loop());
                 instructions.push(format!("{} {} ", add_if(), &counter));

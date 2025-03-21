@@ -97,72 +97,71 @@ impl  LocationRule {
                         let sp = producer.fresh_var();
                         instructions.push(format!("{} = get_template_signal_position {} {}", sp, tid, signal_code));
 			if indexes.len() == 0 {
-			    if producer.needs_comments() {
-                                instructions.push(";; end of load bucket".to_string());
-			    }
                             (instructions, ComputedAddress::SubcmpSignal(vcmp,sp))
 			} else {
                             let mut accsize = sp;
+                            let mut tbid = tid.clone();
+                            let mut get_dimention_function = " get_template_signal_dimension".to_string();
+                            let mut get_size_function = " get_template_signal_size".to_string();
+                            let mut get_type_function = " get_template_signal_type".to_string();
                             let mut idxpos = 0;
-                            if let AccessType::Indexed(index_info) = &indexes[0] {
-                                let index_list = &index_info.indexes;
-                                let dimensions = index_info.symbol_dim;
-                                assert!(index_list.len() > 0);
-                                let (mut instructions_idx0, vidx0) = index_list[0].produce_cvm(producer);
-                                instructions.append(&mut instructions_idx0);
-                                let mut prevsize = vidx0;
-				for i in 1..index_list.len() {
-                                    let dimi = producer.fresh_var();
-                                    instructions.push(format!("{} = get_template_signal_dimension {} {} {}", dimi, tid, signal_code, i));
-                                    let (mut instructions_idxi, vidxi) = index_list[i].produce_cvm(producer);
-                                    instructions.append(&mut instructions_idxi);
-                                    let curmul = producer.fresh_var();
-                                    instructions.push(format!("{} = {} {} {}", curmul, mul64(), prevsize, dimi));
-                                    let cursize = producer.fresh_var();
-                                    instructions.push(format!("{} = {} {} {}", cursize, add64(), curmul, vidxi));
-                                    prevsize = cursize;
-                                }
-                                assert!(index_list.len() <= dimensions);
-				let diff = dimensions - index_list.len();
-				if diff > 0 {
-				    //println!("There is difference: {}",diff);
-				    // must be last access
-				    assert!(idxpos+1 == indexes.len());
-				    for i in 0..diff-1 {
-                                        let dimi = producer.fresh_var();
-                                        instructions.push(format!("{} = get_template_signal_dimension {} {} {}", dimi, tid, signal_code, indexes.len() + i));                                        
-                                        let cursize = producer.fresh_var();
-                                        instructions.push(format!("{} = {} {} {}", cursize, mul64(), prevsize, dimi));
-                                        prevsize = cursize;
-				    }
-				} // after this we have the product of the remaining dimensions
-                                let vsize = producer.fresh_var();
-                                instructions.push(format!("{} = get_template_signal_size {} {}", vsize, tid, signal_code));
-                                let finalsize = producer.fresh_var();
-                                instructions.push(format!("{} = {} {} {}", finalsize, mul64(), prevsize, vsize));
-                                let access = producer.fresh_var();
-                                instructions.push(format!("{} = {} {} {}", access, add64(), accsize, prevsize));
-                                accsize = access;
-                                idxpos = 1;
-			    }
-                            else{
-                                idxpos = 0;
-                            }
-                            let mut get_bus_id_call = format!("get_template_signal_type {} {}", tid, signal_code);
 			    while idxpos < indexes.len() {
-				if let AccessType::Qualified(field_no) = &indexes[idxpos] {
+                                if let AccessType::Indexed(index_info) = &indexes[idxpos] {
+                                    let index_list = &index_info.indexes;
+                                    let dimensions = index_info.symbol_dim;
+                                    assert!(index_list.len() > 0);
+                                    let (mut instructions_idx0, vidx0) = index_list[0].produce_cvm(producer);
+                                    instructions.append(&mut instructions_idx0);
+                                    let mut prevsize = vidx0;
+				    for i in 1..index_list.len() {
+                                        let dimi = producer.fresh_var();
+                                        instructions.push(format!("{} = {} {} {} {}", dimi, get_dimention_function, tbid, signal_code, i));
+                                        let (mut instructions_idxi, vidxi) = index_list[i].produce_cvm(producer);
+                                        instructions.append(&mut instructions_idxi);
+                                        let curmul = producer.fresh_var();
+                                        instructions.push(format!("{} = {} {} {}", curmul, mul64(), prevsize, dimi));
+                                        let cursize = producer.fresh_var();
+                                        instructions.push(format!("{} = {} {} {}", cursize, add64(), curmul, vidxi));
+                                        prevsize = cursize;
+                                    }
+                                    assert!(index_list.len() <= dimensions);
+				    let diff = dimensions - index_list.len();
+				    if diff > 0 {
+				        //println!("There is difference: {}",diff);
+				        // must be last access
+				        assert!(idxpos+1 == indexes.len());
+				        for i in 0..diff-1 {
+                                            let dimi = producer.fresh_var();
+                                            instructions.push(format!("{} = {} {} {} {}", dimi, get_dimention_function, tid, signal_code, indexes.len() + i));                                        
+                                            let cursize = producer.fresh_var();
+                                            instructions.push(format!("{} = {} {} {}", cursize, mul64(), prevsize, dimi));
+                                            prevsize = cursize;
+				        }
+				    } // after this we have the product of the remaining dimensions
+                                    let vsize = producer.fresh_var();
+                                    instructions.push(format!("{} = {} {} {}", vsize,  get_size_function, tid, signal_code));
+                                    let finalsize = producer.fresh_var();
+                                    instructions.push(format!("{} = {} {} {}", finalsize, mul64(), prevsize, vsize));
+                                    let access = producer.fresh_var();
+                                    instructions.push(format!("{} = {} {} {}", access, add64(), accsize, prevsize));
+                                    accsize = access;
+                                } else if let AccessType::Qualified(field_no) = &indexes[idxpos] {
                                     let bid = producer.fresh_var();
-                                    instructions.push(format!("{} = {}", bid, get_bus_id_call));
+                                    instructions.push(format!("{} = {} {} {}", bid, get_type_function, tbid, signal_code));
+                                    tbid = bid.clone();
                                     let sfield = producer.fresh_var();
                                     instructions.push(format!("{} = get_bus_signal_position {} {}", sfield, bid, field_no));
                                     let access = producer.fresh_var();
                                     instructions.push(format!("{} = {} {} {}", access, add64(), accsize, sfield));
                                     accsize = access;
-				} else if let AccessType::Indexed(index_info) = &indexes[idxpos] {				    
-				    assert!(false);  
 				} else {
 				    assert!(false);
 				}
+                                if idxpos == 0 {
+                                    get_dimention_function = " get_bus_signal_dimension".to_string();
+                                    get_size_function = " get_bus_signal_size".to_string();
+                                    get_type_function = " get_bus_signal_type".to_string();
+                                }
                                 idxpos += 1;
 			    }
 			    if producer.needs_comments() {
