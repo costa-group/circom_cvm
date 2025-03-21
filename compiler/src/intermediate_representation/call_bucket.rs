@@ -94,9 +94,6 @@ impl WriteWasm for CallBucket {
                 instructions.push(get_local(producer.get_call_lvar_tag()));
                 instructions.push(set_constant(&count.to_string()));
                 instructions.push(add32());
-                // TODO: We compute the possible sizes, case multiple size
-                // Now in case Multiple we just return the first value
-                // See below case C (complete)
                 let arg_size = match &self.argument_types[i].size{
                     SizeOption::Single(value) => *value,
                     SizeOption::Multiple(_value) => {
@@ -899,18 +896,24 @@ impl WriteCVM for CallBucket{
                 assert!(false);
             }
             ReturnType::Final(data) => {
-                let size = match &data.context.size{
-                    SizeOption::Single(value) => value.to_string(),
-                    SizeOption::Multiple(_values) => {
-                        assert!(false);
-                        "0".to_string()
-                    }
-                };
                 let result_position = "spr".to_string();
                 let call_dest = producer.fresh_var();
-                instructions.push(format!("{} = {}", call_dest, result_position));
-                instructions.push(format!("ff.call ${} {} {} {}",self.symbol.clone(), call_dest, size.clone(), params));
                 let (mut instructions_dest, ldest) = data.dest.produce_cvm(&data.dest_address_type, &data.context,producer);
+                let size = match &data.context.size{
+                    SizeOption::Single(value) => format!("i64.{}",value),
+                    SizeOption::Multiple(values) => {
+                        let rsize = producer.fresh_var();
+                        if let  ComputedAddress::SubcmpSignal(rcmp,_rsig) = &ldest {
+                            let mut instructions_if_size = create_if_selection(&values, &rcmp, &rsize, producer);
+                            instructions.append(&mut instructions_if_size);
+                        } else {
+                            assert!(false);
+                        }
+                        rsize
+                    }
+                };
+                instructions.push(format!("{} = {}", call_dest, result_position));
+                instructions.push(format!("ff.call ${} {} {} {}", self.symbol.clone(), call_dest, size.clone(), params));
                 instructions.append(&mut instructions_dest);
                 let src_value = producer.fresh_var();
                 let dest_location;
@@ -957,22 +960,26 @@ impl WriteCVM for CallBucket{
                         }
                     }
                 }
-                let counter = producer.fresh_var();
+                let mut has_zero = false;
+                let counter;
                 match &data.context.size{
 	            SizeOption::Single(value) => {
+                        counter = producer.fresh_var();
 		        instructions.push(format!("{} = i64.{}", counter, value.to_string()));
 	            }
-	            SizeOption::Multiple(_values) => { //create a nested if-else with all cases
-                        assert!(false);
+	            SizeOption::Multiple(values) => {
+                        has_zero = values.iter().any(|e| e.1 == 0);
+                        counter = size;
 	            }
 	        };
                 if last_out {
                     instructions.push(format!("{} = {} {} i64.1", counter, sub64(), counter)); 
                 }
+                if has_zero && last_out {
+                    instructions.push(format!("{} {} ", add_if(), &counter));
+                }
                 instructions.push(add_loop());
                 instructions.push(format!("{} {} ", add_if(), &counter));
-                instructions.push(add_break());
-                instructions.push(add_end());
                 instructions.push(instruction_get_src);
                 instructions.push(instruction_set_dest);
                 instructions.push(format!("{} = {} {} i64.1", &counter, sub64(), &counter));
@@ -980,8 +987,13 @@ impl WriteCVM for CallBucket{
                 instructions.push(format!("{} = {} {} i64.1", &dest_location ,add64(), &dest_location));
                 instructions.push(add_continue());
                 instructions.push(add_end());
+                instructions.push(add_break());
+                instructions.push(add_end());
                 instructions.append(&mut last_instructions);
                 //result = "".to_string();
+                if has_zero && last_out {
+                    instructions.push(add_end());
+                }
             }
         }
         //make the call with lvar dest, size)

@@ -537,7 +537,7 @@ impl WriteCVM for ComputeBucket{
             }
             OperatorType::Eq(n) => {
                 let mut is_multiple = false;
-                let (length,_values) = match n{
+                let (length,values) = match n{
                     SizeOption::Single(v) => (*v,vec![]),
                     SizeOption::Multiple(v) => {
                         is_multiple = true;
@@ -547,8 +547,41 @@ impl WriteCVM for ComputeBucket{
 		assert!(length != 0);
 		if !is_multiple && length == 1 {
                     instructions.push(format!("{} = {} {}", res, eqff(), params));
-                } else {
-                    assert!(false);
+                } else {                    
+                    let counter = producer.fresh_var();
+                    let res = producer.fresh_var();
+                    if is_multiple { 
+                        if let Instruction::Load(load) = &*self.stack[1] {
+                            if let AddressType::SubcmpSignal {cmp_address, .. } = &load.address_type {
+                                let (mut instructions_cmp, vcmp) = cmp_address.produce_cvm(producer);
+                                instructions.append(&mut instructions_cmp);
+                                let mut instructions_if_eq = create_if_selection(&values, &vcmp, &counter, producer);
+                                instructions.append(&mut instructions_if_eq);
+                                if values.iter().any(|e| e.1 == 0) {
+                                    instructions.push(format!("{} = i64.{}", res, 1));
+                                }
+                            } else {
+                                assert!(false);
+                            }                            
+                        } else {
+                            assert!(false);
+                        }
+                    } else {
+                        instructions.push(format!("{} = i64.{}", counter, length));
+                    }
+                    instructions.push(add_loop());
+                    instructions.push(format!("{} {} ", add_if(), &counter));
+                    instructions.push(format!("{} = {} {}", res, eqff(), params));
+                    instructions.push(format!("{} {} ", add_if(), &res));
+                                      
+                    instructions.push(format!("{} = {} {} i64.1", &counter, sub64(), &counter));
+                    instructions.push(format!("{} = {} {} i64.1", &vresults[0], add64(), &vresults[0]));
+                    instructions.push(format!("{} = {} {} i64.1", &vresults[1], add64(), &vresults[1]));
+                    instructions.push(add_continue());
+                    instructions.push(add_end());
+                    instructions.push(add_end());                    
+                    instructions.push(add_break());
+                    instructions.push(add_end());
                 }
             }
             OperatorType::NotEq => {

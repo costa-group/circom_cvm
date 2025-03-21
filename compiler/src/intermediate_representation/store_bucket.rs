@@ -930,6 +930,7 @@ impl WriteCVM for StoreBucket{
                 let counter = producer.fresh_var(); 
                 let dest_location;
                 let mut instruction_set_dest = "".to_string();
+                let mut has_zero = false;
                 let mut last_out = false;
                 let mut last_instructions = vec![];
                 let mut cmp_dest = "".to_string();
@@ -980,14 +981,14 @@ impl WriteCVM for StoreBucket{
                         instructions.push(format!("{} = i64.{}", counter,n)); 
                     }
                 } else {
-                    if !is_multiple_dest {
+                    if is_multiple_dest {
+                        has_zero = values_dest.iter().any(|e| e.1 == 0) ;
                         if last_out {
                             values_dest = values_dest.iter().map(|&(x,y)| (x, y - 1)).collect();
                         }
-                        let mut intructions_if_dest = create_if_selection(&values_dest, &cmp_dest, &counter, producer);
-                        instructions.append(&mut intructions_if_dest);
-                    }
-                    else {
+                        let mut instructions_if_dest = create_if_selection(&values_dest, &cmp_dest, &counter, producer);
+                        instructions.append(&mut instructions_if_dest);
+                    } else {
                         if last_out {
                             instructions.push(format!("{} = i64.{}", counter.clone(), size_dest-1)); 
                         } else {
@@ -995,14 +996,14 @@ impl WriteCVM for StoreBucket{
                         }
                     }
                     let counter2 = producer.fresh_var();
-                    if !is_multiple_src {
+                    if is_multiple_src {
+                        has_zero = values_src.iter().any(|e| e.1 == 0);
                         if last_out {
                             values_src = values_dest.iter().map(|&(x,y)| (x, y - 1)).collect();
                         }
-                        let mut intructions_if_src = create_if_selection(&values_src, &cmp_src, &counter2, producer);
-                        instructions.append(&mut intructions_if_src);
-                    }
-                    else {
+                        let mut instructions_if_src = create_if_selection(&values_src, &cmp_src, &counter2, producer);
+                        instructions.append(&mut instructions_if_src);
+                    } else {
                         if last_out {
                             instructions.push(format!("{} = i64.{}", counter2.clone(), size_src-1)); 
                         } else {
@@ -1015,10 +1016,11 @@ impl WriteCVM for StoreBucket{
                     instructions.push(format!("{} = {}",  counter, counter2));
                     instructions.push(add_end());
                 }
+                if has_zero && last_out {
+                    instructions.push(format!("{} {} ", add_if(), &counter));
+                }
                 instructions.push(add_loop());
                 instructions.push(format!("{} {} ", add_if(), &counter));
-                instructions.push(add_break());
-                instructions.push(add_end());
                 instructions.push(instruction_get_src);
                 instructions.push(instruction_set_dest);
                 instructions.push(format!("{} = {} {} i64.1", &counter, sub64(), &counter));
@@ -1026,7 +1028,12 @@ impl WriteCVM for StoreBucket{
                 instructions.push(format!("{} = {} {} i64.1", &dest_location ,add64(), &dest_location));
                 instructions.push(add_continue());
                 instructions.push(add_end());
+                instructions.push(add_break());
+                instructions.push(add_end());
                 instructions.append(&mut last_instructions);
+                if has_zero && last_out {
+                    instructions.push(add_end());
+                }
             }
             else {
                 assert!(false);
