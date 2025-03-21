@@ -174,7 +174,7 @@ ff.call <function-name> [<local-memory-address>, <size>] <parameters list>
 i64.call <function-name> [<local-memory-address>, <size>] <parameters list>
 ```
 The parameter list contains element of the form:
-<value> | signal(indx,size) | i64.memory(indx,size) | ff.memory(indx,size) 
+<value> | signal(indx,size) | subcmpsignal(cmp,indx,size) | i64.memory(indx,size) | ff.memory(indx,size) 
 
 The return address (and size) is optional. If not incuded the result of the call should be assigned to  a register. Otherwise, the call is not assigned and the result is saved in the provided local memory address with (at most) the provided size. Note that if the call is not asigned then the first two parameters are the result address and the size. Examples:
 
