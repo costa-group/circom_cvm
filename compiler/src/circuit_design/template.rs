@@ -28,7 +28,9 @@ pub struct TemplateCodeInfo {
     pub expression_stack_depth: usize,
     pub signal_stack_depth: usize, // Not used now
     pub number_of_components: usize,
+    pub components_instances: Vec<Vec<Option<usize>>>,
     pub constant_variables: Vec<(String, Vec<usize>)>,
+    pub subcomponents: Vec<usize>,
 
 }
 impl ToString for TemplateCodeInfo {
@@ -188,9 +190,20 @@ impl WriteCVM for TemplateCodeInfo {
             inputs = format!("{} {}", inputs, in_info);
         }        
         let signals = self.number_of_intermediates + self.number_of_outputs + self.number_of_inputs;
-        let subcomponents = self.number_of_components; // TODO: number of components for now, change to list?
+        //let subcomponents = self.number_of_components; // TODO: number of components for now, change to list?
+
+        let mut subcomponents = "".to_string();
+        for comp_indexes in &self.components_instances{
+            for index in comp_indexes{
+                let index_info = match index{
+                    None => "-1".to_string(),
+                    Some(v) => v.to_string()
+                };
+                subcomponents = format!("{} {}", subcomponents, index_info);
+            }
+        }
         
-        instructions.push(format!("%%template {} [{}] [{}] [{}] [{}]",
+        instructions.push(format!("%%template {} [{}] [{}] [{}] [{} ]",
             self.header, 
             outputs,
             inputs,
