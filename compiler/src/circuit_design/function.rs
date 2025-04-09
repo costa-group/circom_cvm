@@ -162,7 +162,7 @@ impl WriteCVM for FunctionCodeInfo {
             let (mut instructions_body,_) = t.produce_cvm(producer);
             instructions.append(&mut instructions_body);
         }
-        
+        instructions.push("".to_string());
         (instructions, "".to_string())
     }
 }

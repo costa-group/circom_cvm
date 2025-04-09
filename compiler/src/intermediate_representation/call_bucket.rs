@@ -870,13 +870,13 @@ impl WriteCVM for CallBucket{
                     instructions.append(&mut instructions_p);
                     match lp {
                         ComputedAddress::Variable(rvar) => {
-                            params = format!("{} i64.memory({},{})", params, rvar, size);
+                            params = format!("{} ff.memory({},i64.{})", params, rvar, size);
                         }
                         ComputedAddress::Signal(rsig) => {
-                            params = format!("{} signal({},{})", params, rsig, size);
+                            params = format!("{} signal({},i64.{})", params, rsig, size);
                         }
                         ComputedAddress::SubcmpSignal(rcmp,rsig) => {
-                            params = format!("{} subcmpsignal({},{},{})", params, rcmp, rsig, size);
+                            params = format!("{} subcmpsignal({},{},i64.{})", params, rcmp, rsig, size);
                         }
                     }
                 } else {
@@ -887,7 +887,7 @@ impl WriteCVM for CallBucket{
                 instructions.append(&mut instructions_value);
                 params = format!("{} {}", params, src);
             }
-            instructions.push(format!("// end copying argument {}", i));
+            instructions.push(format!(";; end copying argument {}", i));
             i += 1;
         }
         let result = "".to_string();
@@ -997,7 +997,7 @@ impl WriteCVM for CallBucket{
             }
         }
         //make the call with lvar dest, size)
-        instructions.push("// end call bucket".to_string());
+        instructions.push(";; end call bucket".to_string());
         (instructions,result)
     }
 }
