@@ -139,19 +139,34 @@ ff.store
 
 ### Signal memory operations 
 
+```text
 get_signal  inx
+```
+inx is i64
+returns an ff
 
+```text
 get_cmp_signal cinx sinx
+```
+cinx is i64
+sinx is i64
+returns an ff
 
+```text
 set_signal  inx value
+```
+inx is i64
+value is ff
 
+```text
 set_cmp_input cinx sinx value
-
 set_cmp_input_cnt cinx sinx value
-
 set_cmp_input_run cinx sinx value
-
 set_cmp_input_cnt_check cinx sinx value
+```
+cinx is i64
+sinx is i64
+value is ff
 
 ### Control flow operations
 
@@ -193,7 +208,7 @@ Note taht the fact that the call is assigned or not determines whether the first
 
 ```text
 ff.return <value>
-i32.return <value>
+i64.return <value>
 ```
 
 It copies value to the address given in the call (it can be in the local memory of the callee or in signals)
@@ -206,6 +221,60 @@ It compares the given size with the size provided in the function call and copie
 
 
 ### Other operations
+
+```text
+get_template_id <i64 value>
+```
+Given a sub component number returns the template_id (i64) of the sub component as i64.
+it can only be used in the code of a template.
+
+```text
+get_template_signal_position <i64 value> <i64 value>
+```
+Given a template id and a signal id returns the offset (i64) of the signal in such template.
+It can only be used in the code of a template.
+
+```text
+get_template_signal_size <i64 value> <i64 value>
+```
+Given a template id and a signal id returns the size (i64) of the signal in such template.
+It can only be used in the code of a template.
+
+```text
+get_template_signal_dimension <i64 value> <i64 value>
+```
+Given a template id and a signal id returns the number of dimensions of (i64) of the signal in such template.
+It can only be used in the code of a template.
+
+```text
+get_template_signal_type <i64 value> <i64 value>
+```
+Given a template id and a signal id returns the type id (i64) of the signal in such template.
+It can only be used in the code of a template.
+
+```text
+get_bus_signal_position <i64 value> <i64 value>
+```
+Given a bus id and a signal id returns the offset (i64) of the signal in such template.
+It can only be used in the code of a template.
+
+```text
+get_bus_signal_size <i64 value> <i64 value>
+```
+Given a bus id and a signal id returns the size (i64) of the signal in such template.
+It can only be used in the code of a template.
+
+```text
+get_bus_signal_dimension <i64 value> <i64 value>
+```
+Given a bus id and a signal id returns the number of dimensions of (i64) of the signal in such template.
+It can only be used in the code of a template.
+
+```text
+get_bus_signal_type <i64 value> <i64 value>
+```
+Given a bus id and a signal id returns the type id (i64) of the signal in such template.
+It can only be used in the code of a template.
 
 outs ??
 
