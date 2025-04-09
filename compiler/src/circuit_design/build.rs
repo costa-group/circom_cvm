@@ -31,9 +31,8 @@ fn build_template_instances(
     constraint_assert_dissabled_flag: bool
 ) -> (FieldTracker, HashMap<String,usize>) {
 
-    fn compute_jump(lengths: &Vec<usize>, indexes: &[usize]) -> usize {
+    fn compute_jump(lengths: &Vec<usize>, mut full_length: usize, indexes: &[usize]) -> usize {
         let mut jump = 0;
-        let mut full_length = lengths.iter().fold(1, |p, c| p * (*c));
         let mut lengths = lengths.clone();
         lengths.reverse();
         for index in indexes {
@@ -43,6 +42,7 @@ fn build_template_instances(
         }
         jump
     }
+
     let mut cmp_id = 0;
     let mut tmp_id = 0;
     let mut string_table = HashMap::new();
@@ -61,7 +61,17 @@ fn build_template_instances(
         circuit.wasm_producer.message_list.push(msg);
         circuit.c_producer.has_parallelism |= template.is_parallel || template.is_parallel_component;
 
+        let mut component_to_sizes: HashMap<String, (usize, Vec<usize>)> = HashMap::new();
+        
+        for component in &template.components{
+            let full_length = component.lengths.iter().fold(1, |p, c| p * (*c));
+            component_to_sizes.insert(component.name.clone(), (full_length, component.lengths.clone()));
+        }
+
         let mut component_to_parallel: HashMap<String, ParallelClusters> = HashMap::new();
+        let mut component_to_instances: HashMap<String, Vec<(usize, usize)>> = HashMap::new();
+
+
         for trigger in &template.triggers{
             match component_to_parallel.get_mut(&trigger.component_name){
                 Some(parallel_info) => {
@@ -81,6 +91,31 @@ fn build_template_instances(
                     };
                     component_to_parallel.insert(trigger.component_name.clone(), new_parallel_info);
                 },
+            }
+
+            let (full_length, lengths) = component_to_sizes.get(&trigger.component_name).unwrap();
+            let position = compute_jump(lengths, *full_length, &trigger.indexed_with);
+            match component_to_instances.get_mut(&trigger.component_name){
+                Some(info) =>{
+                    info.push((position, trigger.template_id));
+                }
+                None =>{
+                    let mut new_info = Vec::new();
+                    new_info.push((position, trigger.template_id));
+                    component_to_instances.insert(trigger.component_name.clone(), new_info);
+                }
+            }
+        }
+
+        let mut components_instances = Vec::new();
+        for c in &template.components{
+            let total_length = component_to_sizes.get(&c.name).unwrap().0;
+            let c_pos = components_instances.len();
+            components_instances.push(vec![None; total_length]);
+
+            let instances = component_to_instances.get(&c.name).unwrap();
+            for (position, instance) in instances{
+                components_instances[c_pos][*position] = Some(*instance);
             }
         }
 
@@ -129,6 +164,7 @@ fn build_template_instances(
             name,
             header,
             number_of_components,
+            components_instances,
             id: tmp_id,
             is_parallel: template.is_parallel,
             is_parallel_component: template.is_parallel_component,

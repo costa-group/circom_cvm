@@ -1545,6 +1545,7 @@ fn perform_assign(
         } else{
             TagWire::default()
         };
+
         
         // Perform the tag propagation
         let r_slice = safe_unwrap_to_arithmetic_slice(r_folded, line!());
@@ -1554,8 +1555,9 @@ fn perform_assign(
         } else{
             reference_to_tags.remaining_inserts = 0;
         }
-        reference_to_tags.is_init = true;
+        
         perform_tag_propagation(&mut reference_to_tags.tags, &mut reference_to_tags.definitions, &new_tags.tags, reference_to_tags.is_init);
+        reference_to_tags.is_init = true;
 
         // Perform the signal assignment
         let signal_assignment_response = perform_signal_assignment(reference_to_signal_content, &accessing_information.before_signal, &r_slice.route(), &conditions_assignment);
