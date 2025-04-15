@@ -135,38 +135,112 @@ ff.load
 
 i64.store
 
-ff.store
+```text
+ff.store addr value
+```
+addr is i64
+value is ff
+
+```text
+ff.mstore addr1 addr2 size
+```
+addr1 is i64: destination address in variable memory
+addr2 is i64: source address in variable memory
+size is i64: : number of elements to be copied
+
+```text
+ff.mstore_from_signal addr idx size
+```
+addr is i64: destination address in variable memory
+sidx is i64: source signal (local)
+size is i64: : number of elements to be copied
+
+```text
+ff.mstore_from_cmp_signal addr idx size
+```
+addr is i64: destination address in variable memory
+cidx is i64: source component
+sidx is i64: source signal in component
+size is i64: : number of elements to be copied
 
 ### Signal memory operations 
 
 ```text
-get_signal  inx
+get_signal  idx
 ```
-inx is i64
+idx is i64
 returns an ff
 
 ```text
-get_cmp_signal cinx sinx
+get_cmp_signal cidx sidx
 ```
-cinx is i64
-sinx is i64
+cidx is i64
+sidx is i64
 returns an ff
 
 ```text
-set_signal  inx value
+set_signal  idx value
 ```
-inx is i64
+idx is i64
 value is ff
 
 ```text
-set_cmp_input cinx sinx value
-set_cmp_input_cnt cinx sinx value
-set_cmp_input_run cinx sinx value
-set_cmp_input_cnt_check cinx sinx value
+mset_signal  idx1 idx2 size
 ```
-cinx is i64
-sinx is i64
+idx1 is i64: destination
+idx2 is i64: source (signal)
+size: number of elements to be set
+
+```text
+mset_signal_from_memory  idx addr size
+```
+idx is i64: destination signal
+addr is i64: address in variable memory
+size: number of elements to be set
+
+```text
+set_cmp_input cidx sidx value
+set_cmp_input_cnt cidx sidx value
+set_cmp_input_run cidx sidx value
+set_cmp_input_cnt_check cidx sidx value
+```
+cidx is i64
+sidx is i64
 value is ff
+
+```text
+mset_cmp_input cidx sidx1 sidx2 size
+mset_cmp_input_cnt cidx sidx1 sidx2 size
+mset_cmp_input_run cidx sidx1 sidx2 size
+mset_cmp_input_cnt_check cidx sidx1 sidx2 size
+```
+cidx is i64: destination component
+sidx1 is i64: destination signal
+sidx2 is i64: source signal (local)
+size: number of elements to be set
+
+```text
+mset_cmp_input_from_cmp cidx1 sidx1 cidx2 sidx2 size
+mset_cmp_input_from_cmp_cnt cidx1 sidx1 cidx2 sidx2 size
+mset_cmp_input_from_cmp_run cidx1 sidx1 cidx2 sidx2 size
+mset_cmp_input_from_cmp_cnt_check cidx1 sidx1 cidx2 sidx2 size
+```
+cidx1 is i64: destination component
+sidx1 is i64: destination signal
+cidx2 is i64: source component
+sidx2 is i64: source signal
+size: number of elements to be set
+
+```text
+mset_cmp_input_from_memory cidx sidx addr size
+mset_cmp_input_from_memory_cnt cidx sidx addr size
+mset_cmp_input_from_memory_run cidx sidx addr size
+mset_cmp_input_from_memory_cnt_check cidx sidx addr size
+```
+cidx is i64: destination component
+sidx is i64: destination signal
+addr is i64: address in variable memory
+size: number of elements to be set
 
 ### Control flow operations
 
@@ -185,13 +259,15 @@ end
 #### Function call  operations
 
 ```text
-ff.call <function-name> [<local-memory-address>, <size>] <parameters list>
-i64.call <function-name> [<local-memory-address>, <size>] <parameters list>
+
+call <function-name> <parameters list>
+ff.call <function-name> <parameters list>
+i64.call <function-name> <parameters list>
 ```
 The parameter list contains element of the form:
 <value> | signal(indx,size) | subcmpsignal(cmp,indx,size) | i64.memory(indx,size) | ff.memory(indx,size) 
 
-The return address (and size) is optional. If not incuded the result of the call should be assigned to  a register. Otherwise, the call is not assigned and the result is saved in the provided local memory address with (at most) the provided size. Note that if the call is not asigned then the first two parameters are the result address and the size. Examples:
+When the call has no result a return address and size are expected to be provided in the list of parameters. The address will be used by a return statement to place the result in the local memory of the callee.  Examples:
 
 ```text
 x = ff.call $foo y signal(s,3) ff.memory(0,1)
@@ -199,10 +275,9 @@ x = ff.call $foo y signal(s,3) ff.memory(0,1)
 which calls the function $foo with the value in the register y, the tree signals starting from the signal index in the register s and with one field value at position 0 of the local memory and leaves the result in the register x.
 
 ```text
-ff.call $mfoo r s y signal(s,3) ff.memory(0,1)
+call $mfoo r s y signal(s,3) ff.memory(0,1)
 ```
 which calls the function $mfoo with the same parameter as above but the result will be stored at the local memory from address given by register r on.
-Note taht the fact that the call is assigned or not determines whether the first data after the function name is the return address or not.
 
 #### Return operations
 
