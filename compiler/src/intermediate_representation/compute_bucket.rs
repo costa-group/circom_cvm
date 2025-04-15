@@ -603,7 +603,7 @@ impl WriteCVM for ComputeBucket{
                 instructions.push(format!("{} = {} {}", res, bxorff(), params));
             }
             OperatorType::PrefixSub => {
-                instructions.push(format!("{} = {} 0 {}", res, subff(), params));
+                instructions.push(format!("{} = {} ff.0 {}", res, subff(), params));
            }
             OperatorType::BoolNot => {
                 instructions.push(format!("{} = {} {}", res, eqzff(), params));

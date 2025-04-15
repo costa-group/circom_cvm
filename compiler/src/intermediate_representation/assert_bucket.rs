@@ -97,7 +97,7 @@ impl WriteCVM for AssertBucket{
         let cvar = producer.fresh_var();
         instructions.push(format!("{} = {} {}", cvar, eqzff(), avar));
         instructions.push(format!("{} {}", add_if(), cvar));
-        instructions.push(exception(&"0".to_string()));
+        instructions.push(exception(&"i64.0".to_string()));
         instructions.push(add_end());
         if producer.needs_comments() {
             instructions.push(";; end of assert bucket".to_string());

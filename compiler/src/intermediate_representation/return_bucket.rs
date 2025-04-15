@@ -126,7 +126,7 @@ impl WriteCVM for ReturnBucket{
     fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<String>,String) {
         use cvm_code_generator::*;
         let mut instructions = vec![];
-        instructions.push("// return bucket".to_string());
+        instructions.push(";; return bucket".to_string());
         let (mut instructions_src, src) = self.value.produce_cvm(producer); // compute the source
         instructions.append(&mut instructions_src);
         if self.with_size == 1 {

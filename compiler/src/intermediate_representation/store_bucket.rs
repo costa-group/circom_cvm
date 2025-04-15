@@ -1019,13 +1019,17 @@ impl WriteCVM for StoreBucket{
                 if has_zero && last_out {
                     instructions.push(format!("{} {} ", add_if(), &counter));
                 }
+                let location_var = producer.fresh_var();
+                let destination_var = producer.fresh_var();
+                instructions.push(format!("{} = {}", &location_var, &src_location));
+                instructions.push(format!("{} = {}", &destination_var, &dest_location));
                 instructions.push(add_loop());
                 instructions.push(format!("{} {} ", add_if(), &counter));
                 instructions.push(instruction_get_src);
                 instructions.push(instruction_set_dest);
                 instructions.push(format!("{} = {} {} i64.1", &counter, sub64(), &counter));
-                instructions.push(format!("{} = {} {} i64.1", &src_location, add64(), &src_location));
-                instructions.push(format!("{} = {} {} i64.1", &dest_location ,add64(), &dest_location));
+                instructions.push(format!("{} = {} {} i64.1", &location_var, add64(), &location_var));
+                instructions.push(format!("{} = {} {} i64.1", &destination_var ,add64(), &destination_var));
                 instructions.push(add_continue());
                 instructions.push(add_end());
                 instructions.push(add_break());
