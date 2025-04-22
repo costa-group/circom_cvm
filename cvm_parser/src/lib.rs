@@ -91,6 +91,12 @@ fn parse_ast_node(input: &str) -> IResult<&str, ASTNode> {
     )).parse(input)
 }
 
+fn parse_id_name(input: &str) -> Result<usize, nom::Err<nom::error::Error<&str>>> {
+    let (input, _) = many0(complete(preceded(alphanumeric1, tag("_")))).parse(input)?;
+    let (_, id) = usize(input)?;
+    Ok(id)
+}
+
 fn parse_local_memory(input: &str) -> IResult<&str, usize> {
     preceded(tag("local.memory"), preceded(space0, usize)).parse(input)
 }
@@ -101,6 +107,12 @@ fn parse_function(input: &str) -> IResult<&str, Function> {
 
     let (input, name) = parse_variable_name(input)?;
     let (input, _) = space0(input)?;
+
+    let id = parse_id_name(&name);
+    let id = match id {
+        Ok(id) => id,
+        Err(_) => return Err(nom::Err::Failure(nom::error::Error::new(input, nom::error::ErrorKind::Fail))),
+    };
 
     let (input, outputs) = delimited(tag("["),
     delimited(space0, separated_list0(space1, alphanumeric1), space0), 
@@ -119,18 +131,13 @@ fn parse_function(input: &str) -> IResult<&str, Function> {
     let (input, (body, _)) = many_till(parse_ast_node, alt((peek(eof), peek(tag("%%"))))).parse(input)?;
 
     Ok((input, Function {
+        id,
         name,
         outputs,
         inputs,
         local_memory,
         body,
     }))
-}
-
-fn parse_id_template(input: &str) -> Result<usize, nom::Err<nom::error::Error<&str>>> {
-    let (input, _) = many0(complete(preceded(alphanumeric1, tag("_")))).parse(input)?;
-    let (_, id) = usize(input)?;
-    Ok(id)
 }
 
 fn parse_template(input: &str) -> IResult<&str, Template> {
@@ -140,7 +147,7 @@ fn parse_template(input: &str) -> IResult<&str, Template> {
     let (input, name) = parse_variable_name(input)?;
     let (input, _) = space0(input)?;
 
-    let id = parse_id_template(&name);
+    let id = parse_id_name(&name);
     let id = match id {
         Ok(id) => id,
         Err(_) => return Err(nom::Err::Failure(nom::error::Error::new(input, nom::error::ErrorKind::Fail))),
@@ -388,9 +395,10 @@ mod tests {
 
     #[test]
     fn test_parse_function() {
-        let input = "%%function my_function [output1 output2] [input1 input2]\nlocal.memory 10\n  ;; body\n x = ff.add y z\n\n";
+        let input = "%%function my_function_0 [output1 output2] [input1 input2]\nlocal.memory 10\n  ;; body\n x = ff.add y z\n\n";
         let expected = Function {
-            name: "my_function".to_string(),
+            id: 0,
+            name: "my_function_0".to_string(),
             outputs: vec!["output1".to_string(), "output2".to_string()],
             inputs: vec!["input1".to_string(), "input2".to_string()],
             local_memory: 10,
@@ -417,13 +425,13 @@ mod tests {
     #[test]
     fn test_parse_id_template() {
         let input = "template_20";
-        assert_eq!(parse_id_template(input), Ok(20));
+        assert_eq!(parse_id_name(input), Ok(20));
     }
 
     #[test]
     fn test_parse_id_template_2() {
         let input = "template_alfa_23_20";
-        assert_eq!(parse_id_template(input), Ok(20));
+        assert_eq!(parse_id_name(input), Ok(20));
     }
 
     #[test]
