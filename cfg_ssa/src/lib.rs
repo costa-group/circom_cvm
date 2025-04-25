@@ -4,16 +4,26 @@ pub mod ast;
 pub mod types;
 //TODO: This should not be public, but i want to test first
 pub mod type_checking;
+mod cfg_construction;
 mod tests;
 
 use ast::{ASTNode, Function, Template, AST};
+use cfg_construction::CFG_Constructor;
 
 use crate::types::*;
 
+
+#[derive(Debug, Clone)]
+enum OperatorOrPhi {
+    Operator(Operator),
+    Phi,
+}
+
 #[derive(Debug, Clone)]
 pub struct Statement {
-    num_type: Option<NumericType>,
-    operator: Option<Operator>,
+    //TODO: Should we store thiw now?
+    // num_type: Option<NumericType>,
+    operator: Option<OperatorOrPhi>,
     output: Option<String>,
     operands: Vec<Expression>,
 }
@@ -51,11 +61,11 @@ impl BasicBlock {
         self.statements.push(stmt);
     }
 
-    pub fn add_predecessor(&mut self, pred: usize) {
+    fn add_predecessor(&mut self, pred: usize) {
         self.predecessors.insert(pred);
     }
 
-    pub fn add_succesor(&mut self, suc: Successor) {
+    fn add_succesor(&mut self, suc: Successor) {
         self.successors = Some(suc);
     }
 }
@@ -66,84 +76,14 @@ pub struct CFG {
     blocks: Vec<BasicBlock>,
 }
 
-//Returns the exit block
-fn process_body(blocks: &mut Vec<BasicBlock>, body: &Vec<ASTNode>, curr: usize) -> usize {
-    for stat in body {
-        match stat {
-            ASTNode::Operation { num_type, operator, output, operands } => {
-                let stmt = Statement {
-                    //TODO: improve, avoid cloning everything
-                    num_type: num_type.clone(),
-                    operator: operator.clone(),
-                    output: output.clone(),
-                    operands: operands.clone(),
-                };
-                blocks[curr].add_instruction(stmt);
-            }
-            ASTNode::Loop { body } => {
-
-            }
-            ASTNode::IfThenElse { condition, if_case, else_case } => {
-                //Add if block
-                let to_if = body.len();
-                let if_block = BasicBlock::new(to_if);
-                blocks.push(if_block);
-
-                //Add else block (optional)
-                let mut to_else = None;
-                if else_case.is_some() {
-                    to_else = Some(body.len());
-                    let else_block = BasicBlock::new(body.len() + 1);
-                    blocks.push(else_block);
-                }
-
-                let suc = Successor::Conditional { condition: condition.clone(), to_then: body.len(), to_else };
-                blocks[curr].add_succesor(suc);
-
-                //If body
-                let exit_if = process_body(blocks, body, to_if);
-
-                //Else body
-                let mut exit_else: Option<usize> = None;
-                if let Some(to_else) = to_else {
-                    exit_else = Some(process_body(blocks, body, to_else));
-                }
-
-                //Convergence block
-                let conv_id = body.len();
-                let conv_block = BasicBlock::new(conv_id);
-                blocks.push(conv_block);
-
-                //Link with if case
-                blocks[exit_if].add_succesor(Successor::Unconditional { to: conv_id });
-                blocks[conv_id].add_predecessor(exit_if);
-
-                //Link with else case
-                if let Some(exit_else) = exit_else {
-                    blocks[exit_else].add_succesor(Successor::Unconditional { to: conv_id });
-                    blocks[conv_id].add_predecessor(exit_else);
-                }
-            }
-            ASTNode::Break => {
-
-            }
-            ASTNode::Continue => {
-
-            }
-        }
-    }
-
-    //Todo: return the correct exit block
-    0
-}
-
 impl CFG {
     pub fn new_from_fun(f: Function) -> Self {
         let mut entry = 0;
         let mut blocks = vec![BasicBlock::new(entry)];
         //TODO: add declarations of parameters
 
-        process_body(&mut blocks, &f.body, entry);
+        let mut constructor = CFG_Constructor::new();
+        constructor.process_body(&mut blocks, &f.body, entry);
 
         CFG { entry, blocks }
     }
@@ -153,9 +93,35 @@ impl CFG {
         let mut blocks = vec![BasicBlock::new(entry)];
         //TODO: add declarations of inputs
 
-        process_body(&mut blocks, &t.body, entry);
+        let mut constructor = CFG_Constructor::new();
+        constructor.process_body(&mut blocks, &t.body, entry);
 
         CFG { entry, blocks }
+    }
+
+    pub fn add_instruction(&mut self, block: usize, stmt: Statement) {
+        self.blocks[block].add_instruction(stmt);
+    }
+
+    pub fn create_new_block(&mut self) -> usize {
+        let id = self.blocks.len();
+        let new_block = BasicBlock::new(id);
+        self.blocks.push(new_block);
+
+        id
+    }
+
+    pub fn add_uncond_link(&mut self, pred: usize, suc: usize) {
+        self.blocks[pred].add_succesor(Successor::Unconditional { to: suc });
+        self.blocks[suc].add_predecessor(pred);
+    }
+
+    pub fn add_cond_link(&mut self, pred: usize, condition: Expression, to_then: usize, to_else: Option<usize>) {
+        self.blocks[pred].add_succesor(Successor::Conditional { condition, to_then, to_else });
+        self.blocks[to_then].add_predecessor(pred);
+        if let Some(to_else) = to_else {
+            self.blocks[to_else].add_predecessor(pred);
+        }
     }
 }
 
