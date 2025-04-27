@@ -29,9 +29,15 @@ impl  CfgConstructor {
                     cfg.add_instruction(curr, stmt);
                 }
                 ASTNode::Loop { body: body_loop } => {
-                    //Add new block for the loop body
-                    let entry_block_loop = cfg.create_new_block();
-                    cfg.add_uncond_link(curr, entry_block_loop);
+                    //Add new block for the loop body (if the current is not empty)
+                    let entry_block_loop;
+                    if !cfg.check_empty_block(curr) {
+                        entry_block_loop = cfg.create_new_block();
+                        cfg.add_uncond_link(curr, entry_block_loop);
+                    }
+                    else {
+                        entry_block_loop = curr;
+                    }
                     self.entry_loop_context.push(entry_block_loop);
 
                     //Add new block for the instructions after the loop
@@ -55,6 +61,7 @@ impl  CfgConstructor {
                     let to_then = cfg.create_new_block();
 
                     //Convergence block
+                    //TODO: Create this always or only when there are more instructions?
                     let conv_id = cfg.create_new_block();
 
                     //Add else block (optional)
@@ -188,7 +195,7 @@ mod tests {
                             Expression::Atomic(Atomic::Variable("z".to_string())),
                             ],
                         },
-                        ASTNode::Continue,
+                        // ASTNode::Continue,
                     ]),
                 },
                 ],

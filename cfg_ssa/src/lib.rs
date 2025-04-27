@@ -116,6 +116,10 @@ impl CFG {
         id
     }
 
+    pub fn check_empty_block(&self, block: usize) -> bool {
+        self.blocks[block].statements.is_empty()
+    }
+
     fn check_existing_successor(&self, block: usize) -> bool {
         self.blocks[block].successors.is_some()
     }
