@@ -1,20 +1,21 @@
 extern crate num_bigint_dig as num_bigint;
 use num_bigint::BigInt;
+use serde::Serialize;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum NumericType {
     Integer,
     FiniteField,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum Type {
     //TODO: Change in the future, identifiers are not i64 (cannot be used to sum)
     Variable(NumericType),
     Function(Vec<NumericType>, Vec<NumericType>),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum Operator {
     //TODO: There are more operations
     //Arithmetic
@@ -108,19 +109,19 @@ pub enum Operator {
     //TODO: outs
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum ConstantType {
     FF(BigInt),
     I64(i64),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum Atomic {
     Constant(ConstantType),
     Variable(String),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum Parameter {
     //TODO: Not index is number of dimensions and length of each
     //Change second to vector of size first
@@ -143,7 +144,7 @@ pub enum Parameter {
     },
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum Expression {
     Atomic(Atomic),
     Parameter(Parameter),
