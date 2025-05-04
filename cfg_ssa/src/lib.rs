@@ -20,12 +20,16 @@ enum OperatorOrPhi {
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct Statement {
-    //TODO: Should we store thiw now?
-    // num_type: Option<NumericType>,
+struct Value {
     operator: Option<OperatorOrPhi>,
-    output: Option<String>,
     operands: Vec<Expression>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct Statement {
+    num_type: Option<NumericType>,
+    output: Option<String>,
+    value: Value,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -87,8 +91,8 @@ impl CFG {
         let mut cfg = CFG::new(entry);
         //TODO: add declarations of parameters
 
-        let mut constructor = CfgConstructor::new();
-        constructor.process_body(&mut cfg, &f.body, entry);
+        let mut constructor = CfgConstructor::new(&mut cfg);
+        constructor.process_body(&f.body, entry);
 
         cfg
     }
@@ -98,8 +102,8 @@ impl CFG {
         let mut cfg = CFG::new(entry);
         //TODO: add declarations of inputs
 
-        let mut constructor = CfgConstructor::new();
-        constructor.process_body(&mut cfg, &t.body, entry);
+        let mut constructor = CfgConstructor::new(&mut cfg);
+        constructor.process_body(&t.body, entry);
 
         cfg
     }
@@ -118,6 +122,10 @@ impl CFG {
 
     pub fn check_empty_block(&self, block: usize) -> bool {
         self.blocks[block].statements.is_empty()
+    }
+
+    pub fn predecessors(&self, block: usize) -> &Vec<usize> {
+        &self.blocks[block].predecessors
     }
 
     fn check_existing_successor(&self, block: usize) -> bool {
@@ -203,9 +211,6 @@ impl CFG {
         dot.push_str("}\n");
         dot
     }
-    
-    
-    
 }
 
 pub struct CFGList {
