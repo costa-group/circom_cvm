@@ -1,61 +1,92 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
-use crate::{ast::ASTNode, OperatorOrPhi, Statement, Value, CFG};
+use crate::{ast::ASTNode, types::{Atomic, Expression, Parameter}, OperatorOrPhi, Statement, Value, CFG};
 
 type Stack<T> = Vec<T>;
 
+/// A SSA-based CFG builder
 pub struct CfgConstructor<'a> {
     cfg: &'a mut CFG,
-    //This stacks save the last loop entry and exit blocks (needed for the break and continue)
+
+    ///Stacks that save the last loop entry and exit blocks (needed for the break and continue)
     entry_loop_context: Stack<usize>,
     exit_loop_context: Stack<usize>,
-    // Save for each block the definition of the variables it contains (the new name)
-    current_definition: Vec<HashMap<String, String>>,
-    // Save for each static single assign variable its actual value
-    definition_value: HashMap<String, Value>,
-    variable_index: usize,
+
+    /// Save for each block the definition of the variables it contains (the new name)
+    definitions: Vec<HashMap<String, String>>,
+
+    /// Current SSA values: name -> concrete Value
+    values: HashMap<String, Value>,
+
+    /// Tracks unfinished φ-nodes per block
+    incomplete_phis: Vec<HashSet<String>>,
+
+    /// For each variable, we save the variables that make use of it
+    uses: HashMap<String, HashSet<String>>,
+
     sealed_blocks: Vec<bool>,
-    incomplete_phis: Vec<HashMap<String, Value>>,
+    next_var: usize,
 }
 
 
 impl<'a> CfgConstructor<'a> {
-    pub fn new(cfg: &'a mut CFG) -> Self { Self { cfg, entry_loop_context: Stack::new(),
-    exit_loop_context: Stack::new(), current_definition: Vec::new(), definition_value:
-        HashMap::new(), sealed_blocks: Vec::new(), incomplete_phis: Vec::new(), variable_index: 0 }
+    pub fn new(cfg: &'a mut CFG) -> Self {
+        Self {
+            cfg,
+            entry_loop_context: Stack::new(),
+            exit_loop_context: Stack::new(),
+            definitions: Vec::new(),
+            values: HashMap::new(),
+            incomplete_phis: Vec::new(),
+            uses: HashMap::new(),
+            sealed_blocks: Vec::new(),
+            next_var: 0,
+        }
     }
 
     //Create a new block for the cfg, but, at the same time, increase the size of the block
     //variable definition
     fn create_block(&mut self) -> usize {
-        self.current_definition.push(HashMap::new());
-        self.incomplete_phis.push(HashMap::new());
+        self.definitions.push(HashMap::new());
+        self.incomplete_phis.push(HashSet::new());
         self.sealed_blocks.push(false);
         self.cfg.create_new_block()
     }
 
     fn create_new_var(&mut self) -> String {
-        let new_var = format!("v{}", self.variable_index);
-        self.variable_index += 1;
+        let new_var = format!("v{}", self.next_var);
+        self.next_var += 1;
         new_var
     }
 
     fn seal_block(&mut self, block: usize) {
-        //TODO: Check variables in incomplete Phis of the block
+        let vars: Vec<_> = self.incomplete_phis[block].iter().cloned().collect();
+        for var in vars {
+            self.add_phi_operands(var, block);
+        }
         self.sealed_blocks[block] = true;
     }
 
     fn write_variable(&mut self, variable: String, block: usize, value: Value) {
         // self.current_definition[block].insert(variable.clone(), value.clone());
         let new_var = self.create_new_var();
-        self.definition_value.insert(new_var.clone(), value.clone());
-        self.current_definition[block].insert(variable.clone(), new_var);
+        for operand in &value.operands {
+            //TODO: Also for parameters that can have variables inside
+            if let Expression::Atomic(Atomic::Variable(var)) = &operand {
+                //We add to the list of uses of the operand the new variable
+                //We assume that the entries are already the variables of the ssa, meaning that we
+                //have already read them before creating the value
+                self.uses.entry(var.clone()).or_default().insert(new_var.clone());
+            }
+        }
+        self.values.insert(new_var.clone(), value);
+        self.definitions[block].insert(variable.clone(), new_var);
     }
 
     fn read_variable(&mut self, variable: &str, block: usize) -> String {
-        if self.current_definition[block].contains_key(variable) {
+        if self.definitions[block].contains_key(variable) {
             //TODO: Don't clone
-            return self.current_definition[block][variable].clone();
+            return self.definitions[block][variable].clone();
         }
         self.read_variable_recursive(variable, block)
     }
@@ -65,55 +96,122 @@ impl<'a> CfgConstructor<'a> {
         let new_var;
         if !self.sealed_blocks[block] {
             // Incomplete CFG
-            new_var = self.create_new_var();
             let value = Value { operator: Some(OperatorOrPhi::Phi), operands: Vec::new() };
-            // self.incomplete_phis[block].insert(new_var.clone(), value);
+            self.write_variable(variable.to_string(), block, value);
+            new_var = self.read_variable(variable, block);
+            self.incomplete_phis[block].insert(new_var.clone());
         }
         else if self.cfg.predecessors(block).len() == 1 {
             // Optimize the common case of one predecessor: No phi needed
             let var = self.read_variable(variable, self.cfg.predecessors(block)[0]);
-            let value = self.definition_value[&var].clone();
+            let value = self.values[&var].clone();
             self.write_variable(var.clone(), block, value);
-            new_var = self.read_variable(&var, block);
+            new_var = self.read_variable(&var, block);    //This should read the variable written
+                                                                    //in the current block
         }
         else {
             // Break potential cycles with operandless phi
             self.write_variable(variable.to_string(), block, Value { operator: Some(OperatorOrPhi::Phi), operands: Vec::new() });
-            new_var = self.read_variable(variable, block);
-
+            new_var = self.read_variable(variable, block);  //This should read the variable written
+                                                            //in the current block
+            self.add_phi_operands(new_var.clone(), block);
         }
         new_var
     }
 
-    fn add_phi_operands(&mut self, variable: String, phi: &mut Value, block: usize) {
-        for pred in self.cfg.predecessors(block) {
-            phi.append_operand(self.read_variable(variable, *pred));
+    fn add_phi_operands(&mut self, variable: String, block: usize) {
+        //TODO: Avoid cloning
+        let predecessors: Vec<usize> = self.cfg.predecessors(block).clone();
+        let operands: Vec<String> = predecessors
+            .iter()
+            .map(|pred| self.read_variable(&variable, *pred))
+            .collect();
+
+        //TODO: Improve error
+        let phi = self.values.get_mut(&variable).expect("Phi node not found");
+
+        for operand in operands {
+            phi.append_operand(operand);
         }
-        return try_remove_trivial_phi(phi);
+
+        self.try_remove_trivial_phi(variable);
     }
 
-    fn try_remove_trivial_phi(&mut self, phi: &mut Value) {
-        todo!();
-        // let mut same = None;
-        // for op in phi.operands {
-        //     if op == same || op == phi {
-        //         continue;
-        //     }
-        //     if same.is_some() {
-        //         return phi;
-        //     }
-        //     some = Some(op);
-        // }
-        // user = phi.users.remove(phi);
-        // phi.replace_by(same);
-        //
-        // for use in users {
-        //     if use is Phi {
-        //         self.try_remove_trivial_phi(use);
-        //     }
-        // }
-        //
-        // return same;
+    fn replace_variable_in_expression(expr: &mut Expression, target: &str, replacement: &str) {
+        match expr {
+            Expression::Atomic(Atomic::Variable(v)) if v == target => {
+                *v = replacement.to_string();
+            }
+            Expression::Atomic(_) => {}
+            Expression::Parameter(param) => {
+                let update_atomic = |a: &mut Atomic| {
+                    if let Atomic::Variable(v) = a {
+                        if v == target {
+                            *v = replacement.to_string();
+                        }
+                    }
+                };
+
+                match param {
+                    Parameter::Signal { index, size }
+                    | Parameter::I64Memory { index, size }
+                    | Parameter::FfMemory { index, size } => {
+                        update_atomic(index);
+                        update_atomic(size);
+                    }
+                    Parameter::SubcmpSignal { component, index, size } => {
+                        update_atomic(component);
+                        update_atomic(index);
+                        update_atomic(size);
+                    }
+                }
+            }
+        }
+    }
+
+
+    fn try_remove_trivial_phi(&mut self, phi: String) {
+        let val = self.values.get(&phi).expect("Phi node not found");
+        let mut same: Option<String> = None;
+        for op in &val.operands {
+            if let Expression::Atomic(Atomic::Variable(var_op)) = op {
+                if let Some(same_v) = &same {
+                    if *var_op == *same_v || *var_op == phi {
+                        //Unique value or self-reference
+                        continue;
+                    }
+                    else {
+                        //The phi merges at least two different values: not trivial
+                        return;
+                    }
+                }
+                same = Some(var_op.to_string());
+            }
+            else {
+                panic!("Phi functions should only have variables as operands");
+            }
+        }
+
+        if let Some(uses) = self.uses.get_mut(&phi) {
+            if let Some(same_v) = same {
+                let vars_to_process: Vec<String> = uses.iter().cloned().collect();
+                for var in vars_to_process {
+                    if let Some(value) = self.values.get_mut(&var) {
+                        for operand in value.operands.iter_mut() {
+                            Self::replace_variable_in_expression(operand, &phi, &same_v);
+                        }
+
+                        if value.is_phi() {
+                            self.try_remove_trivial_phi(var.clone());
+                        }
+                    }
+                }
+            }
+            else {
+                //This case means that the uses are dead code → eliminate them
+                //TODO: Eliminate them (also their uses recursively)
+            }
+        }
     }
 
     //Returns the exit block

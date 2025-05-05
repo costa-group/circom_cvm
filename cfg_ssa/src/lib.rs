@@ -25,6 +25,17 @@ struct Value {
     operands: Vec<Expression>,
 }
 
+impl Value {
+    //This should only be used for phi functions
+    pub fn append_operand(&mut self, var: String) {
+        self.operands.push(Expression::Atomic(Atomic::Variable(var)));
+    }
+
+    pub fn is_phi(&self) -> bool {
+        matches!(self.operator, Some(OperatorOrPhi::Phi))
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct Statement {
     num_type: Option<NumericType>,
