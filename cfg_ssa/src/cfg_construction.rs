@@ -9,18 +9,21 @@ pub struct CfgConstructor<'a> {
     //This stacks save the last loop entry and exit blocks (needed for the break and continue)
     entry_loop_context: Stack<usize>,
     exit_loop_context: Stack<usize>,
-    //Save for each block the definition of they variables it contains
-    current_definition: Vec<HashMap<String, Value>>,
+    // Save for each block the definition of the variables it contains (the new name)
+    current_definition: Vec<HashMap<String, String>>,
+    // Save for each static single assign variable its actual value
+    definition_value: HashMap<String, Value>,
+    variable_index: usize,
     sealed_blocks: Vec<bool>,
     incomplete_phis: Vec<HashMap<String, Value>>,
 }
 
 
 impl<'a> CfgConstructor<'a> {
-    pub fn new(cfg: &'a mut CFG) -> Self {
-            Self { cfg, entry_loop_context: Stack::new(), exit_loop_context: Stack::new(),
-            current_definition: Vec::new(), sealed_blocks: Vec::new(), incomplete_phis: Vec::new() }
-        }
+    pub fn new(cfg: &'a mut CFG) -> Self { Self { cfg, entry_loop_context: Stack::new(),
+    exit_loop_context: Stack::new(), current_definition: Vec::new(), definition_value:
+        HashMap::new(), sealed_blocks: Vec::new(), incomplete_phis: Vec::new(), variable_index: 0 }
+    }
 
     //Create a new block for the cfg, but, at the same time, increase the size of the block
     //variable definition
@@ -31,56 +34,65 @@ impl<'a> CfgConstructor<'a> {
         self.cfg.create_new_block()
     }
 
+    fn create_new_var(&mut self) -> String {
+        let new_var = format!("v{}", self.variable_index);
+        self.variable_index += 1;
+        new_var
+    }
+
     fn seal_block(&mut self, block: usize) {
         //TODO: Check variables in incomplete Phis of the block
         self.sealed_blocks[block] = true;
     }
 
     fn write_variable(&mut self, variable: String, block: usize, value: Value) {
-        self.current_definition[block].insert(variable.clone(), value.clone());
-        //TODO: Fix num_type
-        let stmt = Statement { num_type: None, output: Some(variable), value };
-        self.cfg.add_instruction(block, stmt);
+        // self.current_definition[block].insert(variable.clone(), value.clone());
+        let new_var = self.create_new_var();
+        self.definition_value.insert(new_var.clone(), value.clone());
+        self.current_definition[block].insert(variable.clone(), new_var);
     }
 
-    fn read_variable(&mut self, variable: String, block: usize) -> Value {
-        if self.current_definition[block].contains_key(&variable) {
+    fn read_variable(&mut self, variable: &str, block: usize) -> String {
+        if self.current_definition[block].contains_key(variable) {
             //TODO: Don't clone
-            return self.current_definition[block][&variable].clone();
+            return self.current_definition[block][variable].clone();
         }
         self.read_variable_recursive(variable, block)
     }
 
-    fn read_variable_recursive(&mut self, variable: String, block: usize) -> Value {
+    fn read_variable_recursive(&mut self, variable: &str, block: usize) -> String {
         //TODO: Remove all those clones
-        let value;
+        let new_var;
         if !self.sealed_blocks[block] {
             // Incomplete CFG
-            value = Value { operator: Some(OperatorOrPhi::Phi), operands: Vec::new() };
-            self.incomplete_phis[block].insert(variable.clone(), value.clone());
+            new_var = self.create_new_var();
+            let value = Value { operator: Some(OperatorOrPhi::Phi), operands: Vec::new() };
+            // self.incomplete_phis[block].insert(new_var.clone(), value);
         }
         else if self.cfg.predecessors(block).len() == 1 {
             // Optimize the common case of one predecessor: No phi needed
-            value = self.read_variable(variable.clone(), self.cfg.predecessors(block)[0]);
+            let var = self.read_variable(variable, self.cfg.predecessors(block)[0]);
+            let value = self.definition_value[&var].clone();
+            self.write_variable(var.clone(), block, value);
+            new_var = self.read_variable(&var, block);
         }
         else {
             // Break potential cycles with operandless phi
-            let val = Value { operator: Some(OperatorOrPhi::Phi), operands: Vec::new() };
-            self.write_variable(variable.clone(), block, val.clone());
-            value = self.add_phi_operands(variable.clone(), val.clone(), block);
+            self.write_variable(variable.to_string(), block, Value { operator: Some(OperatorOrPhi::Phi), operands: Vec::new() });
+            new_var = self.read_variable(variable, block);
+
         }
-        self.write_variable(variable, block, value.clone());
-        value
+        new_var
     }
 
-    fn add_phi_operands(&mut self, variable: String, phi: Value, block: usize) -> Value {
+    fn add_phi_operands(&mut self, variable: String, phi: &mut Value, block: usize) {
         for pred in self.cfg.predecessors(block) {
             phi.append_operand(self.read_variable(variable, *pred));
         }
         return try_remove_trivial_phi(phi);
     }
 
-    fn try_remove_trivial_phi(&mut self, phi: Value) -> Value {
+    fn try_remove_trivial_phi(&mut self, phi: &mut Value) {
         todo!();
         // let mut same = None;
         // for op in phi.operands {
