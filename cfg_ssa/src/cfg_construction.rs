@@ -35,11 +35,11 @@ impl<'a> CfgConstructor<'a> {
             cfg,
             entry_loop_context: Stack::new(),
             exit_loop_context: Stack::new(),
-            definitions: Vec::new(),
+            definitions: vec![HashMap::new()],
             values: HashMap::new(),
-            incomplete_phis: Vec::new(),
+            incomplete_phis: vec![HashSet::new()],
             uses: HashMap::new(),
-            sealed_blocks: Vec::new(),
+            sealed_blocks: vec![false],
             next_var: 0,
         }
     }
@@ -75,11 +75,31 @@ impl<'a> CfgConstructor<'a> {
 
         // Track uses of operands
         for op in &val.operands {
-            //TODO: The rest of expressions with variables (parameters, etc.))
             if let Expression::Atomic(Atomic::Variable(var)) = op {
                 self.uses.entry(var.clone()).or_default().insert(dest.clone());
+            } else if let Expression::Parameter(param) = op {
+                let mut track_atomic = |a: &Atomic| {
+                    if let Atomic::Variable(var) = a {
+                        self.uses.entry(var.clone()).or_default().insert(dest.clone());
+                    }
+                };
+
+                match param {
+                    Parameter::Signal { index, size }
+                    | Parameter::I64Memory { index, size }
+                    | Parameter::FfMemory { index, size } => {
+                        track_atomic(index);
+                        track_atomic(size);
+                    }
+                    Parameter::SubcmpSignal { component, index, size } => {
+                        track_atomic(component);
+                        track_atomic(index);
+                        track_atomic(size);
+                    }
+                }
             }
         }
+
         self.values.insert(dest.clone(), val);
         self.definitions[block].insert(src.to_string(), dest.clone());
         dest
@@ -200,18 +220,66 @@ impl<'a> CfgConstructor<'a> {
         //TODO: Case of same is None → Remove its users recursively
     }
 
+    fn read_expression(&mut self, op: &Expression, block: usize) -> Expression {
+        match op {
+            Expression::Atomic(Atomic::Variable(var)) => {
+                Expression::Atomic(Atomic::Variable(self.read_variable(var, block)))
+            }
+            Expression::Atomic(atomic) => Expression::Atomic(atomic.clone()),
+            Expression::Parameter(param) => {
+                let mut new_param = param.clone();
+                let mut update_atomic = |a: &mut Atomic| {
+                    if let Atomic::Variable(var) = a {
+                        *var = self.read_variable(var, block);
+                    }
+                };
+
+                match &mut new_param {
+                    Parameter::Signal { index, size }
+                    | Parameter::I64Memory { index, size }
+                    | Parameter::FfMemory { index, size } => {
+                        update_atomic(index);
+                        update_atomic(size);
+                    }
+                    Parameter::SubcmpSignal { component, index, size } => {
+                        update_atomic(component);
+                        update_atomic(index);
+                        update_atomic(size);
+                    }
+                }
+                Expression::Parameter(new_param)
+            }
+        }
+    }
+
     /// Process AST nodes into CFG, returning the last block
     pub fn process_body(&mut self, body: &[ASTNode], mut curr: usize) -> usize {
         for stmt in body {
             curr = match stmt {
                 ASTNode::Operation { num_type, operator, output, operands } => {
-                    let stmt = Statement {
-                        //TODO: improve, avoid cloning everything
-                        num_type: num_type.clone(),
-                        output: output.clone(),
-                        value: Value { operator: operator.clone().map(OperatorOrPhi::Operator), operands: operands.clone() }
-                    };
+                    // Nuevas operacion:
+                    // 1) Cambiar los operandos a las variables SSA
+                    // 2) Escribir la variable
+                    // 3) ¿Añadir la instrucción al bloque? o añadirlas todas al rellenarlo del
+                    //    todo?
+                    let mut ops = Vec::new();
+                    for op in operands {
+                        ops.push(self.read_expression(op, curr));
+                    }
+
+                    let val = Value { operator: operator.clone().map(OperatorOrPhi::Operator), operands: ops };
+
+                    let var;
+                    if let Some(v) = output {
+                        var = Some(self.write_variable(v, curr, val.clone()));
+                    }
+                    else {
+                        var = None;
+                    }
+
+                    let stmt = Statement { num_type: num_type.clone(), output: var, value: val };
                     self.cfg.add_instruction(curr, stmt);
+
                     curr
                 }
                 ASTNode::Loop { body: loop_body } => self.handle_loop(loop_body, curr),
@@ -303,6 +371,8 @@ impl<'a> CfgConstructor<'a> {
 
 #[cfg(test)]
 mod tests {
+    use num_bigint_dig::BigInt;
+
     use crate::{ast::Template, types::*};
 
     use super::*;
@@ -317,6 +387,24 @@ mod tests {
             signals: 10,
             components: vec![5, 3, 2],
             body: vec![
+            ASTNode::Operation {
+                num_type: Some(NumericType::FiniteField),
+                operator: None,
+                output: Some("x".to_string()),
+                operands: vec![Expression::Atomic(Atomic::Constant(ConstantType::FF(BigInt::from(1))))],
+            },
+            ASTNode::Operation {
+                num_type: Some(NumericType::FiniteField),
+                operator: None,
+                output: Some("y".to_string()),
+                operands: vec![Expression::Atomic(Atomic::Constant(ConstantType::FF(BigInt::from(10))))],
+            },
+            ASTNode::Operation {
+                num_type: Some(NumericType::FiniteField),
+                operator: None,
+                output: Some("z".to_string()),
+                operands: vec![Expression::Atomic(Atomic::Constant(ConstantType::FF(BigInt::from(9))))],
+            },
             ASTNode::Operation {
                 num_type: Some(NumericType::FiniteField),
                 operator: Some(Operator::Add),
