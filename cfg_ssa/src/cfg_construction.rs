@@ -53,88 +53,79 @@ impl<'a> CfgConstructor<'a> {
         self.cfg.create_new_block()
     }
 
-    fn create_new_var(&mut self) -> String {
+    /// Create a fresh SSA name
+    fn fresh(&mut self) -> String {
         let new_var = format!("v{}", self.next_var);
         self.next_var += 1;
         new_var
     }
 
+    /// Seal a block: finish φ-nodes
     fn seal_block(&mut self, block: usize) {
-        let vars: Vec<_> = self.incomplete_phis[block].iter().cloned().collect();
-        for var in vars {
-            self.add_phi_operands(var, block);
+        let pending = std::mem::take(&mut self.incomplete_phis[block]);
+        for phi in pending {
+            self.add_phi_operands(&phi, block);
         }
         self.sealed_blocks[block] = true;
     }
 
-    fn write_variable(&mut self, variable: String, block: usize, value: Value) {
-        // self.current_definition[block].insert(variable.clone(), value.clone());
-        let new_var = self.create_new_var();
-        for operand in &value.operands {
-            //TODO: Also for parameters that can have variables inside
-            if let Expression::Atomic(Atomic::Variable(var)) = &operand {
-                //We add to the list of uses of the operand the new variable
-                //We assume that the entries are already the variables of the ssa, meaning that we
-                //have already read them before creating the value
-                self.uses.entry(var.clone()).or_default().insert(new_var.clone());
+    /// Write a new SSA binding for source `src` in `block` with `val`
+    fn write_variable(&mut self, src: &str, block: usize, val: Value) -> String {
+        let dest = self.fresh();
+
+        // Track uses of operands
+        for op in &val.operands {
+            //TODO: The rest of expressions with variables (parameters, etc.))
+            if let Expression::Atomic(Atomic::Variable(var)) = op {
+                self.uses.entry(var.clone()).or_default().insert(dest.clone());
             }
         }
-        self.values.insert(new_var.clone(), value);
-        self.definitions[block].insert(variable.clone(), new_var);
+        self.values.insert(dest.clone(), val);
+        self.definitions[block].insert(src.to_string(), dest.clone());
+        dest
     }
 
-    fn read_variable(&mut self, variable: &str, block: usize) -> String {
-        if self.definitions[block].contains_key(variable) {
-            //TODO: Don't clone
-            return self.definitions[block][variable].clone();
+    /// Read a variable, inserting φ if needed
+    fn read_variable(&mut self, name: &str, block: usize) -> String {
+        if let Some(ssa) = self.definitions[block].get(name) {
+            return ssa.clone();
         }
-        self.read_variable_recursive(variable, block)
+        self.read_recursive(name, block)
     }
 
-    fn read_variable_recursive(&mut self, variable: &str, block: usize) -> String {
-        //TODO: Remove all those clones
-        let new_var;
+    fn read_recursive(&mut self, name: &str, block: usize) -> String {
         if !self.sealed_blocks[block] {
-            // Incomplete CFG
-            let value = Value { operator: Some(OperatorOrPhi::Phi), operands: Vec::new() };
-            self.write_variable(variable.to_string(), block, value);
-            new_var = self.read_variable(variable, block);
-            self.incomplete_phis[block].insert(new_var.clone());
+            // Incomplete block: create φ placeholder
+            let val = Value { operator: Some(OperatorOrPhi::Phi), operands: Vec::new() };
+            let phi = self.write_variable(name, block, val);
+            self.incomplete_phis[block].insert(phi.clone());
+            return phi;
         }
-        else if self.cfg.predecessors(block).len() == 1 {
-            // Optimize the common case of one predecessor: No phi needed
-            let var = self.read_variable(variable, self.cfg.predecessors(block)[0]);
-            let value = self.values[&var].clone();
-            self.write_variable(var.clone(), block, value);
-            new_var = self.read_variable(&var, block);    //This should read the variable written
-                                                                    //in the current block
+        let preds = self.cfg.predecessors(block);
+        if preds.len() == 1 {
+            // Single predecessor -> no φ needed
+            let v = self.read_variable(name, preds[0]);
+            let val = self.values.get(&v).cloned().expect("Value missing");
+            return self.write_variable(&v, block, val);
         }
-        else {
-            // Break potential cycles with operandless phi
-            self.write_variable(variable.to_string(), block, Value { operator: Some(OperatorOrPhi::Phi), operands: Vec::new() });
-            new_var = self.read_variable(variable, block);  //This should read the variable written
-                                                            //in the current block
-            self.add_phi_operands(new_var.clone(), block);
-        }
-        new_var
+        // Multiple predecessors -> φ
+        // Break potential cycles with operandless phi
+        let val = Value { operator: Some(OperatorOrPhi::Phi), operands: Vec::new() };
+        let phi = self.write_variable(name, block, val);
+        self.add_phi_operands(&phi, block);
+        phi
     }
 
-    fn add_phi_operands(&mut self, variable: String, block: usize) {
-        //TODO: Avoid cloning
-        let predecessors: Vec<usize> = self.cfg.predecessors(block).clone();
-        let operands: Vec<String> = predecessors
-            .iter()
-            .map(|pred| self.read_variable(&variable, *pred))
-            .collect();
-
-        //TODO: Improve error
-        let phi = self.values.get_mut(&variable).expect("Phi node not found");
-
-        for operand in operands {
-            phi.append_operand(operand);
+    /// Add φ operands from all predecessors for `phi` in `block`
+    fn add_phi_operands(&mut self, phi: &str, block: usize) {
+        let mut ops = Vec::new();
+        let predecessors: Vec<_> = self.cfg.predecessors(block).to_vec();
+        for &pred in &predecessors {
+            ops.push(self.read_variable(phi, pred));
         }
-
-        self.try_remove_trivial_phi(variable);
+        let entry = self.values.get_mut(phi).expect("Phi node missing");
+        entry.operands.extend(ops.into_iter().map(|op| Expression::Atomic(Atomic::Variable(op))));
+        self.try_remove_trivial(phi);
     }
 
     fn replace_variable_in_expression(expr: &mut Expression, target: &str, replacement: &str) {
@@ -169,56 +160,50 @@ impl<'a> CfgConstructor<'a> {
         }
     }
 
-
-    fn try_remove_trivial_phi(&mut self, phi: String) {
-        let val = self.values.get(&phi).expect("Phi node not found");
+    /// Simplify trivial φ-nodes with identical operands
+    fn try_remove_trivial(&mut self, phi: &str) {
+        let val = match self.values.get(phi) {
+            Some(v) if v.is_phi() => v.clone(),
+            _ => return,
+        };
         let mut same: Option<String> = None;
         for op in &val.operands {
-            if let Expression::Atomic(Atomic::Variable(var_op)) = op {
-                if let Some(same_v) = &same {
-                    if *var_op == *same_v || *var_op == phi {
-                        //Unique value or self-reference
-                        continue;
-                    }
-                    else {
-                        //The phi merges at least two different values: not trivial
-                        return;
-                    }
+            if let Expression::Atomic(Atomic::Variable(var)) = op {
+                if var == phi { continue; }     //Self reference
+                if let Some(r) = &same {
+                    //The phi merges at least two different values: not trivial
+                    if r != var { return; }
                 }
-                same = Some(var_op.to_string());
+                same = Some(var.clone());
             }
             else {
                 panic!("Phi functions should only have variables as operands");
             }
         }
 
-        if let Some(uses) = self.uses.get_mut(&phi) {
-            if let Some(same_v) = same {
-                let vars_to_process: Vec<String> = uses.iter().cloned().collect();
-                for var in vars_to_process {
-                    if let Some(value) = self.values.get_mut(&var) {
+        if let Some(same_v) = same {
+            if let Some(users) = self.uses.remove(phi) {
+                for user in users {
+                    if let Some(value) = self.values.get_mut(&user) {
                         for operand in value.operands.iter_mut() {
                             Self::replace_variable_in_expression(operand, &phi, &same_v);
                         }
 
                         if value.is_phi() {
-                            self.try_remove_trivial_phi(var.clone());
+                            self.try_remove_trivial(&user);
                         }
                     }
                 }
             }
-            else {
-                //This case means that the uses are dead code → eliminate them
-                //TODO: Eliminate them (also their uses recursively)
-            }
+            self.values.remove(phi);
         }
+        //TODO: Case of same is None → Remove its users recursively
     }
 
-    //Returns the exit block
-    //TODO: Right now we return a cfg with unreachable blocks, we should remove them or not include them
-    pub fn process_body(&mut self, body: &Vec<ASTNode>, mut curr: usize) -> usize {
-        for stat in body {
-            match stat {
+    /// Process AST nodes into CFG, returning the last block
+    pub fn process_body(&mut self, body: &[ASTNode], mut curr: usize) -> usize {
+        for stmt in body {
+            curr = match stmt {
                 ASTNode::Operation { num_type, operator, output, operands } => {
                     let stmt = Statement {
                         //TODO: improve, avoid cloning everything
@@ -227,89 +212,88 @@ impl<'a> CfgConstructor<'a> {
                         value: Value { operator: operator.clone().map(OperatorOrPhi::Operator), operands: operands.clone() }
                     };
                     self.cfg.add_instruction(curr, stmt);
+                    curr
                 }
-                ASTNode::Loop { body: body_loop } => {
-                    //Add new block for the loop body (if the current is not empty)
-                    let entry_block_loop;
-                    if !self.cfg.check_empty_block(curr) {
-                        entry_block_loop = self.create_block();
-                        self.cfg.add_uncond_link(curr, entry_block_loop);
-                    }
-                    else {
-                        entry_block_loop = curr;
-                    }
-                    self.entry_loop_context.push(entry_block_loop);
-
-                    //Add new block for the instructions after the loop
-                    let after_loop_block = self.create_block();
-                    self.exit_loop_context.push(after_loop_block);
-
-                    //The block that will be the last one in the loop
-                    let last_block_loop = self.process_body(body_loop, entry_block_loop);
-                    //Link the last block with the entry block for looping
-                    self.cfg.add_uncond_link(last_block_loop, entry_block_loop);
-
-                    //Pop the context
-                    self.entry_loop_context.pop();
-                    self.exit_loop_context.pop();
-
-                    //Continue after the loop
-                    curr = after_loop_block;
-                }
+                ASTNode::Loop { body: loop_body } => self.handle_loop(loop_body, curr),
                 ASTNode::IfThenElse { condition, if_case, else_case } => {
-                    //If body
-                    let to_then = self.create_block();
-
-                    //Convergence block
-                    //TODO: Create this always or only when there are more instructions?
-                    let conv_id = self.create_block();
-
-                    //Add else block (optional)
-                    let to_else = else_case
-                        .as_ref()
-                        .map_or(conv_id, |_| self.create_block());
-
-                    //Link current block with the then and else blocks
-                    self.cfg.add_cond_link(curr, condition.clone(), to_then, to_else);
-
-    //Process then case
-                    let exit_if = self.process_body(if_case, to_then);
-                    self.cfg.add_uncond_link(exit_if, conv_id);
-
-                    //Process else case
-                    if let Some(else_case) = else_case {
-                        let exit_else = self.process_body(else_case, to_else);
-                        self.cfg.add_uncond_link(exit_else, conv_id);
-                    }
-
-                    curr = conv_id;
+                    self.handle_if(condition, if_case, else_case, curr)
                 }
                 ASTNode::Break => {
-                    if let Some(out_loop) = self.exit_loop_context.last() {
-                        self.cfg.add_uncond_link(curr, *out_loop);
-                        //The instructions following a break will never be executed
-                        break;
-                    }
-                    else {
-                        //TODO: Improve error
-                        panic!("There must not be a break outside a loop");
-                    }
+                    let out = *self.exit_loop_context.last().expect("break outside loop");
+                    self.cfg.add_uncond_link(curr, out);
+                    break;
                 }
                 ASTNode::Continue => {
-                    if let Some(entry_loop) = self.entry_loop_context.last() {
-                        self.cfg.add_uncond_link(curr, *entry_loop);
-                        //The instructions following a continue will never be executed
-                        break;
-                    }
-                    else {
-                        //TODO: Improve error
-                        panic!("There must not be a continue outside a loop");
-                    }
+                    let entry = *self.entry_loop_context.last().expect("continue outside loop");
+                    self.cfg.add_uncond_link(curr, entry);
+                    break;
                 }
-            }
+            };
         }
 
         curr
+    }
+
+    /// Helper: create a new block and link from `curr`
+    fn create_and_link(&mut self, curr: usize) -> usize {
+        let b = self.create_block();
+        self.cfg.add_uncond_link(curr, b);
+        b
+    }
+
+    fn handle_loop(&mut self, loop_body: &[ASTNode], curr: usize) -> usize {
+        // Add new block for the loop body (if the current is not empty)
+        let entry = if self.cfg.check_empty_block(curr) { curr }
+                           else { self.create_and_link(curr) };
+        self.entry_loop_context.push(entry);
+
+        // Add new block for the instructions after the loop
+        let after = self.create_block();
+        self.exit_loop_context.push(after);
+
+        // The block that will be the last one in the loop
+        let last = self.process_body(loop_body, entry);
+        self.cfg.add_uncond_link(last, entry);
+
+        // Popo the context
+        self.entry_loop_context.pop();
+        self.exit_loop_context.pop();
+
+        // Continue after the loop
+        after
+    }
+
+    fn handle_if(
+        &mut self,
+        condition: &Expression,
+        if_case: &[ASTNode],
+        else_case: &Option<Vec<ASTNode>>,
+        curr: usize,
+    ) -> usize {
+        // If body
+        let then_b = self.create_block();
+
+        // Convergence block
+        // TODO: Create this always or only when there are more instructions?
+        let join = self.create_block();
+
+        // Add else block (optional)
+        let else_b = if else_case.is_some() { self.create_block() }
+                            else { join };
+
+        // Link current block with the then and else blocks
+        self.cfg.add_cond_link(curr, condition.clone(), then_b, else_b);
+
+        // Process then case
+        let end_then = self.process_body(if_case, then_b);
+        self.cfg.add_uncond_link(end_then, join);
+
+        if let Some(else_stmts) = else_case {
+            let end_else = self.process_body(else_stmts, else_b);
+            self.cfg.add_uncond_link(end_else, join);
+        }
+
+        join
     }
 
     pub fn remove_unreachable_blocks(&mut self) {
