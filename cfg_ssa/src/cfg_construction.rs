@@ -151,7 +151,7 @@ impl<'a> CfgConstructor<'a> {
         //TODO: Does this go here?
         //TODO: Fix num_type
         let stmt = Statement { num_type: None, output: Some(phi.to_string()), value: entry.clone() };
-        self.cfg.add_instruction(block, stmt);
+        self.cfg.add_phi_function(block, stmt);
 
         //TODO: Fix remove trivial
         // self.try_remove_trivial(phi);
@@ -215,7 +215,7 @@ impl<'a> CfgConstructor<'a> {
                 for user in users {
                     if let Some(value) = self.values.get_mut(&user) {
                         for operand in value.operands.iter_mut() {
-                            Self::replace_variable_in_expression(operand, &phi, &same_v);
+                            Self::replace_variable_in_expression(operand, phi, &same_v);
                         }
 
                         if value.is_phi() {
