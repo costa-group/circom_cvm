@@ -18,8 +18,8 @@ pub struct CfgConstructor<'a> {
     /// Current SSA values: name -> concrete Value
     values: HashMap<String, Value>,
 
-    /// Tracks unfinished φ-nodes per block
-    incomplete_phis: Vec<HashSet<String>>,
+    /// Tracks unfinished φ-nodes per block (tracked variable and its φ-node)
+    incomplete_phis: Vec<HashSet<(String, String)>>,
 
     /// For each variable, we save the variables that make use of it
     uses: HashMap<String, HashSet<String>>,
@@ -39,7 +39,7 @@ impl<'a> CfgConstructor<'a> {
             values: HashMap::new(),
             incomplete_phis: vec![HashSet::new()],
             uses: HashMap::new(),
-            sealed_blocks: vec![false],
+            sealed_blocks: vec![true],
             next_var: 0,
         }
     }
@@ -63,8 +63,8 @@ impl<'a> CfgConstructor<'a> {
     /// Seal a block: finish φ-nodes
     fn seal_block(&mut self, block: usize) {
         let pending = std::mem::take(&mut self.incomplete_phis[block]);
-        for phi in pending {
-            self.add_phi_operands(&phi, block);
+        for (name, phi) in pending {
+            self.add_phi_operands(&name, &phi, block);
         }
         self.sealed_blocks[block] = true;
     }
@@ -118,34 +118,43 @@ impl<'a> CfgConstructor<'a> {
             // Incomplete block: create φ placeholder
             let val = Value { operator: Some(OperatorOrPhi::Phi), operands: Vec::new() };
             let phi = self.write_variable(name, block, val);
-            self.incomplete_phis[block].insert(phi.clone());
+            self.incomplete_phis[block].insert((name.to_string(), phi.clone()));
             return phi;
         }
         let preds = self.cfg.predecessors(block);
         if preds.len() == 1 {
             // Single predecessor -> no φ needed
             let v = self.read_variable(name, preds[0]);
-            let val = self.values.get(&v).cloned().expect("Value missing");
-            return self.write_variable(&v, block, val);
+            // TODO: Why does Braun et al write the var in the current block?
+            // let val = self.values.get(&v).cloned().expect("Value missing");
+            // return self.write_variable(&v, block, val);
+            return v;
         }
         // Multiple predecessors -> φ
         // Break potential cycles with operandless phi
         let val = Value { operator: Some(OperatorOrPhi::Phi), operands: Vec::new() };
         let phi = self.write_variable(name, block, val);
-        self.add_phi_operands(&phi, block);
+        self.add_phi_operands(name, &phi, block);
         phi
     }
 
-    /// Add φ operands from all predecessors for `phi` in `block`
-    fn add_phi_operands(&mut self, phi: &str, block: usize) {
+    /// Add φ operands from all predecessors for `name` in `block`
+    fn add_phi_operands(&mut self, name: &str, phi: &str, block: usize) {
         let mut ops = Vec::new();
         let predecessors: Vec<_> = self.cfg.predecessors(block).to_vec();
         for &pred in &predecessors {
-            ops.push(self.read_variable(phi, pred));
+            ops.push(self.read_variable(name, pred));
         }
         let entry = self.values.get_mut(phi).expect("Phi node missing");
         entry.operands.extend(ops.into_iter().map(|op| Expression::Atomic(Atomic::Variable(op))));
-        self.try_remove_trivial(phi);
+
+        //TODO: Does this go here?
+        //TODO: Fix num_type
+        let stmt = Statement { num_type: None, output: Some(phi.to_string()), value: entry.clone() };
+        self.cfg.add_instruction(block, stmt);
+
+        //TODO: Fix remove trivial
+        // self.try_remove_trivial(phi);
     }
 
     fn replace_variable_in_expression(expr: &mut Expression, target: &str, replacement: &str) {
@@ -257,11 +266,7 @@ impl<'a> CfgConstructor<'a> {
         for stmt in body {
             curr = match stmt {
                 ASTNode::Operation { num_type, operator, output, operands } => {
-                    // Nuevas operacion:
-                    // 1) Cambiar los operandos a las variables SSA
-                    // 2) Escribir la variable
-                    // 3) ¿Añadir la instrucción al bloque? o añadirlas todas al rellenarlo del
-                    //    todo?
+                    //TODO: When should we add the Statement to the block?
                     let mut ops = Vec::new();
                     for op in operands {
                         ops.push(self.read_expression(op, curr));
@@ -284,7 +289,8 @@ impl<'a> CfgConstructor<'a> {
                 }
                 ASTNode::Loop { body: loop_body } => self.handle_loop(loop_body, curr),
                 ASTNode::IfThenElse { condition, if_case, else_case } => {
-                    self.handle_if(condition, if_case, else_case, curr)
+                    let cond = self.read_expression(condition, curr);
+                    self.handle_if(&cond, if_case, else_case, curr)
                 }
                 ASTNode::Break => {
                     let out = *self.exit_loop_context.last().expect("break outside loop");
@@ -323,9 +329,13 @@ impl<'a> CfgConstructor<'a> {
         let last = self.process_body(loop_body, entry);
         self.cfg.add_uncond_link(last, entry);
 
-        // Popo the context
+        // Pop the context
         self.entry_loop_context.pop();
         self.exit_loop_context.pop();
+
+        // Seal the blocks
+        self.seal_block(entry);
+        self.seal_block(after);
 
         // Continue after the loop
         after
@@ -352,6 +362,13 @@ impl<'a> CfgConstructor<'a> {
         // Link current block with the then and else blocks
         self.cfg.add_cond_link(curr, condition.clone(), then_b, else_b);
 
+        // Seal the blocks that start then and else
+        self.seal_block(then_b);
+        // Ensure the join is not accidentally sealed
+        if else_case.is_some() {
+            self.seal_block(else_b);
+        }
+
         // Process then case
         let end_then = self.process_body(if_case, then_b);
         self.cfg.add_uncond_link(end_then, join);
@@ -360,6 +377,9 @@ impl<'a> CfgConstructor<'a> {
             let end_else = self.process_body(else_stmts, else_b);
             self.cfg.add_uncond_link(end_else, join);
         }
+
+        // Seal join
+        self.seal_block(join);
 
         join
     }
@@ -413,6 +433,12 @@ mod tests {
                 Expression::Atomic(Atomic::Variable("y".to_string())),
                 Expression::Atomic(Atomic::Variable("z".to_string())),
                 ],
+            },
+            ASTNode::Operation {
+                num_type: Some(NumericType::FiniteField),
+                operator: None,
+                output: Some("condition".to_string()),
+                operands: vec![Expression::Atomic(Atomic::Constant(ConstantType::I64(1)))],
             },
             ASTNode::IfThenElse {
                 condition: Expression::Atomic(Atomic::Variable("condition".to_string())),

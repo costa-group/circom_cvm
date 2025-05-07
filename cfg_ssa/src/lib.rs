@@ -73,6 +73,10 @@ impl BasicBlock {
         }
     }
 
+    pub fn add_phi_function(&mut self, stmt: Statement) {
+        self.statements.insert(0, stmt);
+    }
+
     pub fn add_instruction(&mut self, stmt: Statement) {
         self.statements.push(stmt);
     }
@@ -117,6 +121,10 @@ impl CFG {
         constructor.process_body(&t.body, entry);
 
         cfg
+    }
+
+    pub fn add_phi_function(&mut self, block: usize, stmt: Statement) {
+        self.blocks[block].add_phi_function(stmt);
     }
 
     pub fn add_instruction(&mut self, block: usize, stmt: Statement) {
