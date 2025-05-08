@@ -5,6 +5,8 @@ pub mod type_checking;
 mod cfg_construction;
 mod tests;
 
+use std::collections::HashMap;
+
 use ast::{Function, Template, AST};
 use cfg_construction::CfgConstructor;
 
@@ -61,6 +63,8 @@ pub struct BasicBlock {
     statements: Vec<Statement>,
     predecessors: Vec<usize>,
     successors: Option<Successor>,
+    //The position in which a variable is declared
+    declarations: HashMap<String, usize>,
 }
 
 impl BasicBlock {
@@ -70,15 +74,32 @@ impl BasicBlock {
             statements: Vec::new(),
             predecessors: Vec::new(),
             successors: None,
+            declarations: HashMap::new(),
         }
     }
 
-    pub fn add_phi_function(&mut self, stmt: Statement) {
+    fn add_phi_function(&mut self, stmt: Statement) {
+        self.declarations.insert(stmt.output.clone().expect("Phi functions require an output name for declaration"), 0);
         self.statements.insert(0, stmt);
     }
 
-    pub fn add_instruction(&mut self, stmt: Statement) {
+    fn add_instruction(&mut self, stmt: Statement) {
+        if let Some(output) = &stmt.output {
+            self.declarations.insert(output.clone(), self.statements.len());
+        }
         self.statements.push(stmt);
+    }
+
+    fn change_declaration(&mut self, name: &str, val: Value) {
+        if let Some(decl) = self.declarations.get(name) {
+            if let Some(stmt) = self.statements.get_mut(*decl) {
+                stmt.value = val;
+            } else {
+                panic!("Statement not found in block {}", self.id);
+            }
+        } else {
+            panic!("Variable {} not found in block {}", name, self.id);
+        }
     }
 
     fn add_predecessor(&mut self, pred: usize) {
@@ -107,7 +128,7 @@ impl CFG {
         //TODO: add declarations of parameters
 
         let mut constructor = CfgConstructor::new(&mut cfg);
-        constructor.process_body(&f.body, entry);
+        constructor.process_body(&f.body, entry, None);
 
         cfg
     }
@@ -118,7 +139,7 @@ impl CFG {
         //TODO: add declarations of inputs
 
         let mut constructor = CfgConstructor::new(&mut cfg);
-        constructor.process_body(&t.body, entry);
+        constructor.process_body(&t.body, entry, None);
 
         cfg
     }
@@ -168,9 +189,12 @@ impl CFG {
         }
     }
 
-
     pub fn get_entry(&self) -> usize {
         self.entry
+    }
+
+    fn change_declaration(&mut self, block: usize, name: &str, val: Value) {
+        self.blocks[block].change_declaration(name, val);
     }
 
     #[deprecated(note = "This function is only for debugging purposes!")]
