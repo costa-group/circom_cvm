@@ -265,26 +265,7 @@ impl<'a> CfgConstructor<'a> {
         for stmt in body {
             curr = match stmt {
                 ASTNode::Operation { num_type, operator, output, operands } => {
-                    //TODO: When should we add the Statement to the block?
-                    let mut ops = Vec::new();
-                    for op in operands {
-                        ops.push(self.read_expression(op, curr));
-                    }
-
-                    let val = Value { operator: operator.clone().map(OperatorOrPhi::Operator), operands: ops };
-
-                    let var;
-                    if let Some(v) = output {
-                        var = Some(self.write_variable(v, curr, val.clone()));
-                    }
-                    else {
-                        var = None;
-                    }
-
-                    let stmt = Statement { num_type: num_type.clone(), output: var, value: val };
-                    self.cfg.add_instruction(curr, stmt);
-
-                    curr
+                    self.handle_operation(curr, num_type, operator, output, operands)
                 }
                 ASTNode::Loop { body: loop_body } => self.handle_loop(loop_body, curr),
                 ASTNode::IfThenElse { condition, if_case, else_case } => {
@@ -307,6 +288,36 @@ impl<'a> CfgConstructor<'a> {
         curr
     }
 
+    fn handle_operation(
+        &mut self, curr: usize,
+        num_type: &Option<crate::types::NumericType>,
+        operator: &Option<crate::types::Operator>,
+        output: &Option<String>,
+        operands: &Vec<Expression>,
+    ) -> usize {
+        //TODO: When should we add the Statement to the block?
+        let mut ops = Vec::new();
+        println!("Operands: {:?}", operands);
+        for op in operands {
+            ops.push(self.read_expression(op, curr));
+        }
+    
+        let val = Value { operator: operator.clone().map(OperatorOrPhi::Operator), operands: ops };
+    
+        let var;
+        if let Some(v) = output {
+            var = Some(self.write_variable(v, curr, val.clone()));
+        }
+        else {
+            var = None;
+        }
+    
+        let stmt = Statement { num_type: num_type.clone(), output: var, value: val };
+        self.cfg.add_instruction(curr, stmt);
+    
+        curr
+    }
+    
     /// Helper: create a new block and link from `curr`
     fn create_and_link(&mut self, curr: usize) -> usize {
         let b = self.create_block();
@@ -316,15 +327,16 @@ impl<'a> CfgConstructor<'a> {
 
     fn handle_loop(&mut self, loop_body: &[ASTNode], curr: usize) -> usize {
         // Add new block for the loop body (if the current is not empty)
-        let entry = if self.cfg.check_empty_block(curr) { curr }
-                           else { self.create_and_link(curr) };
+        let entry = self.create_and_link(curr);
 
         // Add new block for the instructions after the loop
         let after = self.create_block();
 
         // The block that will be the last one in the loop
         let last = self.process_body(loop_body, entry, Some((entry, after)));
-        self.cfg.add_uncond_link(last, entry);
+        if self.cfg.predecessors(last).len() > 1 {
+            self.cfg.add_uncond_link(last, after);
+        }
 
         // Seal the blocks
         self.seal_block(entry);
@@ -434,6 +446,12 @@ mod tests {
                 output: Some("condition".to_string()),
                 operands: vec![Expression::Atomic(Atomic::Constant(ConstantType::I64(1)))],
             },
+            ASTNode::Operation {
+                num_type: Some(NumericType::FiniteField),
+                operator: None,
+                output: Some("loop_condition".to_string()),
+                operands: vec![Expression::Atomic(Atomic::Constant(ConstantType::I64(1)))],
+            },
             ASTNode::IfThenElse {
                 condition: Expression::Atomic(Atomic::Variable("condition".to_string())),
                 if_case: vec![
@@ -484,7 +502,7 @@ mod tests {
                             Expression::Atomic(Atomic::Variable("z".to_string())),
                             ],
                         },
-                        // ASTNode::Continue,
+                        ASTNode::Continue,
                     ]),
                 },
                 ],
