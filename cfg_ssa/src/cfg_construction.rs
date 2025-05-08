@@ -2,15 +2,9 @@ use std::collections::{HashMap, HashSet};
 
 use crate::{ast::ASTNode, types::{Atomic, Expression, Parameter}, OperatorOrPhi, Statement, Value, CFG};
 
-type Stack<T> = Vec<T>;
-
 /// A SSA-based CFG builder
 pub struct CfgConstructor<'a> {
     cfg: &'a mut CFG,
-
-    ///Stacks that save the last loop entry and exit blocks (needed for the break and continue)
-    entry_loop_context: Stack<usize>,
-    exit_loop_context: Stack<usize>,
 
     /// Save for each block the definition of the variables it contains (the new name)
     definitions: Vec<HashMap<String, String>>,
@@ -21,8 +15,8 @@ pub struct CfgConstructor<'a> {
     /// Tracks unfinished φ-nodes per block (tracked variable and its φ-node)
     incomplete_phis: Vec<HashSet<(String, String)>>,
 
-    /// For each variable, we save the variables that make use of it
-    uses: HashMap<String, HashSet<String>>,
+    /// For each variable, we save the variables that make use of it and in which block
+    uses: HashMap<String, HashSet<(String, usize)>>,
 
     sealed_blocks: Vec<bool>,
     next_var: usize,
@@ -33,8 +27,6 @@ impl<'a> CfgConstructor<'a> {
     pub fn new(cfg: &'a mut CFG) -> Self {
         Self {
             cfg,
-            entry_loop_context: Stack::new(),
-            exit_loop_context: Stack::new(),
             definitions: vec![HashMap::new()],
             values: HashMap::new(),
             incomplete_phis: vec![HashSet::new()],
@@ -76,11 +68,11 @@ impl<'a> CfgConstructor<'a> {
         // Track uses of operands
         for op in &val.operands {
             if let Expression::Atomic(Atomic::Variable(var)) = op {
-                self.uses.entry(var.clone()).or_default().insert(dest.clone());
+                self.uses.entry(var.clone()).or_default().insert((dest.clone(), block));
             } else if let Expression::Parameter(param) = op {
                 let mut track_atomic = |a: &Atomic| {
                     if let Atomic::Variable(var) = a {
-                        self.uses.entry(var.clone()).or_default().insert(dest.clone());
+                        self.uses.entry(var.clone()).or_default().insert((dest.clone(), block));
                     }
                 };
 
@@ -127,8 +119,6 @@ impl<'a> CfgConstructor<'a> {
             let v = self.read_variable(name, preds[0]);
             // TODO: Why does Braun et al write the var in the current block?
             // Maybe to avoid the recursive lookup in future cases?
-            // let val = self.values.get(&v).cloned().expect("Value missing");
-            // return self.write_variable(&v, block, val);
             // Don't write_variable because it creates a new SSA name 
             self.definitions[block].insert(name.to_string(), v.clone());
             return v;
@@ -151,13 +141,13 @@ impl<'a> CfgConstructor<'a> {
         let entry = self.values.get_mut(phi).expect("Phi node missing");
         entry.operands.extend(ops.into_iter().map(|op| Expression::Atomic(Atomic::Variable(op))));
 
-        //TODO: Does this go here?
-        //TODO: Fix num_type
-        let stmt = Statement { num_type: None, output: Some(phi.to_string()), value: entry.clone() };
-        self.cfg.add_phi_function(block, stmt);
-
+        let entry_clone = entry.clone();
         //TODO: Fix remove trivial
-        // self.try_remove_trivial(phi);
+        if !self.try_remove_trivial(phi, name, block) {
+            //TODO: Does this go here?
+            let stmt = Statement { num_type: None, output: Some(phi.to_string()), value: entry_clone };
+            self.cfg.add_phi_function(block, stmt);
+        }
     }
 
     fn replace_variable_in_expression(expr: &mut Expression, target: &str, replacement: &str) {
@@ -193,10 +183,10 @@ impl<'a> CfgConstructor<'a> {
     }
 
     /// Simplify trivial φ-nodes with identical operands
-    fn try_remove_trivial(&mut self, phi: &str) {
+    fn try_remove_trivial(&mut self, phi: &str, name: &str, block: usize) -> bool{
         let val = match self.values.get(phi) {
             Some(v) if v.is_phi() => v.clone(),
-            _ => return,
+            _ => return false,
         };
         let mut same: Option<String> = None;
         for op in &val.operands {
@@ -204,7 +194,7 @@ impl<'a> CfgConstructor<'a> {
                 if var == phi { continue; }     //Self reference
                 if let Some(r) = &same {
                     //The phi merges at least two different values: not trivial
-                    if r != var { return; }
+                    if r != var { return false; }
                 }
                 same = Some(var.clone());
             }
@@ -215,21 +205,26 @@ impl<'a> CfgConstructor<'a> {
 
         if let Some(same_v) = same {
             if let Some(users) = self.uses.remove(phi) {
-                for user in users {
+                for (user, block_u) in users {
                     if let Some(value) = self.values.get_mut(&user) {
                         for operand in value.operands.iter_mut() {
                             Self::replace_variable_in_expression(operand, phi, &same_v);
                         }
 
+                        self.cfg.change_declaration(block_u, &user, value.clone());
+
                         if value.is_phi() {
-                            self.try_remove_trivial(&user);
+                            let name_u = self.definitions[block_u].get(&user).expect("Phi function not found").clone();
+                            self.try_remove_trivial(&user, &name_u, block_u);
                         }
                     }
                 }
             }
+            self.definitions[block].insert(name.to_string(), same_v);
             self.values.remove(phi);
         }
         //TODO: Case of same is None → Remove its users recursively
+        true
     }
 
     fn read_expression(&mut self, op: &Expression, block: usize) -> Expression {
@@ -265,7 +260,8 @@ impl<'a> CfgConstructor<'a> {
     }
 
     /// Process AST nodes into CFG, returning the last block
-    pub fn process_body(&mut self, body: &[ASTNode], mut curr: usize) -> usize {
+    /// loop_blocks: (entry, exit)
+    pub fn process_body(&mut self, body: &[ASTNode], mut curr: usize, loop_blocks: Option<(usize, usize)>) -> usize {
         for stmt in body {
             curr = match stmt {
                 ASTNode::Operation { num_type, operator, output, operands } => {
@@ -293,15 +289,15 @@ impl<'a> CfgConstructor<'a> {
                 ASTNode::Loop { body: loop_body } => self.handle_loop(loop_body, curr),
                 ASTNode::IfThenElse { condition, if_case, else_case } => {
                     let cond = self.read_expression(condition, curr);
-                    self.handle_if(&cond, if_case, else_case, curr)
+                    self.handle_if(&cond, if_case, else_case, curr, loop_blocks)
                 }
                 ASTNode::Break => {
-                    let out = *self.exit_loop_context.last().expect("break outside loop");
+                    let out = loop_blocks.expect("break outside loop").1;
                     self.cfg.add_uncond_link(curr, out);
                     break;
                 }
                 ASTNode::Continue => {
-                    let entry = *self.entry_loop_context.last().expect("continue outside loop");
+                    let entry = loop_blocks.expect("continue outside loop").0;
                     self.cfg.add_uncond_link(curr, entry);
                     break;
                 }
@@ -322,19 +318,13 @@ impl<'a> CfgConstructor<'a> {
         // Add new block for the loop body (if the current is not empty)
         let entry = if self.cfg.check_empty_block(curr) { curr }
                            else { self.create_and_link(curr) };
-        self.entry_loop_context.push(entry);
 
         // Add new block for the instructions after the loop
         let after = self.create_block();
-        self.exit_loop_context.push(after);
 
         // The block that will be the last one in the loop
-        let last = self.process_body(loop_body, entry);
+        let last = self.process_body(loop_body, entry, Some((entry, after)));
         self.cfg.add_uncond_link(last, entry);
-
-        // Pop the context
-        self.entry_loop_context.pop();
-        self.exit_loop_context.pop();
 
         // Seal the blocks
         self.seal_block(entry);
@@ -350,6 +340,7 @@ impl<'a> CfgConstructor<'a> {
         if_case: &[ASTNode],
         else_case: &Option<Vec<ASTNode>>,
         curr: usize,
+        loop_blocks: Option<(usize, usize)>,
     ) -> usize {
         // If body
         let then_b = self.create_block();
@@ -373,11 +364,11 @@ impl<'a> CfgConstructor<'a> {
         }
 
         // Process then case
-        let end_then = self.process_body(if_case, then_b);
+        let end_then = self.process_body(if_case, then_b, loop_blocks);
         self.cfg.add_uncond_link(end_then, join);
 
         if let Some(else_stmts) = else_case {
-            let end_else = self.process_body(else_stmts, else_b);
+            let end_else = self.process_body(else_stmts, else_b, loop_blocks);
             self.cfg.add_uncond_link(end_else, join);
         }
 
