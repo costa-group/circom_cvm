@@ -312,6 +312,7 @@ impl CFG {
     }
 }
 
+#[derive(Default, Debug, Serialize)]
 pub struct CFGList {
     entry: usize,
     cfgs: Vec<CFG>,
@@ -336,5 +337,26 @@ impl CFGList {
         }
 
         Self { entry, cfgs }
+    }
+
+    #[deprecated(note = "This function is only for debugging purposes!")]
+    #[doc(hidden)]
+    pub fn to_json(&self) -> String {
+        serde_json::to_string_pretty(self).unwrap()
+    }
+
+    #[deprecated(note = "This function is only for debugging purposes!")]
+    #[doc(hidden)]
+    pub fn to_dot(&self) -> String {
+        self.cfgs
+            .iter()
+            .enumerate()
+            .map(|(i, cfg)| {
+                let mut dot = cfg.to_dot();
+                dot = dot.replacen("digraph G", &format!("digraph G{}", i), 1);
+                dot
+            })
+            .collect::<Vec<_>>()
+            .join("\n\n")   
     }
 }
