@@ -15,6 +15,39 @@ use serde::Serialize;
 use crate::types::*;
 
 
+fn replace_variable_in_expression(expr: &mut Expression, target: &str, replacement: &str) {
+    match expr {
+        Expression::Atomic(Atomic::Variable(v)) if v == target => {
+            *v = replacement.to_string();
+        }
+        Expression::Atomic(_) => {}
+        Expression::Parameter(param) => {
+            let update_atomic = |a: &mut Atomic| {
+                if let Atomic::Variable(v) = a {
+                    if v == target {
+                        *v = replacement.to_string();
+                    }
+                }
+            };
+
+            match param {
+                Parameter::Signal { index, size }
+                | Parameter::I64Memory { index, size }
+                | Parameter::FfMemory { index, size } => {
+                    update_atomic(index);
+                    update_atomic(size);
+                }
+                Parameter::SubcmpSignal { component, index, size } => {
+                    update_atomic(component);
+                    update_atomic(index);
+                    update_atomic(size);
+                }
+            }
+        }
+    }
+}
+
+
 #[derive(Debug, Clone, Serialize)]
 enum OperatorOrPhi {
     Operator(Operator),
@@ -90,15 +123,21 @@ impl BasicBlock {
         self.statements.push(stmt);
     }
 
-    fn change_declaration(&mut self, name: &str, val: Value) {
+    fn change_declaration_operands(&mut self, name: &str, target: &str, replacement: &str) {
         if let Some(decl) = self.declarations.get(name) {
-            if let Some(stmt) = self.statements.get_mut(*decl) {
-                stmt.value = val;
-            } else {
-                panic!("Statement not found in block {}", self.id);
+            let stmt = self.statements.get_mut(*decl).expect("Missing statement");
+            for op in stmt.value.operands.iter_mut() {
+                replace_variable_in_expression(op, target, replacement);
             }
         } else {
             panic!("Variable {} not found in block {}", name, self.id);
+        }
+    }
+
+    fn change_statement_operands(&mut self, line: usize, target: &str, replacement: &str) {
+        let stmt = self.statements.get_mut(line).expect("Missing statement");
+        for op in stmt.value.operands.iter_mut() {
+            replace_variable_in_expression(op, target, replacement);
         }
     }
 
@@ -109,6 +148,15 @@ impl BasicBlock {
     fn add_succesor(&mut self, suc: Successor) {
         self.successors = Some(suc);
     }
+
+    fn change_condition(&mut self, target: &str, replacement: &str) {
+        if let Some(Successor::Conditional { condition, to_then: _, to_else: _ }) = &mut self.successors {
+            replace_variable_in_expression(condition, target, replacement);
+        } else {
+            panic!("Expected conditional successors");
+        }
+    }
+
 }
 
 #[derive(Default, Debug, Serialize)]
@@ -193,8 +241,16 @@ impl CFG {
         self.entry
     }
 
-    fn change_declaration(&mut self, block: usize, name: &str, val: Value) {
-        self.blocks[block].change_declaration(name, val);
+    fn change_declaration_operands(&mut self, block: usize, name: &str, target: &str, replacement: &str) {
+        self.blocks[block].change_declaration_operands(name, target, replacement);
+    }
+
+    fn change_statement_operands(&mut self, block: usize, line: usize, target: &str, replacement: &str) {
+        self.blocks[block].change_statement_operands(line, target, replacement);
+    }
+
+    fn change_condition(&mut self, block: usize, target: &str, replacement: &str) {
+        self.blocks[block].change_condition(target, replacement);
     }
 
     #[deprecated(note = "This function is only for debugging purposes!")]

@@ -2,6 +2,14 @@ use std::collections::{HashMap, HashSet};
 
 use crate::{ast::ASTNode, types::{Atomic, Expression, Parameter}, OperatorOrPhi, Statement, Value, CFG};
 
+/// Enum to represent the possible uses: In a statement (line in the block) or in a condition of
+/// the block
+enum Use {
+    InDeclaration(String),
+    InStmt(usize),
+    InCondition,
+}
+
 /// A SSA-based CFG builder
 pub struct CfgConstructor<'a> {
     cfg: &'a mut CFG,
@@ -15,8 +23,8 @@ pub struct CfgConstructor<'a> {
     /// Tracks unfinished φ-nodes per block (tracked variable and its φ-node)
     incomplete_phis: Vec<HashSet<(String, String)>>,
 
-    /// For each variable, we save the variables that make use of it and in which block
-    uses: HashMap<String, HashSet<(String, usize)>>,
+    /// For each variable, we save a set of blocks where it is used and how
+    uses: HashMap<String, HashSet<(usize, Use)>>,
 
     sealed_blocks: Vec<bool>,
     next_var: usize,
@@ -64,34 +72,6 @@ impl<'a> CfgConstructor<'a> {
     /// Write a new SSA binding for source `src` in `block` with `val`
     fn write_variable(&mut self, src: &str, block: usize, val: Value) -> String {
         let dest = self.fresh();
-
-        // Track uses of operands
-        for op in &val.operands {
-            if let Expression::Atomic(Atomic::Variable(var)) = op {
-                self.uses.entry(var.clone()).or_default().insert((dest.clone(), block));
-            } else if let Expression::Parameter(param) = op {
-                let mut track_atomic = |a: &Atomic| {
-                    if let Atomic::Variable(var) = a {
-                        self.uses.entry(var.clone()).or_default().insert((dest.clone(), block));
-                    }
-                };
-
-                match param {
-                    Parameter::Signal { index, size }
-                    | Parameter::I64Memory { index, size }
-                    | Parameter::FfMemory { index, size } => {
-                        track_atomic(index);
-                        track_atomic(size);
-                    }
-                    Parameter::SubcmpSignal { component, index, size } => {
-                        track_atomic(component);
-                        track_atomic(index);
-                        track_atomic(size);
-                    }
-                }
-            }
-        }
-
         self.values.insert(dest.clone(), val);
         self.definitions[block].insert(src.to_string(), dest.clone());
         dest
@@ -128,7 +108,8 @@ impl<'a> CfgConstructor<'a> {
         let val = Value { operator: Some(OperatorOrPhi::Phi), operands: Vec::new() };
         let phi = self.write_variable(name, block, val);
         self.add_phi_operands(name, &phi, block);
-        phi
+        // In case phi is trivial, we read again
+        self.read_variable(name, block)
     }
 
     /// Add φ operands from all predecessors for `name` in `block`
@@ -136,6 +117,7 @@ impl<'a> CfgConstructor<'a> {
         let mut ops = Vec::new();
         let predecessors: Vec<_> = self.cfg.predecessors(block).to_vec();
         for &pred in &predecessors {
+            //TODO: Avoid pushing trivial phis
             ops.push(self.read_variable(name, pred));
         }
         let entry = self.values.get_mut(phi).expect("Phi node missing");
@@ -147,38 +129,6 @@ impl<'a> CfgConstructor<'a> {
             //TODO: Does this go here?
             let stmt = Statement { num_type: None, output: Some(phi.to_string()), value: entry_clone };
             self.cfg.add_phi_function(block, stmt);
-        }
-    }
-
-    fn replace_variable_in_expression(expr: &mut Expression, target: &str, replacement: &str) {
-        match expr {
-            Expression::Atomic(Atomic::Variable(v)) if v == target => {
-                *v = replacement.to_string();
-            }
-            Expression::Atomic(_) => {}
-            Expression::Parameter(param) => {
-                let update_atomic = |a: &mut Atomic| {
-                    if let Atomic::Variable(v) = a {
-                        if v == target {
-                            *v = replacement.to_string();
-                        }
-                    }
-                };
-
-                match param {
-                    Parameter::Signal { index, size }
-                    | Parameter::I64Memory { index, size }
-                    | Parameter::FfMemory { index, size } => {
-                        update_atomic(index);
-                        update_atomic(size);
-                    }
-                    Parameter::SubcmpSignal { component, index, size } => {
-                        update_atomic(component);
-                        update_atomic(index);
-                        update_atomic(size);
-                    }
-                }
-            }
         }
     }
 
@@ -205,17 +155,18 @@ impl<'a> CfgConstructor<'a> {
 
         if let Some(same_v) = same {
             if let Some(users) = self.uses.remove(phi) {
-                for (user, block_u) in users {
-                    if let Some(value) = self.values.get_mut(&user) {
-                        for operand in value.operands.iter_mut() {
-                            Self::replace_variable_in_expression(operand, phi, &same_v);
+                for (block_u, user) in users {
+                    match user {
+                        Use::InDeclaration(user_name) => {
+                            self.cfg.change_declaration_operands(block_u, &user_name, phi, &same_v);
+                            let name_ssa = self.definitions[block_u].get(&user_name).expect("Declaration not found").clone();
+                            let _ = self.try_remove_trivial(&user_name, &name_ssa, block_u);
                         }
-
-                        self.cfg.change_declaration(block_u, &user, value.clone());
-
-                        if value.is_phi() {
-                            let name_u = self.definitions[block_u].get(&user).expect("Phi function not found").clone();
-                            self.try_remove_trivial(&user, &name_u, block_u);
+                        Use::InStmt(line) => {
+                            self.cfg.change_statement_operands(block_u, line, phi, &same_v);
+                        }
+                        Use::InCondition => {
+                            self.cfg.change_condition(block_u, phi, &same_v);
                         }
                     }
                 }
@@ -295,9 +246,8 @@ impl<'a> CfgConstructor<'a> {
         output: &Option<String>,
         operands: &Vec<Expression>,
     ) -> usize {
-        //TODO: When should we add the Statement to the block?
+        //TODO: Track use of operands
         let mut ops = Vec::new();
-        println!("Operands: {:?}", operands);
         for op in operands {
             ops.push(self.read_expression(op, curr));
         }
