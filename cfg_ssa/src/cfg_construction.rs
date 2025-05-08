@@ -126,8 +126,11 @@ impl<'a> CfgConstructor<'a> {
             // Single predecessor -> no φ needed
             let v = self.read_variable(name, preds[0]);
             // TODO: Why does Braun et al write the var in the current block?
+            // Maybe to avoid the recursive lookup in future cases?
             // let val = self.values.get(&v).cloned().expect("Value missing");
             // return self.write_variable(&v, block, val);
+            // Don't write_variable because it creates a new SSA name 
+            self.definitions[block].insert(name.to_string(), v.clone());
             return v;
         }
         // Multiple predecessors -> φ
