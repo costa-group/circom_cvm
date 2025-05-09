@@ -3,11 +3,13 @@ use std::collections::{HashMap, HashSet};
 use crate::{ast::ASTNode, types::{Atomic, Expression, Parameter}, OperatorOrPhi, Statement, Value, CFG};
 
 /// Enum to represent the possible uses:
+/// - In memoization (the block has written in its definitions this variable)
 /// - In a statement (block and line in the block)
 /// - A declaration (block and which variable is being declared)
 /// - In a condition (block with the branch)
 #[derive (Eq, Hash, PartialEq, Clone)]
 enum Use {
+    InMemoization(usize),
     InCondition(usize),
     InDeclaration(usize, String),
     InStmt(usize, usize),
@@ -22,6 +24,9 @@ pub struct CfgConstructor<'a> {
 
     /// Current SSA values: name -> concrete Value
     values: HashMap<String, Value>,
+
+    /// Current SSA values: ssa name -> original name
+    to_non_ssa: HashMap<String, String>,
 
     /// Tracks unfinished φ-nodes per block (tracked variable and its φ-node)
     incomplete_phis: Vec<HashSet<(String, String)>>,
@@ -40,6 +45,7 @@ impl<'a> CfgConstructor<'a> {
             cfg,
             definitions: vec![HashMap::new()],
             values: HashMap::new(),
+            to_non_ssa: HashMap::new(),
             incomplete_phis: vec![HashSet::new()],
             uses: HashMap::new(),
             sealed_blocks: vec![true],
@@ -76,6 +82,7 @@ impl<'a> CfgConstructor<'a> {
     fn write_variable(&mut self, src: &str, block: usize, val: Value) -> String {
         let dest = self.fresh();
         self.values.insert(dest.clone(), val);
+        self.to_non_ssa.insert(dest.clone(), src.to_string());
         self.definitions[block].insert(src.to_string(), dest.clone());
         dest
     }
@@ -101,8 +108,10 @@ impl<'a> CfgConstructor<'a> {
             // Single predecessor -> no φ needed
             let v = self.read_variable(name, preds[0]);
             // Avoid the recursive lookup in future cases
-            // Don't write_variable because it creates a new SSA name 
+            // Don't write_variable because it creates a new SSA name
             self.definitions[block].insert(name.to_string(), v.clone());
+            let usage = Use::InMemoization(block);
+            self.uses.entry(v.clone()).or_default().insert(usage);
             return v;
         }
         // Multiple predecessors -> φ
@@ -156,10 +165,13 @@ impl<'a> CfgConstructor<'a> {
             if let Some(users) = self.uses.remove(phi) {
                 for user in users {
                     match user {
-                        Use::InDeclaration(block_u, user_name) => {
-                            self.cfg.change_declaration_operands(block_u, &user_name, phi, &same_v);
-                            let name_ssa = self.definitions[block_u].get(&user_name).expect("Declaration not found").clone();
-                            let _ = self.try_remove_trivial(&user_name, &name_ssa, block_u);
+                        Use::InDeclaration(block_u, user_ssa_name) => {
+                            self.cfg.change_declaration_operands(block_u, &user_ssa_name, phi, &same_v);
+                            let non_ssa_name = self.to_non_ssa.get(&user_ssa_name).expect("Phi function not found").clone();
+
+                            //TODO: Possibly we need to remove the phi from the block if it has
+                            //been written
+                            let _ = self.try_remove_trivial(&user_ssa_name, &non_ssa_name, block_u);
                         }
                         Use::InStmt(block_u, line) => {
                             self.cfg.change_statement_operands(block_u, line, phi, &same_v);
@@ -167,11 +179,15 @@ impl<'a> CfgConstructor<'a> {
                         Use::InCondition(block_u) => {
                             self.cfg.change_condition(block_u, phi, &same_v);
                         }
+                        Use::InMemoization(block_u) => {
+                            self.definitions[block_u].insert(name.to_string(), same_v.clone());
+                        }
                     }
                 }
             }
             self.definitions[block].insert(name.to_string(), same_v);
             self.values.remove(phi);
+            self.to_non_ssa.remove(phi);
         }
         //TODO: Case of same is None → Remove its users recursively
         true
