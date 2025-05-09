@@ -80,14 +80,14 @@ fn parse_continue(input: &str) -> IResult<&str, ASTNode> {
 fn parse_ast_node(input: &str) -> IResult<&str, ASTNode> {
     //Delimited by useless to avoid parsing comments and whitespaces
     complete(delimited(
-     parse_useless,
-     alt((
-             parse_if_then_else,
-             parse_loop,
-             parse_break,
-             parse_continue,
-             parse_operation)),
-     parse_useless
+            parse_useless,
+            alt((
+                    parse_if_then_else,
+                    parse_loop,
+                    parse_break,
+                    parse_continue,
+                    parse_operation)),
+            parse_useless
     )).parse(input)
 }
 
@@ -226,7 +226,7 @@ pub fn parse_program(input: &str) -> IResult<&str, AST> {
     let mut functions: Vec<Function> = Vec::new();
 
     // Process each parsed field
-    // If one is repeated -> TODO: Error (current) or change value
+    // If one is repeated -> TODO: Error (current) or change value?
     for ast_field in fields {
         match ast_field {
             ASTField::Field(val) => {
