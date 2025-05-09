@@ -39,7 +39,8 @@ pub fn parse_components_heap(input: &str) -> IResult<&str, usize> {
 }
 
 pub fn parse_start(input: &str) -> IResult<&str, String> {
-    map(preceded(tag("%%start"), preceded(space1, parse_variable_name)), |start: String| start)
+    map(preceded(tag("%%start"), preceded(space1,
+                parse_variable_name)), |start: String| start)
         .parse(input)
 }
 

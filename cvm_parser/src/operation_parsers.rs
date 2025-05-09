@@ -121,6 +121,7 @@ fn parse_atomic(input: &str) -> IResult<&str, Atomic> {
     alt((map(parse_constant, Atomic::Constant), map(parse_variable_name, Atomic::Variable))).parse(input)
 }
 
+//TODO: This probably is suppossed to be a pair Atomic and list of Atomics
 fn parse_two_atomics(input: &str) -> IResult<&str, (Atomic, Atomic)> {
     delimited(
         tag("("),
@@ -130,6 +131,8 @@ fn parse_two_atomics(input: &str) -> IResult<&str, (Atomic, Atomic)> {
     .parse(input)
 }
 
+
+//TODO: Change Parameter parsers to accept as second argument a list of Atomics instead of only one
 fn parse_signal(input: &str) -> IResult<&str, Parameter> {
     map((tag("signal"), parse_two_atomics), |(_, (index, size))| Parameter::Signal { index, size })
         .parse(input)
