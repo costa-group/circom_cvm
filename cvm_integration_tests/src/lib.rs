@@ -28,34 +28,47 @@ mod tests {
     fn test_parse_and_type_checking() {
         let mut checker = cfg_ssa::type_checking::TypeChecker::new();
         let compiled_folder = Path::new("./compiled/");
-    
+
         // Process a single file: read, parse, and type check.
         fn process_file(path: &Path, checker: &mut cfg_ssa::type_checking::TypeChecker) {
             let content = match fs::read_to_string(path) {
                 Ok(content) => content,
                 Err(e) => {
-                    eprintln!("Failed to read file {:?}: {:?}", path, e);
+                    eprintln!("❌ Failed to read file {:?}: {:?}", path, e);
                     return;
                 }
             };
-    
+
             match cvm_parser::parse_program(&content) {
                 Ok((_, parsed)) => {
-                    println!("Parsed successfully: {:?}", parsed);
+                    println!("✅ Parsed successfully: {:?}", parsed);
                     match checker.check(&parsed) {
-                        Ok(_) => println!("Type checking passed for file: {:?}", path),
+                        Ok(_) => {
+                            println!("✅ Type checking passed for file: {:?}", path);
+                            let success_file_name = format!("./successes/{}", path.file_name().unwrap().to_string_lossy());
+                            fs::create_dir_all("./successes").unwrap();
+                            let mut success_file = fs::File::create(success_file_name).unwrap();
+                            writeln!(success_file, "Type checking passed for file: {:?}", path).unwrap();
+                        }
                         Err(e) => {
-                            eprintln!("Parsing failed for file {:?}", path);
-                            let error_file_name = format!("./outputs/{}_error.txt", path.file_name().unwrap().to_string_lossy());
+                            eprintln!("❌ Type checking failed for file {:?}", path);
+                            let error_file_name = format!("./fails/{}", path.file_name().unwrap().to_string_lossy());
+                            fs::create_dir_all("./fails").unwrap();
                             let mut error_file = fs::File::create(error_file_name).unwrap();
                             writeln!(error_file, "{:?}", e).unwrap();
                         }
                     }
                 }
-                Err(e) => eprintln!("Parsing failed for file {:?}: {:?}", path, e),
+                Err(e) => {
+                    eprintln!("❌ Parsing failed for file {:?}: {:?}", path, e);
+                    let error_file_name = format!("./fails/{}", path.file_name().unwrap().to_string_lossy());
+                    fs::create_dir_all("./fails").unwrap();
+                    let mut error_file = fs::File::create(error_file_name).unwrap();
+                    writeln!(error_file, "{:?}", e).unwrap();
+                }
             }
         }
-    
+
         // Recursively process all files in the directory.
         fn process_directory(dir: &Path, checker: &mut cfg_ssa::type_checking::TypeChecker) {
             for entry in fs::read_dir(dir).unwrap_or_else(|e| {
@@ -70,8 +83,7 @@ mod tests {
                 }
             }
         }
-    
         process_directory(compiled_folder, &mut checker);
     }
-    
+
 }
