@@ -93,6 +93,8 @@ pub enum Successor {
 #[derive(Debug, Serialize)]
 pub struct BasicBlock {
     id: usize,
+    //TODO: Maybe create another list only for phi functions in the case that we have to remove
+    //some trivial ones we don't mess the order of the rest of statements (necessary for the uses)
     statements: Vec<Statement>,
     predecessors: Vec<usize>,
     successors: Option<Successor>,
@@ -309,6 +311,10 @@ impl CFG {
     
         dot.push_str("}\n");
         dot
+    }
+
+    fn get_block_size(&self, block: usize) -> usize {
+        self.blocks[block].statements.len()
     }
 }
 

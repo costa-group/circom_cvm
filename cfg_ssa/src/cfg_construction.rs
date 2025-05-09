@@ -2,12 +2,15 @@ use std::collections::{HashMap, HashSet};
 
 use crate::{ast::ASTNode, types::{Atomic, Expression, Parameter}, OperatorOrPhi, Statement, Value, CFG};
 
-/// Enum to represent the possible uses: In a statement (line in the block) or in a condition of
-/// the block
+/// Enum to represent the possible uses:
+/// - In a statement (block and line in the block)
+/// - A declaration (block and which variable is being declared)
+/// - In a condition (block with the branch)
+#[derive (Eq, Hash, PartialEq, Clone)]
 enum Use {
-    InDeclaration(String),
-    InStmt(usize),
-    InCondition,
+    InCondition(usize),
+    InDeclaration(usize, String),
+    InStmt(usize, usize),
 }
 
 /// A SSA-based CFG builder
@@ -24,7 +27,7 @@ pub struct CfgConstructor<'a> {
     incomplete_phis: Vec<HashSet<(String, String)>>,
 
     /// For each variable, we save a set of blocks where it is used and how
-    uses: HashMap<String, HashSet<(usize, Use)>>,
+    uses: HashMap<String, HashSet<Use>>,
 
     sealed_blocks: Vec<bool>,
     next_var: usize,
@@ -97,8 +100,7 @@ impl<'a> CfgConstructor<'a> {
         if preds.len() == 1 {
             // Single predecessor -> no φ needed
             let v = self.read_variable(name, preds[0]);
-            // TODO: Why does Braun et al write the var in the current block?
-            // Maybe to avoid the recursive lookup in future cases?
+            // Avoid the recursive lookup in future cases
             // Don't write_variable because it creates a new SSA name 
             self.definitions[block].insert(name.to_string(), v.clone());
             return v;
@@ -117,16 +119,13 @@ impl<'a> CfgConstructor<'a> {
         let mut ops = Vec::new();
         let predecessors: Vec<_> = self.cfg.predecessors(block).to_vec();
         for &pred in &predecessors {
-            //TODO: Avoid pushing trivial phis
             ops.push(self.read_variable(name, pred));
         }
         let entry = self.values.get_mut(phi).expect("Phi node missing");
         entry.operands.extend(ops.into_iter().map(|op| Expression::Atomic(Atomic::Variable(op))));
 
         let entry_clone = entry.clone();
-        //TODO: Fix remove trivial
         if !self.try_remove_trivial(phi, name, block) {
-            //TODO: Does this go here?
             let stmt = Statement { num_type: None, output: Some(phi.to_string()), value: entry_clone };
             self.cfg.add_phi_function(block, stmt);
         }
@@ -155,17 +154,17 @@ impl<'a> CfgConstructor<'a> {
 
         if let Some(same_v) = same {
             if let Some(users) = self.uses.remove(phi) {
-                for (block_u, user) in users {
+                for user in users {
                     match user {
-                        Use::InDeclaration(user_name) => {
+                        Use::InDeclaration(block_u, user_name) => {
                             self.cfg.change_declaration_operands(block_u, &user_name, phi, &same_v);
                             let name_ssa = self.definitions[block_u].get(&user_name).expect("Declaration not found").clone();
                             let _ = self.try_remove_trivial(&user_name, &name_ssa, block_u);
                         }
-                        Use::InStmt(line) => {
+                        Use::InStmt(block_u, line) => {
                             self.cfg.change_statement_operands(block_u, line, phi, &same_v);
                         }
-                        Use::InCondition => {
+                        Use::InCondition(block_u) => {
                             self.cfg.change_condition(block_u, phi, &same_v);
                         }
                     }
@@ -221,6 +220,7 @@ impl<'a> CfgConstructor<'a> {
                 ASTNode::Loop { body: loop_body } => self.handle_loop(loop_body, curr),
                 ASTNode::IfThenElse { condition, if_case, else_case } => {
                     let cond = self.read_expression(condition, curr);
+                    self.track_use_condition(&cond, curr);
                     self.handle_if(&cond, if_case, else_case, curr, loop_blocks)
                 }
                 ASTNode::Break => {
@@ -239,6 +239,72 @@ impl<'a> CfgConstructor<'a> {
         curr
     }
 
+    fn track_use_declaration(&mut self, op: &Expression, dest: &str, block: usize) {
+        let usage = Use::InDeclaration(block, dest.to_string());
+        if let Expression::Atomic(Atomic::Variable(var)) = op {
+            self.uses.entry(var.clone()).or_default().insert(usage);
+        } else if let Expression::Parameter(param) = op {
+            let mut track_atomic = |a: &Atomic| {
+                if let Atomic::Variable(var) = a {
+                    self.uses.entry(var.clone()).or_default().insert(usage.clone());
+                }
+            };
+
+            match param {
+                Parameter::Signal { index, size }
+                | Parameter::I64Memory { index, size }
+                | Parameter::FfMemory { index, size } => {
+                    track_atomic(index);
+                    track_atomic(size);
+                }
+
+                Parameter::SubcmpSignal { component, index, size } => {
+                    track_atomic(component);
+                    track_atomic(index);
+                    track_atomic(size);
+                }
+            }
+        }
+    }
+
+    fn track_use_stmt(&mut self, op: &Expression, line: usize, block: usize) {
+        let usage = Use::InStmt(block, line);
+        if let Expression::Atomic(Atomic::Variable(var)) = op {
+            self.uses.entry(var.clone()).or_default().insert(usage);
+        } else if let Expression::Parameter(param) = op {
+            let mut track_atomic = |a: &Atomic| {
+                if let Atomic::Variable(var) = a {
+                    self.uses.entry(var.clone()).or_default().insert(usage.clone());
+                }
+            };
+
+            match param {
+                Parameter::Signal { index, size }
+                | Parameter::I64Memory { index, size }
+                | Parameter::FfMemory { index, size } => {
+                    track_atomic(index);
+                    track_atomic(size);
+                }
+
+                Parameter::SubcmpSignal { component, index, size } => {
+                    track_atomic(component);
+                    track_atomic(index);
+                    track_atomic(size);
+                }
+            }
+        }
+    }
+
+    fn track_use_condition(&mut self, op: &Expression, block: usize) {
+        let usage = Use::InCondition(block);
+        if let Expression::Atomic(Atomic::Variable(var)) = op {
+            self.uses.entry(var.clone()).or_default().insert(usage);
+        }
+        else if let Expression::Parameter(_) = op {
+            panic!("The condition of a branch cannot be a parameter for a function");
+        }
+    }
+
     fn handle_operation(
         &mut self, curr: usize,
         num_type: &Option<crate::types::NumericType>,
@@ -246,28 +312,35 @@ impl<'a> CfgConstructor<'a> {
         output: &Option<String>,
         operands: &Vec<Expression>,
     ) -> usize {
-        //TODO: Track use of operands
         let mut ops = Vec::new();
         for op in operands {
             ops.push(self.read_expression(op, curr));
         }
-    
-        let val = Value { operator: operator.clone().map(OperatorOrPhi::Operator), operands: ops };
-    
+
+        let val = Value { operator: operator.clone().map(OperatorOrPhi::Operator), operands: ops.clone() };
+
         let var;
         if let Some(v) = output {
-            var = Some(self.write_variable(v, curr, val.clone()));
+            let aux = self.write_variable(v, curr, val.clone());
+            for op in &ops {
+                self.track_use_declaration(op, &aux, curr);
+            }
+            var = Some(aux);
         }
         else {
+            let line = self.cfg.get_block_size(curr);
+            for op in &ops {
+                self.track_use_stmt(op, line, curr);
+            }
             var = None;
         }
-    
+
         let stmt = Statement { num_type: num_type.clone(), output: var, value: val };
         self.cfg.add_instruction(curr, stmt);
-    
+
         curr
     }
-    
+
     /// Helper: create a new block and link from `curr`
     fn create_and_link(&mut self, curr: usize) -> usize {
         let b = self.create_block();
@@ -313,7 +386,7 @@ impl<'a> CfgConstructor<'a> {
 
         // Add else block (optional)
         let else_b = if else_case.is_some() { self.create_block() }
-                            else { join };
+        else { join };
 
         // Link current block with the then and else blocks
         self.cfg.add_cond_link(curr, condition.clone(), then_b, else_b);
@@ -363,113 +436,114 @@ mod tests {
             signals: 10,
             components: vec![5, 3, 2],
             body: vec![
-            ASTNode::Operation {
-                num_type: Some(NumericType::FiniteField),
-                operator: None,
-                output: Some("x".to_string()),
-                operands: vec![Expression::Atomic(Atomic::Constant(ConstantType::FF(BigInt::from(1))))],
-            },
-            ASTNode::Operation {
-                num_type: Some(NumericType::FiniteField),
-                operator: None,
-                output: Some("y".to_string()),
-                operands: vec![Expression::Atomic(Atomic::Constant(ConstantType::FF(BigInt::from(10))))],
-            },
-            ASTNode::Operation {
-                num_type: Some(NumericType::FiniteField),
-                operator: None,
-                output: Some("z".to_string()),
-                operands: vec![Expression::Atomic(Atomic::Constant(ConstantType::FF(BigInt::from(9))))],
-            },
-            ASTNode::Operation {
-                num_type: Some(NumericType::FiniteField),
-                operator: Some(Operator::Add),
-                output: Some("a".to_string()),
-                operands: vec![
-                Expression::Atomic(Atomic::Variable("y".to_string())),
-                Expression::Atomic(Atomic::Variable("z".to_string())),
-                ],
-            },
-            ASTNode::Operation {
-                num_type: Some(NumericType::FiniteField),
-                operator: None,
-                output: Some("condition".to_string()),
-                operands: vec![Expression::Atomic(Atomic::Constant(ConstantType::I64(1)))],
-            },
-            ASTNode::Operation {
-                num_type: Some(NumericType::FiniteField),
-                operator: None,
-                output: Some("loop_condition".to_string()),
-                operands: vec![Expression::Atomic(Atomic::Constant(ConstantType::I64(1)))],
-            },
-            ASTNode::IfThenElse {
-                condition: Expression::Atomic(Atomic::Variable("condition".to_string())),
-                if_case: vec![
                 ASTNode::Operation {
                     num_type: Some(NumericType::FiniteField),
-                    operator: Some(Operator::Sub),
-                    output: Some("b".to_string()),
-                    operands: vec![
-                    Expression::Atomic(Atomic::Variable("x".to_string())),
-                    Expression::Atomic(Atomic::Variable("y".to_string())),
-                    ],
+                    operator: None,
+                    output: Some("x".to_string()),
+                    operands: vec![Expression::Atomic(Atomic::Constant(ConstantType::FF(BigInt::from(1))))],
                 },
-                ],
-                else_case: None,
-            },
-            ASTNode::Loop {
-                body: vec![
                 ASTNode::Operation {
                     num_type: Some(NumericType::FiniteField),
-                    operator: Some(Operator::Mul),
-                    output: Some("b".to_string()),
+                    operator: None,
+                    output: Some("y".to_string()),
+                    operands: vec![Expression::Atomic(Atomic::Constant(ConstantType::FF(BigInt::from(10))))],
+                },
+                ASTNode::Operation {
+                    num_type: Some(NumericType::FiniteField),
+                    operator: None,
+                    output: Some("z".to_string()),
+                    operands: vec![Expression::Atomic(Atomic::Constant(ConstantType::FF(BigInt::from(9))))],
+                },
+                ASTNode::Operation {
+                    num_type: Some(NumericType::FiniteField),
+                    operator: Some(Operator::Add),
+                    output: Some("a".to_string()),
                     operands: vec![
-                        Expression::Atomic(Atomic::Variable("x".to_string())),
+                        Expression::Atomic(Atomic::Variable("y".to_string())),
                         Expression::Atomic(Atomic::Variable("z".to_string())),
                     ],
                 },
+                ASTNode::Operation {
+                    num_type: Some(NumericType::FiniteField),
+                    operator: None,
+                    output: Some("condition".to_string()),
+                    operands: vec![Expression::Atomic(Atomic::Constant(ConstantType::I64(1)))],
+                },
+                ASTNode::Operation {
+                    num_type: Some(NumericType::FiniteField),
+                    operator: None,
+                    output: Some("loop_condition".to_string()),
+                    operands: vec![Expression::Atomic(Atomic::Constant(ConstantType::I64(1)))],
+                },
                 ASTNode::IfThenElse {
-                    condition: Expression::Atomic(Atomic::Variable("loop_condition".to_string())),
+                    condition: Expression::Atomic(Atomic::Variable("condition".to_string())),
                     if_case: vec![
                         ASTNode::Operation {
                             num_type: Some(NumericType::FiniteField),
-                            operator: Some(Operator::Div),
-                            output: Some("c".to_string()),
+                            operator: Some(Operator::Sub),
+                            output: Some("b".to_string()),
                             operands: vec![
-                            Expression::Atomic(Atomic::Variable("x".to_string())),
-                            Expression::Atomic(Atomic::Variable("z".to_string())),
+                                Expression::Atomic(Atomic::Variable("x".to_string())),
+                                Expression::Atomic(Atomic::Variable("y".to_string())),
                             ],
                         },
-                        ASTNode::Break,
                     ],
-                    else_case: Some(vec![
+                    else_case: None,
+                },
+                ASTNode::Loop {
+                    body: vec![
                         ASTNode::Operation {
                             num_type: Some(NumericType::FiniteField),
-                            operator: Some(Operator::Sub),
-                            output: Some("d".to_string()),
+                            operator: Some(Operator::Mul),
+                            output: Some("b".to_string()),
                             operands: vec![
-                            Expression::Atomic(Atomic::Variable("x".to_string())),
-                            Expression::Atomic(Atomic::Variable("z".to_string())),
+                                Expression::Atomic(Atomic::Variable("x".to_string())),
+                                Expression::Atomic(Atomic::Variable("z".to_string())),
                             ],
                         },
-                        ASTNode::Continue,
-                    ]),
+                        ASTNode::IfThenElse {
+                            condition: Expression::Atomic(Atomic::Variable("loop_condition".to_string())),
+                            if_case: vec![
+                                ASTNode::Operation {
+                                    num_type: Some(NumericType::FiniteField),
+                                    operator: Some(Operator::Div),
+                                    output: Some("c".to_string()),
+                                    operands: vec![
+                                        Expression::Atomic(Atomic::Variable("x".to_string())),
+                                        Expression::Atomic(Atomic::Variable("z".to_string())),
+                                    ],
+                                },
+                                ASTNode::Break,
+                            ],
+                            else_case: Some(vec![
+                                ASTNode::Operation {
+                                    num_type: Some(NumericType::FiniteField),
+                                    operator: Some(Operator::Sub),
+                                    output: Some("d".to_string()),
+                                    operands: vec![
+                                        Expression::Atomic(Atomic::Variable("x".to_string())),
+                                        Expression::Atomic(Atomic::Variable("z".to_string())),
+                                    ],
+                                },
+                                ASTNode::Continue,
+                            ]),
+                        },
+                        ],
+                },
+                ASTNode::Operation {
+                    num_type: Some(NumericType::FiniteField),
+                    operator: Some(Operator::Add),
+                    output: Some("x".to_string()),
+                    operands: vec![
+                        Expression::Atomic(Atomic::Variable("y".to_string())),
+                        Expression::Atomic(Atomic::Variable("z".to_string())),
+                    ],
                 },
                 ],
-            },
-            ASTNode::Operation {
-                num_type: Some(NumericType::FiniteField),
-                operator: Some(Operator::Add),
-                output: Some("x".to_string()),
-                operands: vec![
-                Expression::Atomic(Atomic::Variable("y".to_string())),
-                Expression::Atomic(Atomic::Variable("z".to_string())),
-                ],
-            },
-            ],
         };
         let cfg = CFG::new_from_template(template);
         let dot_representation = cfg.to_dot();
+        std::fs::create_dir_all("./test").expect("Unable to create test directory");
         std::fs::write("./test/cfg_output.dot", dot_representation).expect("Unable to write DOT file");
         let json_representation = cfg.to_json();
         std::fs::write("./test/cfg_output.json", json_representation).expect("Unable to write JSON file");
