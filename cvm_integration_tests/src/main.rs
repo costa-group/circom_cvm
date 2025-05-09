@@ -1,3 +1,4 @@
+use std::default;
 use std::env;
 use std::fs;
 use cvm_parser::parse_program;
@@ -7,12 +8,15 @@ use cfg_ssa::CFGList;
 fn main() {
     // Get the command-line arguments
     let args: Vec<String> = env::args().collect();
-    if args.len() != 2 {
-        eprintln!("Usage: {} <file.cvm>", args[0]);
-        std::process::exit(1);
-    }
+    let default_file_path = "/home/mario/compilados/sum_test_cvm/sum_test.cvm".to_string();
+    let file_path = &default_file_path;
 
-    let file_path = &args[1];
+    // if args.len() != 2 {
+    //     eprintln!("Usage: {} <file.cvm>", args[0]);
+    //     //std::process::exit(1);
+    // }
+
+    // let file_path = &args[1];
 
     // Read the .cvm file
     let file_content = match fs::read_to_string(file_path) {
@@ -42,7 +46,7 @@ fn main() {
 
     // Construct the control flow graph (CFG)
     let cfg = CFGList::new(parsed_program);
-    
+
     // Write the CFG to a JSON file
     let json_output_path = format!("{}.json", file_path);
     if let Err(err) = fs::write(&json_output_path, cfg.to_json()) {
@@ -50,12 +54,15 @@ fn main() {
         std::process::exit(1);
     }
 
-    // Write the CFG to a DOT file
-    let dot_output_path = format!("{}.dot", file_path);
-    if let Err(err) = fs::write(&dot_output_path, cfg.to_dot()) {
-        eprintln!("Error writing DOT file {}: {}", dot_output_path, err);
-        std::process::exit(1);
+    // Write each CFG to a separate DOT file
+    let dot_files = cfg.to_dot();
+    for (index, dot_content) in dot_files.iter().enumerate() {
+        let dot_output_path = format!("{}_{}.dot", file_path, index);
+        if let Err(err) = fs::write(&dot_output_path, dot_content) {
+            eprintln!("Error writing DOT file {}: {}", dot_output_path, err);
+            std::process::exit(1);
+        }
     }
 
-    println!("CFG successfully written to {} and {}", json_output_path, dot_output_path);
+    println!("CFGList successfully written to {}", json_output_path);
 }

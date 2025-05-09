@@ -263,15 +263,15 @@ impl CFG {
 
     #[deprecated(note = "This function is only for debugging purposes!")]
     #[doc(hidden)]
-    pub fn to_dot(&self) -> String {
+    pub fn to_dot(&self, id: usize) -> String {
         // helper: only escape quotes, leave \n alone
         fn esc(s: &str) -> String {
             s.replace('"', "\\\"")
         }
-    
+
         let mut dot = String::new();
-        dot.push_str("digraph G {\n");
-    
+        dot.push_str(&format!("digraph G{} {{\n", id));
+
         for block in &self.blocks {
             // 1) collect one line per statement (with Debug)
             let mut lines = Vec::new();
@@ -279,17 +279,17 @@ impl CFG {
             for stmt in &block.statements {
                 lines.push(format!("{:?}", stmt));
             }
-    
+
             // 2) join with "\n"
             let raw_label = lines.join("\n");
             // 3) escape only quotes
             let label = esc(&raw_label);
-    
+
             dot.push_str(&format!(
-                "  {} [label=\"{}\", shape=box];\n",
-                block.id, label
+                    "  {} [label=\"{}\", shape=box];\n",
+                    block.id, label
             ));
-    
+
             // edges
             if let Some(succ) = &block.successors {
                 match succ {
@@ -299,16 +299,16 @@ impl CFG {
                     Successor::Conditional { condition, to_then, to_else } => {
                         let cond = esc(&format!("{:?}", condition));
                         dot.push_str(&format!(
-                            "  {} -> {} [label=\"if {}\"];\n",
-                            block.id, to_then, cond
+                                "  {} -> {} [label=\"if {}\"];\n",
+                                block.id, to_then, cond
                         ));
                         dot.push_str(&format!("  {} -> {} [label=\"else\"];\n",
-                                            block.id, to_else));
+                                block.id, to_else));
                     }
                 }
             }
         }
-    
+
         dot.push_str("}\n");
         dot
     }
@@ -353,16 +353,7 @@ impl CFGList {
 
     #[deprecated(note = "This function is only for debugging purposes!")]
     #[doc(hidden)]
-    pub fn to_dot(&self) -> String {
-        self.cfgs
-            .iter()
-            .enumerate()
-            .map(|(i, cfg)| {
-                let mut dot = cfg.to_dot();
-                dot = dot.replacen("digraph G", &format!("digraph G{}", i), 1);
-                dot
-            })
-            .collect::<Vec<_>>()
-            .join("\n\n")   
+    pub fn to_dot(&self) -> Vec<String> {
+        self.cfgs.iter().enumerate().map(|(id, cfg)| cfg.to_dot(id)).collect()
     }
 }
