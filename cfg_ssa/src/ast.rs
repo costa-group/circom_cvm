@@ -27,7 +27,7 @@ pub struct Function {
     pub name: String,
     pub inputs: Vec<String>,
     pub outputs: Vec<String>,
-    pub local_memory: usize, //TODO: Change name to size
+    pub memory_size: usize,
     pub body: Vec<ASTNode>,
 }
 

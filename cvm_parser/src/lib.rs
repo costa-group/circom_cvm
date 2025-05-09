@@ -135,7 +135,7 @@ fn parse_function(input: &str) -> IResult<&str, Function> {
         name,
         outputs,
         inputs,
-        local_memory,
+        memory_size: local_memory,
         body,
     }))
 }
@@ -401,7 +401,7 @@ mod tests {
             name: "my_function_0".to_string(),
             outputs: vec!["output1".to_string(), "output2".to_string()],
             inputs: vec!["input1".to_string(), "input2".to_string()],
-            local_memory: 10,
+            memory_size: 10,
             body: vec![ASTNode::Operation {
                 num_type: Some(NumericType::FiniteField),
                 operator: Some(Operator::Add),
