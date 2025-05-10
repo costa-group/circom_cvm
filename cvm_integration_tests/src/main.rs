@@ -8,7 +8,7 @@ use cfg_ssa::CFGList;
 fn main() {
     // Get the command-line arguments
     let args: Vec<String> = env::args().collect();
-    let default_file_path = "/home/mario/compilados/sum_test_cvm/sum_test.cvm".to_string();
+    let default_file_path = "/home/mario/compilados/sum_test_cvm/sum_test".to_string();
     let file_path = &default_file_path;
 
     // if args.len() != 2 {
@@ -19,10 +19,11 @@ fn main() {
     // let file_path = &args[1];
 
     // Read the .cvm file
-    let file_content = match fs::read_to_string(file_path) {
+    let file = format!("{}.cvm", &file_path);
+    let file_content = match fs::read_to_string(&file) {
         Ok(content) => content,
         Err(err) => {
-            eprintln!("Error reading file {}: {}", file_path, err);
+            eprintln!("Error reading file {}: {}", &file, err);
             std::process::exit(1);
         }
     };
@@ -31,7 +32,7 @@ fn main() {
     let parsed_program = match parse_program(&file_content) {
         Ok((_, program)) => program,
         Err(err) => {
-            eprintln!("Error parsing file {}: {}", file_path, err);
+            eprintln!("Error parsing file {}: {}", &file, err);
             std::process::exit(1);
         }
     };
