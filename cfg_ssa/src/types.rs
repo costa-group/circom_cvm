@@ -1,4 +1,5 @@
 extern crate num_bigint_dig as num_bigint;
+use std::fmt;
 use num_bigint::BigInt;
 use serde::Serialize;
 
@@ -109,19 +110,37 @@ pub enum Operator {
     //TODO: outs
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Clone, PartialEq, Serialize)]
 pub enum ConstantType {
     FF(BigInt),
     I64(i64),
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+impl fmt::Debug for ConstantType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ConstantType::FF(value) => write!(f, "{}", value),
+            ConstantType::I64(value) => write!(f, "{}", value),
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize)]
 pub enum Atomic {
     Constant(ConstantType),
     Variable(String),
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+impl fmt::Debug for Atomic {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Atomic::Constant(constant) => write!(f, "{:?}", constant),
+            Atomic::Variable(var) => write!(f, "{}", var),
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize)]
 pub enum Parameter {
     //TODO: Not index is number of dimensions and length of each
     //Change second to vector of size first
@@ -144,8 +163,30 @@ pub enum Parameter {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+impl fmt::Debug for Parameter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Parameter::Signal { index, size } => write!(f, "signal({:?}, {:?})", index, size),
+            Parameter::SubcmpSignal { component, index, size } => {
+                write!(f, "subcmpsignal({:?}, {:?}, {:?})", component, index, size)
+            }
+            Parameter::I64Memory { index, size } => write!(f, "i64.memory({:?}, {:?})", index, size),
+            Parameter::FfMemory { index, size } => write!(f, "ff.memory({:?}, {:?})", index, size),
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize)]
 pub enum Expression {
     Atomic(Atomic),
     Parameter(Parameter),
+}
+
+impl fmt::Debug for Expression {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Expression::Atomic(atomic) => write!(f, "{:?}", atomic),
+            Expression::Parameter(parameter) => write!(f, "{:?}", parameter),
+        }
+    }
 }

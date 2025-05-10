@@ -71,11 +71,42 @@ impl Value {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Clone, Serialize)]
 pub struct Statement {
     num_type: Option<NumericType>,
     output: Option<String>,
     value: Value,
+}
+
+use std::fmt;
+impl fmt::Debug for Statement {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut s = String::new();
+        if let Some(out) = &self.output {
+            s.push_str(out);
+            s.push_str(" = ");
+        }
+        if let Some(typ) = &self.num_type {
+            s.push_str(match typ {
+                NumericType::Integer => "i64.",
+                NumericType::FiniteField => "ff."
+            })
+        }
+        if let Some(op) = &self.value.operator {
+            match op {
+                OperatorOrPhi::Phi => {
+                    s.push_str("φ ");
+                }
+                OperatorOrPhi::Operator(ope) => {
+                    s.push_str(&format!("{:?} ", ope).to_lowercase());
+                }
+            }
+        }
+        for op in self.value.operands.iter() {
+            s.push_str(&format!("{:?} ", op));
+        }
+        write!(f, "{}", s)
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -299,11 +330,11 @@ impl CFG {
                     Successor::Conditional { condition, to_then, to_else } => {
                         let cond = esc(&format!("{:?}", condition));
                         dot.push_str(&format!(
-                                "  {} -> {} [label=\"if {}\"];\n",
+                                "  {} -> {} [label=\"{} != 0\"];\n",
                                 block.id, to_then, cond
                         ));
-                        dot.push_str(&format!("  {} -> {} [label=\"else\"];\n",
-                                block.id, to_else));
+                        dot.push_str(&format!("  {} -> {} [label=\"{} == 0\"];\n",
+                                block.id, to_else, cond));
                     }
                 }
             }

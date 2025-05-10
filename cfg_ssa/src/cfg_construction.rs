@@ -382,7 +382,7 @@ impl<'a> CfgConstructor<'a> {
 
         // The block that will be the last one in the loop
         let last = self.process_body(loop_body, entry, Some((entry, after)));
-        if !self.exception_blocks.contains(&last) {
+        if !self.cfg.predecessors(last).is_empty() && !self.exception_blocks.contains(&last) {
             self.cfg.add_uncond_link(last, after);
         }
 
