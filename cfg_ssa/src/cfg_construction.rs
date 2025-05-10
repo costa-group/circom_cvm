@@ -510,7 +510,7 @@ mod tests {
                         ASTNode::Operation {
                             num_type: Some(NumericType::FiniteField),
                             operator: Some(Operator::Sub),
-                            output: Some("b".to_string()),
+                            output: Some("x".to_string()),
                             operands: vec![
                                 Expression::Atomic(Atomic::Variable("x".to_string())),
                                 Expression::Atomic(Atomic::Variable("y".to_string())),
@@ -548,7 +548,7 @@ mod tests {
                                 ASTNode::Operation {
                                     num_type: Some(NumericType::FiniteField),
                                     operator: Some(Operator::Sub),
-                                    output: Some("d".to_string()),
+                                    output: Some("x".to_string()),
                                     operands: vec![
                                         Expression::Atomic(Atomic::Variable("x".to_string())),
                                         Expression::Atomic(Atomic::Variable("z".to_string())),

@@ -51,6 +51,8 @@ fn replace_variable_in_expression(expr: &mut Expression, target: &str, replaceme
 #[derive(Debug, Clone, Serialize)]
 enum OperatorOrPhi {
     Operator(Operator),
+    // TODO: Make sure the operands in the phi function have the same order as their corresponding
+    // predecessors
     Phi,
 }
 
@@ -62,9 +64,9 @@ struct Value {
 
 impl Value {
     //This should only be used for phi functions
-    pub fn append_operand(&mut self, var: String) {
-        self.operands.push(Expression::Atomic(Atomic::Variable(var)));
-    }
+    // pub fn append_operand(&mut self, var: String) {
+    //     self.operands.push(Expression::Atomic(Atomic::Variable(var)));
+    // }
 
     pub fn is_phi(&self) -> bool {
         matches!(self.operator, Some(OperatorOrPhi::Phi))

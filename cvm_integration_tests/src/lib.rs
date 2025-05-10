@@ -85,5 +85,4 @@ mod tests {
         }
         process_directory(compiled_folder, &mut checker);
     }
-
 }
