@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::{ast::ASTNode, types::{Atomic, Expression, Parameter}, OperatorOrPhi, Statement, Value, CFG};
+use crate::{ast::ASTNode, types::{Atomic, Expression, Operator, Parameter}, OperatorOrPhi, Statement, Value, CFG};
 
 /// Enum to represent the possible uses:
 /// - In memoization (the block has written in its definitions this variable)
@@ -34,6 +34,9 @@ pub struct CfgConstructor<'a> {
     /// For each variable, we save a set of blocks where it is used and how
     uses: HashMap<String, HashSet<Use>>,
 
+    /// We keep track of the blocks that lead to exceptions (i.e., errors)
+    exception_blocks: HashSet<usize>,
+
     sealed_blocks: Vec<bool>,
     next_var: usize,
 }
@@ -48,6 +51,7 @@ impl<'a> CfgConstructor<'a> {
             to_non_ssa: HashMap::new(),
             incomplete_phis: vec![HashSet::new()],
             uses: HashMap::new(),
+            exception_blocks: HashSet::new(),
             sealed_blocks: vec![true],
             next_var: 0,
         }
@@ -231,6 +235,11 @@ impl<'a> CfgConstructor<'a> {
         for stmt in body {
             curr = match stmt {
                 ASTNode::Operation { num_type, operator, output, operands } => {
+                    if let Some(Operator::Error) = operator {
+                        let new_curr = self.handle_operation(curr, num_type, operator, output, operands);
+                        self.exception_blocks.insert(new_curr);
+                        return new_curr;
+                    }
                     self.handle_operation(curr, num_type, operator, output, operands)
                 }
                 ASTNode::Loop { body: loop_body } => self.handle_loop(loop_body, curr),
@@ -373,7 +382,7 @@ impl<'a> CfgConstructor<'a> {
 
         // The block that will be the last one in the loop
         let last = self.process_body(loop_body, entry, Some((entry, after)));
-        if self.cfg.predecessors(last).len() > 1 {
+        if !self.exception_blocks.contains(&last) {
             self.cfg.add_uncond_link(last, after);
         }
 
@@ -402,7 +411,7 @@ impl<'a> CfgConstructor<'a> {
 
         // Add else block (optional)
         let else_b = if else_case.is_some() { self.create_block() }
-        else { join };
+                            else { join };
 
         // Link current block with the then and else blocks
         self.cfg.add_cond_link(curr, condition.clone(), then_b, else_b);
@@ -416,11 +425,15 @@ impl<'a> CfgConstructor<'a> {
 
         // Process then case
         let end_then = self.process_body(if_case, then_b, loop_blocks);
-        self.cfg.add_uncond_link(end_then, join);
+        if !self.exception_blocks.contains(&end_then) {
+            self.cfg.add_uncond_link(end_then, join);
+        }
 
         if let Some(else_stmts) = else_case {
             let end_else = self.process_body(else_stmts, else_b, loop_blocks);
-            self.cfg.add_uncond_link(end_else, join);
+            if !self.exception_blocks.contains(&end_else) {
+                self.cfg.add_uncond_link(end_else, join);
+            }
         }
 
         // Seal join
