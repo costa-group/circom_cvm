@@ -466,9 +466,6 @@ impl WriteCVM for LoadBucket{
 	}
         let (mut instructions_src, lsrc) = self.src.produce_cvm(&self.address_type, &self.context,producer); 
         instructions.append(&mut instructions_src);
-	if producer.needs_comments() {
-            instructions.push(";; end of load bucket".to_string());
-        }
         let res = producer.fresh_var();
         match lsrc {
             ComputedAddress::Variable(dir) => {
@@ -480,6 +477,9 @@ impl WriteCVM for LoadBucket{
             ComputedAddress::SubcmpSignal(rcmp,dir) => {
                 instructions.push(format!("{} = {}",res, &get_cmp_signal(&rcmp,&dir)));
             }
+        }
+	if producer.needs_comments() {
+            instructions.push(";; end of load bucket".to_string());
         }
         (instructions,res)
     }

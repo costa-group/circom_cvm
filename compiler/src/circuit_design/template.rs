@@ -210,6 +210,8 @@ impl WriteCVM for TemplateCodeInfo {
             signals,
             subcomponents
         ));
+        
+        instructions.push(format!("{} = {}", RETURN_POSITION, &self.var_stack_depth));
 
         for t in &self.body {
             let (mut instructions_body,_) = t.produce_cvm(producer);

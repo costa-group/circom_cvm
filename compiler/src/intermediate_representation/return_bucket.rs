@@ -11,6 +11,7 @@ pub struct ReturnBucket {
     pub message_id: usize,
     pub with_size: usize,
     pub value: InstructionPointer,
+    pub is_array: bool,
 }
 
 impl IntoInstruction for ReturnBucket {
@@ -130,13 +131,13 @@ impl WriteCVM for ReturnBucket{
         let (mut instructions_src, src) = self.value.produce_cvm(producer); // compute the source
         instructions.append(&mut instructions_src);
         if self.with_size == 1 {
-            instructions.push(format!("{} {} {}", add_return(), src, "1".to_string() ));
+            instructions.push(format!("{} {} i64.{}", add_return(), src, "1".to_string() ));
         } else {
             let vcond = producer.fresh_var();
-            instructions.push(format!("{} = {} {} {}", vcond, "i64.le".to_string(), self.with_size, FUNCTION_DESTINATION_SIZE));
+            instructions.push(format!("{} = {} i64.{} {}", vcond, "i64.le".to_string(), self.with_size, FUNCTION_DESTINATION_SIZE));
             let final_size = producer.fresh_var();
             instructions.push(format!("{} {}", add_if(), vcond));
-            instructions.push(format!("{} = {}",final_size, self.with_size));
+            instructions.push(format!("{} = i64.{}",final_size, self.with_size));
             instructions.push(add_else());
             instructions.push(format!("{} = {}", final_size, FUNCTION_DESTINATION_SIZE));
             instructions.push(add_end());

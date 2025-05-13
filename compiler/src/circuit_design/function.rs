@@ -19,6 +19,7 @@ pub struct FunctionCodeInfo {
     pub constant_variables: Vec<(String, Vec<usize>)>,
     pub max_number_of_vars: usize,
     pub max_number_of_ops_in_expression: usize,
+    pub is_array_result: bool,
 }
 
 impl ToString for FunctionCodeInfo {
@@ -148,16 +149,16 @@ impl WriteCVM for FunctionCodeInfo {
             inputs = format!("{} {}", inputs, declare_variable(None, &param.length));
         }
 
-        let outputs = declare_variable(None, &self.returns);
-        
+        let outputs = if self.returns.len() == 0 { "ff".to_string() } else { "".to_string() };
 
         instructions.push(format!("%%function {} [{}] [{}]",
             self.header, 
             outputs,
             inputs,
         ));
-        let size = producer.get_local_info_size_u32() * 4 + self.max_number_of_vars;
-        instructions.push(format!("local.memory {}",size));
+        let size = self.max_number_of_vars;
+        //instructions.push(format!("local.memory {}",size));
+        instructions.push(format!("{} = {}", RETURN_POSITION, size));
         for t in &self.body {
             let (mut instructions_body,_) = t.produce_cvm(producer);
             instructions.append(&mut instructions_body);

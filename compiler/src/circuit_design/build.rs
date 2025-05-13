@@ -206,6 +206,7 @@ fn build_function_instances(
         let header = instance.header;
         let name = instance.name;
         let params = instance.params_types;
+        let is_array_result = instance.return_type.len() == 0;
         let returns = instance.return_type;
         let id = circuit.wasm_producer.message_list.len();
         circuit.wasm_producer.message_list.push(msg);
@@ -235,6 +236,7 @@ fn build_function_instances(
             params,
             returns,
             header: header.clone(),
+            is_array_result,
             ..FunctionCodeInfo::default()
         };
         let code = instance.body;

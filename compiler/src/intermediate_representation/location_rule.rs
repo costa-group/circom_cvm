@@ -95,7 +95,7 @@ impl  LocationRule {
                         let tid = producer.fresh_var();
                         instructions.push(format!("{} = get_template_id {}", tid, vcmp));
                         let sp = producer.fresh_var();
-                        instructions.push(format!("{} = get_template_signal_position {} {}", sp, tid, signal_code));
+                        instructions.push(format!("{} = get_template_signal_position {} i64.{}", sp, tid, signal_code));
 			if indexes.len() == 0 {
                             (instructions, ComputedAddress::SubcmpSignal(vcmp,sp))
 			} else {
@@ -112,10 +112,12 @@ impl  LocationRule {
                                     assert!(index_list.len() > 0);
                                     let (mut instructions_idx0, vidx0) = index_list[0].produce_cvm(producer);
                                     instructions.append(&mut instructions_idx0);
-                                    let mut prevsize = vidx0;
+                                    let psize = producer.fresh_var();
+                                    let mut prevsize = psize;
+                                    instructions.push(format!("{} = {}", prevsize, vidx0));
 				    for i in 1..index_list.len() {
                                         let dimi = producer.fresh_var();
-                                        instructions.push(format!("{} = {} {} {} {}", dimi, get_dimention_function, tbid, signal_code, i));
+                                        instructions.push(format!("{} = {} {} i64.{} i64.{}", dimi, get_dimention_function, tbid, signal_code, i));
                                         let (mut instructions_idxi, vidxi) = index_list[i].produce_cvm(producer);
                                         instructions.append(&mut instructions_idxi);
                                         let curmul = producer.fresh_var();
@@ -132,14 +134,14 @@ impl  LocationRule {
 				        assert!(idxpos+1 == indexes.len());
 				        for i in 0..diff-1 {
                                             let dimi = producer.fresh_var();
-                                            instructions.push(format!("{} = {} {} {} {}", dimi, get_dimention_function, tid, signal_code, indexes.len() + i));                                        
+                                            instructions.push(format!("{} = {} {} i64.{} i64.{}", dimi, get_dimention_function, tid, signal_code, indexes.len() + i));                                        
                                             let cursize = producer.fresh_var();
                                             instructions.push(format!("{} = {} {} {}", cursize, mul64(), prevsize, dimi));
                                             prevsize = cursize;
 				        }
 				    } // after this we have the product of the remaining dimensions
                                     let vsize = producer.fresh_var();
-                                    instructions.push(format!("{} = {} {} {}", vsize,  get_size_function, tid, signal_code));
+                                    instructions.push(format!("{} = {} {} i64.{}", vsize,  get_size_function, tid, signal_code));
                                     let finalsize = producer.fresh_var();
                                     instructions.push(format!("{} = {} {} {}", finalsize, mul64(), prevsize, vsize));
                                     let access = producer.fresh_var();
@@ -147,10 +149,10 @@ impl  LocationRule {
                                     accsize = access;
                                 } else if let AccessType::Qualified(field_no) = &indexes[idxpos] {
                                     let bid = producer.fresh_var();
-                                    instructions.push(format!("{} = {} {} {}", bid, get_type_function, tbid, signal_code));
+                                    instructions.push(format!("{} = {} {} i64.{}", bid, get_type_function, tbid, signal_code));
                                     tbid = bid.clone();
                                     let sfield = producer.fresh_var();
-                                    instructions.push(format!("{} = get_bus_signal_position {} {}", sfield, bid, field_no));
+                                    instructions.push(format!("{} = get_bus_signal_position {} i64.{}", sfield, bid, field_no));
                                     let access = producer.fresh_var();
                                     instructions.push(format!("{} = {} {} {}", access, add64(), accsize, sfield));
                                     accsize = access;

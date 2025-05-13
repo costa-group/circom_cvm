@@ -779,7 +779,8 @@ fn translate_log(stmt: Statement, state: &mut State, context: &Context) {
 fn translate_return(stmt: Statement, state: &mut State, context: &Context) {
     use Statement::Return;
     if let Return { meta, value, .. } = stmt {
-        
+
+        let is_array = is_array_variable(&value, state, context);
         let (src_size, _) = get_expression_size(&value, state, context);
         // it is always a Single, not possible multiple options --> ENSURE
         let with_size = match src_size{
@@ -791,6 +792,7 @@ fn translate_return(stmt: Statement, state: &mut State, context: &Context) {
             message_id: state.message_id,
             with_size,
             value: translate_expression(value, state, context),
+            is_array,
         }
         .allocate();
         state.code.push(return_bucket);
@@ -1878,6 +1880,28 @@ fn get_variable_size(
     }
 }
 
+
+/******** Auxiliar function to check we have an array var ************/
+
+fn is_array_variable(
+    expression: &Expression,
+    state: &mut State,
+    context: &Context,
+) -> bool {
+    use Expression::Variable;
+    if let Variable { meta, name, access, .. } = expression {
+        let tag_access = check_tag_access(&name, &access, state);
+        if tag_access.is_some(){
+            false
+        } else{
+            let def = SymbolDef { meta: meta.clone(), symbol: name.clone(), acc: access.clone() };
+            let aux_symbol = ProcessedSymbol::new(def, state, context);
+            return aux_symbol.symbol_dimensions.len() > 0
+        }
+    } else {
+        false
+    }
+}
 
 /*************************************************************/
 

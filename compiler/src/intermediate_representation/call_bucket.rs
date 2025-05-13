@@ -917,6 +917,7 @@ impl WriteCVM for CallBucket{
                 instructions.append(&mut instructions_dest);
                 let src_value = producer.fresh_var();
                 let dest_location;
+                let dest_position = producer.fresh_var();
                 let instruction_get_src = format!("{} = {} {}", src_value, loadff(), call_dest);
                 let mut instruction_set_dest = "".to_string();
                 let mut last_out = false;
@@ -924,11 +925,11 @@ impl WriteCVM for CallBucket{
                 match ldest {
                     ComputedAddress::Variable(rvar) => {
                         dest_location = rvar;
-                        instruction_set_dest = format!("{} {} {}", storeff(), dest_location, src_value);                       
+                        instruction_set_dest = format!("{} {} {}", storeff(), dest_position, src_value);                       
                     }
                     ComputedAddress::Signal(rsig) => {
                         dest_location = rsig;
-                        instruction_set_dest = set_signal(&dest_location,&src_value);
+                        instruction_set_dest = set_signal(&dest_position,&src_value);
                     }
                     ComputedAddress::SubcmpSignal(rcmp,rsig) => {
                         dest_location = rsig;
@@ -937,20 +938,20 @@ impl WriteCVM for CallBucket{
 		                if let StatusInput::NoLast = status {
 			            // no need to run subcomponent
                                     if *needs_decrement{
-                                        instruction_set_dest = set_cmp_input_dec_no_last(&rcmp,&dest_location, &src_value);
+                                        instruction_set_dest = set_cmp_input_dec_no_last(&rcmp,&dest_position, &src_value);
                                     } else {
-                                        instruction_set_dest = set_cmp_input_no_dec_no_last(&rcmp,&dest_location, &src_value);
+                                        instruction_set_dest = set_cmp_input_no_dec_no_last(&rcmp,&dest_position, &src_value);
                                     }
                                 } else if let StatusInput::Last = status {
                                     last_out = true;
-                                    instruction_set_dest = set_cmp_input_no_dec_no_last(&rcmp,&dest_location, &src_value);
+                                    instruction_set_dest = set_cmp_input_no_dec_no_last(&rcmp,&dest_position, &src_value);
                                     last_instructions.push(instruction_get_src.clone());
-                                    last_instructions.push(set_cmp_input_and_run(&rcmp,&dest_location, &src_value));
+                                    last_instructions.push(set_cmp_input_and_run(&rcmp,&dest_position, &src_value));
                                 } else {
                                     last_out = true;
-                                    instruction_set_dest = set_cmp_input_dec_no_last(&rcmp,&dest_location, &src_value);
+                                    instruction_set_dest = set_cmp_input_dec_no_last(&rcmp,&dest_position, &src_value);
                                     last_instructions.push(instruction_get_src.clone());
-                                    last_instructions.push(set_cmp_input_dec_and_check_run(&rcmp,&dest_location, &src_value));
+                                    last_instructions.push(set_cmp_input_dec_and_check_run(&rcmp,&dest_position, &src_value));
                                 }
                             } else {
                                 assert!(false);
@@ -960,6 +961,7 @@ impl WriteCVM for CallBucket{
                         }
                     }
                 }
+                instructions.push(format!("{} = {}", &dest_position, &dest_location));
                 let mut has_zero = false;
                 let counter;
                 match &data.context.size{
@@ -984,7 +986,7 @@ impl WriteCVM for CallBucket{
                 instructions.push(instruction_set_dest);
                 instructions.push(format!("{} = {} {} i64.1", &counter, sub64(), &counter));
                 instructions.push(format!("{} = {} {} i64.1", &call_dest, add64(), &call_dest));
-                instructions.push(format!("{} = {} {} i64.1", &dest_location ,add64(), &dest_location));
+                instructions.push(format!("{} = {} {} i64.1", &dest_position ,add64(), &dest_position));
                 instructions.push(add_continue());
                 instructions.push(add_end());
                 instructions.push(add_break());
