@@ -145,11 +145,16 @@ impl WriteCVM for FunctionCodeInfo {
         let mut inputs = "".to_string();
         //let mut inputs = format!("{} {}", "i64".to_string(), FUNCTION_DESTINATION_SIZE); 
 
+        if self.is_array_result {
+             inputs = format!("{} i64 0 i64 0", inputs);
+        }
+        
         for param in &self.params{
             inputs = format!("{} {}", inputs, declare_variable(None, &param.length));
         }
 
-        let outputs = if self.returns.len() == 0 { "ff".to_string() } else { "".to_string() };
+//        instructions.push(format!("%%result  {} {}", self.is_array_result, self.returns.len()));
+        let outputs = if !self.is_array_result || self.returns.len() == 0 { "ff".to_string() } else { "".to_string() };
 
         instructions.push(format!("%%function {} [{}] [{}]",
             self.header, 
