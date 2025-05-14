@@ -201,7 +201,8 @@ struct Context<'a> {
     cmp_to_type: HashMap<String, ClusterType>,
     buses: &'a Vec<BusInstance>,
     constraint_assert_dissabled_flag: bool,
-    in_function: bool
+    in_function: bool,
+    in_function_returning_array:bool
 }
 
 fn initialize_parameters(state: &mut State, params: Vec<Param>) {
@@ -230,7 +231,7 @@ fn initialize_parameters(state: &mut State, params: Vec<Param>) {
     }
 }
 
-fn initialize_constants(state: &mut State, constants: Vec<Argument>, in_function: bool) {
+fn initialize_constants(state: &mut State, constants: Vec<Argument>, in_function: bool, in_function_returning_array: bool) {
     for arg in constants {
         let dimensions = arg.lengths;
         let size = dimensions.iter().fold(1, |p, c| p * (*c));
@@ -289,10 +290,13 @@ fn initialize_constants(state: &mut State, constants: Vec<Argument>, in_function
                 context: InstrContext { 
                     size: SizeOption::Single(1),
                     in_function,
+                    in_function_returning_array
+
                 },
                 src_context: InstrContext {
                     size: SizeOption::Single(1),
-                    in_function
+                    in_function,
+                    in_function_returning_array
                 },
                 src_address_type: None,
                 src: content,
@@ -1386,6 +1390,7 @@ impl ProcessedSymbol {
                 context: InstrContext { 
                     size: self.length,
                     in_function: context.in_function,
+                    in_function_returning_array: context.in_function_returning_array
                 },
                 dest_is_output: false,
                 dest_address_type: dest_type,
@@ -1407,6 +1412,8 @@ impl ProcessedSymbol {
                 context: InstrContext { 
                     size: self.length,
                     in_function: context.in_function,
+                    in_function_returning_array: context.in_function_returning_array
+
                 },
                 dest_is_output: self.signal_type.map_or(false, |t| t == SignalType::Output),
                 dest_address_type: xtype,
@@ -1460,10 +1467,12 @@ impl ProcessedSymbol {
                 context: InstrContext { 
                     size: self.length,
                     in_function: context.in_function,
+                    in_function_returning_array: context.in_function_returning_array
                 },
                 src_context: InstrContext {
                     size: src_size,
                     in_function: context.in_function,
+                    in_function_returning_array: context.in_function_returning_array
                 },
                 dest_is_output: false,
                 dest_address_type: dest_type,
@@ -1493,10 +1502,12 @@ impl ProcessedSymbol {
                 context: InstrContext { 
                     size: self.length,
                     in_function: context.in_function, 
+                    in_function_returning_array: context.in_function_returning_array
                 },
                 src_context: InstrContext {
                     size: src_size,
                     in_function: context.in_function,
+                    in_function_returning_array: context.in_function_returning_array
                 },
                 src_address_type: src_address
             }
@@ -1532,6 +1543,7 @@ impl ProcessedSymbol {
                 context: InstrContext { 
                     size: self.length,
                     in_function: context.in_function,
+                    in_function_returning_array: context.in_function_returning_array
                  },
             }
             .allocate()
@@ -1556,6 +1568,7 @@ impl ProcessedSymbol {
                 context: InstrContext { 
                     size: self.length,
                     in_function: context.in_function,
+                    in_function_returning_array: context.in_function_returning_array
                 },
             }
             .allocate()
@@ -1849,6 +1862,7 @@ fn translate_call_arguments(
         info.argument_data.push(InstrContext { 
             size: SizeOption::Single(length),
             in_function: context.in_function,
+            in_function_returning_array: context.in_function_returning_array
         });
         info.arguments.push(instr);
     }
@@ -1965,7 +1979,8 @@ pub struct CodeInfo<'a> {
     pub signals_to_tags: HashMap<Vec<String>, BigInt>,
     pub buses: &'a Vec<BusInstance>,
     pub constraint_assert_dissabled_flag: bool,
-    pub in_function: bool
+    pub in_function: bool,
+    pub in_function_returning_array: bool
 
 }
 
@@ -1991,7 +2006,7 @@ pub fn translate_code(body: Statement, code_info: CodeInfo) -> CodeOutput {
     state.string_table = code_info.string_table;
     initialize_components(&mut state, code_info.components);
     initialize_signals(&mut state, code_info.wires);
-    initialize_constants(&mut state, code_info.constants, code_info.in_function);
+    initialize_constants(&mut state, code_info.constants, code_info.in_function, code_info.in_function_returning_array);
     initialize_parameters(&mut state, code_info.params);
 
     let context = Context {
@@ -2002,7 +2017,8 @@ pub fn translate_code(body: Statement, code_info: CodeInfo) -> CodeOutput {
         tmp_database: code_info.template_database,
         buses: code_info.buses,
         constraint_assert_dissabled_flag: code_info.constraint_assert_dissabled_flag,
-        in_function: code_info.in_function
+        in_function: code_info.in_function,
+        in_function_returning_array: code_info.in_function_returning_array
     };
 
     create_components(&mut state, &code_info.triggers, code_info.clusters);

@@ -159,7 +159,8 @@ fn build_template_instances(
             string_table : string_table,
             signals_to_tags: template.signals_to_tags,
             constraint_assert_dissabled_flag, 
-            in_function: false
+            in_function: false,
+            in_function_returning_array: false
         };
         let mut template_info = TemplateCodeInfo {
             name,
@@ -231,7 +232,8 @@ fn build_function_instances(
             signals_to_tags: HashMap::new(),
             buses: &c_info.buses,
             constraint_assert_dissabled_flag, 
-            in_function: true
+            in_function: true,
+            in_function_returning_array: is_array_result
         };
         let mut function_info = FunctionCodeInfo {
             name,
