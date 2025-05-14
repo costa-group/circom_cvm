@@ -23,4 +23,5 @@ pub enum SizeOption{
 #[derive(Clone, PartialEq, Eq)]
 pub struct InstrContext {
     pub size: SizeOption,
+    pub in_function: bool
 }

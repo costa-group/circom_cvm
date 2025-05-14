@@ -201,6 +201,7 @@ struct Context<'a> {
     cmp_to_type: HashMap<String, ClusterType>,
     buses: &'a Vec<BusInstance>,
     constraint_assert_dissabled_flag: bool,
+    in_function: bool
 }
 
 fn initialize_parameters(state: &mut State, params: Vec<Param>) {
@@ -229,7 +230,7 @@ fn initialize_parameters(state: &mut State, params: Vec<Param>) {
     }
 }
 
-fn initialize_constants(state: &mut State, constants: Vec<Argument>) {
+fn initialize_constants(state: &mut State, constants: Vec<Argument>, in_function: bool) {
     for arg in constants {
         let dimensions = arg.lengths;
         let size = dimensions.iter().fold(1, |p, c| p * (*c));
@@ -285,8 +286,14 @@ fn initialize_constants(state: &mut State, constants: Vec<Argument>) {
                 dest_is_output: false,
                 dest_address_type: AddressType::Variable,
                 dest: LocationRule::Indexed { location: full_address, template_header: None },
-                context: InstrContext { size: SizeOption::Single(1) },
-                src_context: InstrContext {size: SizeOption::Single(1)},
+                context: InstrContext { 
+                    size: SizeOption::Single(1),
+                    in_function,
+                },
+                src_context: InstrContext {
+                    size: SizeOption::Single(1),
+                    in_function
+                },
                 src_address_type: None,
                 src: content,
             }
@@ -1376,7 +1383,10 @@ impl ProcessedSymbol {
                 cmp_name: self.name.clone()
             };
             FinalData {
-                context: InstrContext { size: self.length },
+                context: InstrContext { 
+                    size: self.length,
+                    in_function: context.in_function,
+                },
                 dest_is_output: false,
                 dest_address_type: dest_type,
                 dest: signal,
@@ -1394,7 +1404,10 @@ impl ProcessedSymbol {
                 _ => AddressType::Signal,
             };
             FinalData {
-                context: InstrContext { size: self.length },
+                context: InstrContext { 
+                    size: self.length,
+                    in_function: context.in_function,
+                },
                 dest_is_output: self.signal_type.map_or(false, |t| t == SignalType::Output),
                 dest_address_type: xtype,
                 dest: LocationRule::Indexed { location: address, template_header: None },
@@ -1444,8 +1457,14 @@ impl ProcessedSymbol {
                 dest: signal,
                 line: self.line,
                 message_id: self.message_id,
-                context: InstrContext { size: self.length },
-                src_context: InstrContext {size: src_size},
+                context: InstrContext { 
+                    size: self.length,
+                    in_function: context.in_function,
+                },
+                src_context: InstrContext {
+                    size: src_size,
+                    in_function: context.in_function,
+                },
                 dest_is_output: false,
                 dest_address_type: dest_type,
                 src_address_type: src_address
@@ -1471,8 +1490,14 @@ impl ProcessedSymbol {
                 message_id: self.message_id,
                 dest_is_output: self.signal_type.map_or(false, |t| t == SignalType::Output),
                 dest: LocationRule::Indexed { location: address, template_header: None },
-                context: InstrContext { size: self.length },
-                src_context: InstrContext {size: src_size},
+                context: InstrContext { 
+                    size: self.length,
+                    in_function: context.in_function, 
+                },
+                src_context: InstrContext {
+                    size: src_size,
+                    in_function: context.in_function,
+                },
                 src_address_type: src_address
             }
             .allocate()
@@ -1504,7 +1529,10 @@ impl ProcessedSymbol {
                 line: self.line,
                 message_id: self.message_id,
                 address_type: dest_type,
-                context: InstrContext { size: self.length },
+                context: InstrContext { 
+                    size: self.length,
+                    in_function: context.in_function,
+                 },
             }
             .allocate()
         } else {
@@ -1525,7 +1553,10 @@ impl ProcessedSymbol {
                 address_type: xtype,
                 message_id: self.message_id,
                 src: LocationRule::Indexed { location: address, template_header: None },
-                context: InstrContext { size: self.length },
+                context: InstrContext { 
+                    size: self.length,
+                    in_function: context.in_function,
+                },
             }
             .allocate()
         }
@@ -1815,7 +1846,10 @@ fn translate_call_arguments(
             .iter()
             .fold(1, |r, c| r * (*c));
         let instr = translate_expression(arg, state, context);
-        info.argument_data.push(InstrContext { size: SizeOption::Single(length) });
+        info.argument_data.push(InstrContext { 
+            size: SizeOption::Single(length),
+            in_function: context.in_function,
+        });
         info.arguments.push(instr);
     }
     info
@@ -1930,7 +1964,9 @@ pub struct CodeInfo<'a> {
     pub string_table: HashMap<String, usize>,
     pub signals_to_tags: HashMap<Vec<String>, BigInt>,
     pub buses: &'a Vec<BusInstance>,
-    pub constraint_assert_dissabled_flag: bool
+    pub constraint_assert_dissabled_flag: bool,
+    pub in_function: bool
+
 }
 
 pub struct CodeOutput {
@@ -1955,7 +1991,7 @@ pub fn translate_code(body: Statement, code_info: CodeInfo) -> CodeOutput {
     state.string_table = code_info.string_table;
     initialize_components(&mut state, code_info.components);
     initialize_signals(&mut state, code_info.wires);
-    initialize_constants(&mut state, code_info.constants);
+    initialize_constants(&mut state, code_info.constants, code_info.in_function);
     initialize_parameters(&mut state, code_info.params);
 
     let context = Context {
@@ -1966,6 +2002,7 @@ pub fn translate_code(body: Statement, code_info: CodeInfo) -> CodeOutput {
         tmp_database: code_info.template_database,
         buses: code_info.buses,
         constraint_assert_dissabled_flag: code_info.constraint_assert_dissabled_flag,
+        in_function: code_info.in_function
     };
 
     create_components(&mut state, &code_info.triggers, code_info.clusters);
