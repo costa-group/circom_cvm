@@ -239,8 +239,11 @@ pub fn br_if(value: &str) -> CVMInstruction {
 pub fn br(value: &str) -> CVMInstruction {
     format!("br {}", value)
 }
-pub fn add_if() -> CVMInstruction {
-    "if".to_string()
+pub fn add_if64() -> CVMInstruction {
+    "i64.if".to_string()
+}
+pub fn add_ifff() -> CVMInstruction {
+    "ff.if".to_string()
 }
 pub fn add_else() -> CVMInstruction {
     "else".to_string()
@@ -273,11 +276,11 @@ pub fn create_if_selection(
     for i in 0..values.len() {
         let comp = producer.fresh_var();
 	instructions.push(format!("{} = {} {} {}", comp, eq64(), tid, values[i].0));
-	instructions.push(format!("{} {}", add_if(), comp));
-	instructions.push(format!("{} = i64{}", rresult, values[i].1)); //Add corresponding size in list
+	instructions.push(format!("{} {}", add_if64(), comp));
+	instructions.push(format!("{} = i64.{}", rresult, values[i].1)); //Add corresponding size in list
 	instructions.push(add_else());
     }
-    instructions.push(format!("{} = i64{}", rresult, 0)); //default o complete the last else
+    instructions.push(format!("{} = i64.{}", rresult, 0)); //default o complete the last else
     for _i in 0..values.len() {
 	instructions.push(add_end());
     }

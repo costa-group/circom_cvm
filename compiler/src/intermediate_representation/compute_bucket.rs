@@ -570,9 +570,9 @@ impl WriteCVM for ComputeBucket{
                         instructions.push(format!("{} = i64.{}", counter, length));
                     }
                     instructions.push(add_loop());
-                    instructions.push(format!("{} {} ", add_if(), &counter));
+                    instructions.push(format!("{} {} ", add_if64(), &counter));
                     instructions.push(format!("{} = {} {}", res, eqff(), params));
-                    instructions.push(format!("{} {} ", add_if(), &res));
+                    instructions.push(format!("{} {} ", add_ifff(), &res));
                                       
                     instructions.push(format!("{} = {} {} i64.1", &counter, sub64(), &counter));
                     instructions.push(format!("{} = {} {} i64.1", &vresults[0], add64(), &vresults[0]));

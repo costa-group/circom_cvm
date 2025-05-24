@@ -136,7 +136,7 @@ impl WriteCVM for ReturnBucket{
             let vcond = producer.fresh_var();
             instructions.push(format!("{} = {} i64.{} {}", vcond, "i64.le".to_string(), self.with_size, FUNCTION_DESTINATION_SIZE));
             let final_size = producer.fresh_var();
-            instructions.push(format!("{} {}", add_if(), vcond));
+            instructions.push(format!("{} {}", add_if64(), vcond));
             instructions.push(format!("{} = i64.{}",final_size, self.with_size));
             instructions.push(add_else());
             instructions.push(format!("{} = {}", final_size, FUNCTION_DESTINATION_SIZE));

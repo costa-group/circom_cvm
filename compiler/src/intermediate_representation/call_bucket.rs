@@ -978,10 +978,10 @@ impl WriteCVM for CallBucket{
                     instructions.push(format!("{} = {} {} i64.1", counter, sub64(), counter)); 
                 }
                 if has_zero && last_out {
-                    instructions.push(format!("{} {} ", add_if(), &counter));
+                    instructions.push(format!("{} {} ", add_if64(), &counter));
                 }
                 instructions.push(add_loop());
-                instructions.push(format!("{} {} ", add_if(), &counter));
+                instructions.push(format!("{} {} ", add_if64(), &counter));
                 instructions.push(instruction_get_src);
                 instructions.push(instruction_set_dest);
                 instructions.push(format!("{} = {} {} i64.1", &counter, sub64(), &counter));

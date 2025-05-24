@@ -133,7 +133,7 @@ impl WriteCVM for BranchBucket{
         if self.if_branch.len() > 0 {
             let (mut instructions_cond, vcond) = self.cond.produce_cvm(producer);
             instructions.append(&mut instructions_cond);
-            instructions.push(format!("{} {}", add_if(), vcond));
+            instructions.push(format!("{} {}", add_ifff(), vcond));
             for ins in &self.if_branch {
                 let (mut instructions_if, _) = ins.produce_cvm(producer);
                 instructions.append(&mut instructions_if);
@@ -152,7 +152,7 @@ impl WriteCVM for BranchBucket{
                 instructions.append(&mut instructions_cond);
                 let res = producer.fresh_var();
                 instructions.push(format!("{} = {} {}", res, eqzff(), vcond));
-                instructions.push(format!("{} {}", add_if(), res));
+                instructions.push(format!("{} {}", add_ifff(), res));
                 for ins in &self.else_branch {
                     let (mut instructions_else, _) = ins.produce_cvm(producer);
                     instructions.append(&mut instructions_else);

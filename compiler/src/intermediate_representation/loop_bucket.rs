@@ -104,7 +104,7 @@ impl WriteCVM for LoopBucket{
         instructions.push(add_loop());
         let (mut instructions_continue, vcond) = self.continue_condition.produce_cvm(producer);
         instructions.append(&mut instructions_continue);
-        instructions.push(format!("{} {}", add_if(), vcond));
+        instructions.push(format!("{} {}", add_ifff(), vcond));
         for ins in &self.body {
             let (mut instructions_loop, _) = ins.produce_cvm(producer);
             instructions.append(&mut instructions_loop);
