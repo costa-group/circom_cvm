@@ -126,10 +126,10 @@ fn build_template_instances(
             let wire = template.wires.get(index).unwrap();
             match wire.xtype() {
                 SignalType::Input => {
-                    outputs_info.push(wire.clone());
+                    inputs_info.push(wire.clone());
                 }
                 SignalType::Output =>{
-                    inputs_info.push(wire.clone());
+                    outputs_info.push(wire.clone());
                 }
                 SignalType::Intermediate =>{
                     break;
