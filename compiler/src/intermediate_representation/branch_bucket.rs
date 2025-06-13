@@ -133,10 +133,18 @@ impl WriteCVM for BranchBucket{
         if self.if_branch.len() > 0 {
             let (mut instructions_cond, vcond) = self.cond.produce_cvm(producer);
             instructions.append(&mut instructions_cond);
+            if producer.get_current_line() != self.line {
+                instructions.push(format!(";;line {}", self.line));
+                producer.set_current_line(self.line);
+            }
             instructions.push(format!("{} {}", add_ifff(), vcond));
             for ins in &self.if_branch {
                 let (mut instructions_if, _) = ins.produce_cvm(producer);
                 instructions.append(&mut instructions_if);
+            }
+            if producer.get_current_line() != self.line {
+                instructions.push(format!(";;line {}", self.line));
+                producer.set_current_line(self.line);
             }
             if self.else_branch.len() > 0 {
                 instructions.push(add_else());
@@ -150,6 +158,10 @@ impl WriteCVM for BranchBucket{
             if self.else_branch.len() > 0 {
                 let (mut instructions_cond, vcond) = self.cond.produce_cvm(producer);
                 instructions.append(&mut instructions_cond);
+                if producer.get_current_line() != self.line {
+                    instructions.push(format!(";;line {}", self.line));
+                    producer.set_current_line(self.line);
+                }
                 let res = producer.fresh_var();
                 instructions.push(format!("{} = {} {}", res, eqzff(), vcond));
                 instructions.push(format!("{} {}", add_ifff(), res));

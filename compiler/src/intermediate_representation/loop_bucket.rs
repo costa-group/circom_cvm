@@ -101,6 +101,10 @@ impl WriteCVM for LoopBucket{
         if producer.needs_comments() {
             instructions.push(format!(";; loop bucket. Line {}", self.line)); //.to_string()
 	}
+        if producer.get_current_line() != self.line {
+            instructions.push(format!(";;line {}", self.line));
+            producer.set_current_line(self.line);
+        }
         instructions.push(add_loop());
         let (mut instructions_continue, vcond) = self.continue_condition.produce_cvm(producer);
         instructions.append(&mut instructions_continue);
@@ -110,6 +114,10 @@ impl WriteCVM for LoopBucket{
             instructions.append(&mut instructions_loop);
         }
         instructions.push(add_continue());
+        if producer.get_current_line() != self.line {
+            instructions.push(format!(";;line {}", self.line));
+            producer.set_current_line(self.line);
+        }
         instructions.push(add_end());
         instructions.push(add_end());
         if producer.needs_comments() {

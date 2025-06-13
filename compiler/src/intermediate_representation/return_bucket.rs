@@ -128,8 +128,16 @@ impl WriteCVM for ReturnBucket{
         use cvm_code_generator::*;
         let mut instructions = vec![];
         instructions.push(";; return bucket".to_string());
+        if producer.get_current_line() != self.line {
+            instructions.push(format!(";;line {}", self.line));
+            producer.set_current_line(self.line);
+        }
         let (mut instructions_src, src) = self.value.produce_cvm(producer); // compute the source
         instructions.append(&mut instructions_src);
+        if producer.get_current_line() != self.line {
+            instructions.push(format!(";;line {}", self.line));
+            producer.set_current_line(self.line);
+        }
         if self.with_size == 1 {
             instructions.push(format!("{} {} i64.{}", add_return(), src, "1".to_string() ));
         } else {

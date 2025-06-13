@@ -197,7 +197,7 @@ struct Context<'a> {
     _translating: String,
     files: &'a FileLibrary,
     tmp_database: &'a TemplateDB,
-    _functions: &'a HashMap<String, Vec<Length>>,
+    functions: &'a HashMap<String, Vec<Length>>,
     cmp_to_type: HashMap<String, ClusterType>,
     buses: &'a Vec<BusInstance>,
     constraint_assert_dissabled_flag: bool,
@@ -842,6 +842,7 @@ fn translate_call(
     use Expression::Call;
     use ReturnType::Intermediate;
     if let Call { id, args, meta, .. } = expression {
+        let is_function_returning_array = context.functions[&id].len() > 0;
         let args_inst = translate_call_arguments(args, state, context);
         CallBucket {
             line: context.files.get_line(meta.start, meta.get_file_id()).unwrap(),
@@ -851,6 +852,7 @@ fn translate_call(
             arguments: args_inst.arguments,
             arena_size: 200,
             return_info: Intermediate { op_aux_no: 0 },
+            is_called_function_returning_array: is_function_returning_array,
         }
         .allocate()
     } else {
@@ -1403,8 +1405,9 @@ impl ProcessedSymbol {
                 self.symbol_dimensions,
                 self.symbol_size,
                 self.bus_accesses,
-    self.before_signal, 
-            );            let xtype = match self.xtype {
+                self.before_signal, 
+            );
+            let xtype = match self.xtype {
                 TypeReduction::Variable => AddressType::Variable,
                 _ => AddressType::Signal,
             };
@@ -1428,6 +1431,7 @@ impl ProcessedSymbol {
             arguments: args.arguments,
             arena_size: 200,
             return_info: ReturnType::Final(data),
+            is_called_function_returning_array: false,
         }
         .allocate()
     }
@@ -2012,7 +2016,7 @@ pub fn translate_code(body: Statement, code_info: CodeInfo) -> CodeOutput {
     let context = Context {
         files: code_info.files,
         _translating: code_info.header,
-        _functions: code_info.functions,
+        functions: code_info.functions,
         cmp_to_type: code_info.cmp_to_type,
         tmp_database: code_info.template_database,
         buses: code_info.buses,

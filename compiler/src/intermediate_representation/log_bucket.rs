@@ -166,6 +166,12 @@ impl WriteC for LogBucket {
 
 impl WriteCVM for LogBucket{
     fn produce_cvm(&self, _producer: &mut CVMProducer) -> (Vec<String>, String) {
+        /*
+        if producer.get_current_line() != self.line {
+            instructions.push(format!(";;line {}", self.line));
+            producer.set_current_line(self.line);
+        }
+         */
         (vec![";; log bucket not implemented".to_string()],"".to_string())
     }
 }

@@ -28,36 +28,14 @@ pub struct CVMProducer {
     pub major_version: usize,
     pub minor_version: usize,
     pub patch_version: usize,
+    current_line: usize,
+    current_function_return_position_var: String,
+    current_function_return_size_var: String,
     var_no: usize,
     stack_free_pos: usize,
     local_info_size_u32: usize,
     size_of_message_buffer_in_bytes: usize,
     size_of_message_in_bytes: usize,
-    offset_tag: String,
-    signal_offset_tag: String,
-    signal_start_tag: String,
-    sub_cmp_tag: String,
-    sub_cmp_src_tag: String,
-    sub_cmp_load_tag: String,
-    io_info_tag: String,
-    result_address_tag: String,
-    result_size_tag: String,
-    cstack_tag: String,
-    lvar_tag: String,
-    call_lvar_tag: String,
-    expaux_tag: String,
-    temp_tag: String,
-    aux_0_tag: String,
-    aux_1_tag: String,
-    aux_2_tag: String,
-    counter_tag: String,
-    store_aux_1_tag: String,
-    store_aux_2_tag: String,
-    copy_counter_tag: String,
-    create_loop_sub_cmp_tag: String,
-    create_loop_offset_tag: String,
-    create_loop_counter_tag: String,
-    merror_tag: String,
     string_table:  Vec<String>,
     //New for buses
     pub num_of_bus_instances: usize,  //total number of different bus instances
@@ -112,36 +90,14 @@ impl Default for CVMProducer {
             major_version: 0,
             minor_version: 0,
             patch_version: 0,
+            current_line: 0,
+            current_function_return_position_var: "".to_string(),
+            current_function_return_size_var: "".to_string(),
             var_no: 0,
             stack_free_pos: 0,
             local_info_size_u32: 0, // in the future we can add some info like pointer to run father or text father
             size_of_message_buffer_in_bytes: 256,
             size_of_message_in_bytes: 240,
-            offset_tag: "$offset".to_string(),
-            signal_offset_tag: "$signaloffset".to_string(),
-            signal_start_tag: "$signalstart".to_string(),
-            sub_cmp_tag: "$subcmp".to_string(),
-            sub_cmp_src_tag: "$subcmpsrc".to_string(),
-            sub_cmp_load_tag: "$subcmpload".to_string(),
-            io_info_tag: "$ioinfo".to_string(),
-            result_address_tag: "$resultaddress".to_string(),
-            result_size_tag: "$resultsize".to_string(),
-            cstack_tag: "$cstack".to_string(),
-            lvar_tag: "$lvar".to_string(),
-            call_lvar_tag: "$calllvar".to_string(),
-            expaux_tag: "$expaux".to_string(),
-            temp_tag: "$temp".to_string(),
-            aux_0_tag: "$aux0".to_string(),
-            aux_1_tag: "$aux1".to_string(),
-            aux_2_tag: "$aux2".to_string(),
-            counter_tag: "$counter".to_string(),
-            store_aux_1_tag: "$storeaux1".to_string(),
-            store_aux_2_tag: "$storeaux2".to_string(),
-            copy_counter_tag: "$copycounter".to_string(),
-            create_loop_sub_cmp_tag: "$createloopsubcmp".to_string(),
-            create_loop_offset_tag: "$createloopoffset".to_string(),
-            create_loop_counter_tag: "$createloopcounter".to_string(),
-	        merror_tag: "$merror".to_string(),
             string_table: Vec::new(),
 	    //New for buses
 	    num_of_bus_instances: 0,
@@ -198,6 +154,24 @@ impl CVMProducer {
     }
     pub fn get_prime(&self) -> &str {
         &self.prime
+    }
+    pub fn get_current_function_return_position_var(&self) -> String {
+        self.current_function_return_position_var.clone()
+    }
+    pub fn get_current_line(&mut self) -> usize {
+        self.current_line
+    }
+    pub fn set_current_line(&mut self, line: usize) {
+        self.current_line = line;
+    }    
+    pub fn set_current_function_return_position_var(&mut self, name: String) {
+        self.current_function_return_position_var = name;
+    }
+    pub fn get_current_function_return_size_var(&self) -> String {
+        self.current_function_return_size_var.clone()
+    }
+    pub fn set_current_function_return_size_var(&mut self, name: String) {
+        self.current_function_return_size_var = name;
     }
     pub fn fresh_var(&mut self) -> String {
         let s = format!("x_{}",self.var_no);
@@ -420,81 +394,6 @@ impl CVMProducer {
     }
     pub fn get_size_32_bits_in_memory(&self) -> usize {
         self.size_32_bit + 2
-    }
-    pub fn get_offset_tag(&self) -> &str {
-        &self.offset_tag
-    }
-    pub fn get_signal_offset_tag(&self) -> &str {
-        &self.signal_offset_tag
-    }
-    pub fn get_signal_start_tag(&self) -> &str {
-        &self.signal_start_tag
-    }
-    pub fn get_sub_cmp_tag(&self) -> &str {
-        &self.sub_cmp_tag
-    }
-    pub fn get_sub_cmp_src_tag(&self) -> &str {
-        &self.sub_cmp_src_tag
-    }
-    pub fn get_sub_cmp_load_tag(&self) -> &str {
-        &self.sub_cmp_load_tag
-    }
-    pub fn get_io_info_tag(&self) -> &str {
-        &self.io_info_tag
-    }
-    pub fn get_result_address_tag(&self) -> &str {
-        &self.result_address_tag
-    }
-    pub fn get_result_size_tag(&self) -> &str {
-        &self.result_size_tag
-    }
-    pub fn get_cstack_tag(&self) -> &str {
-        &self.cstack_tag
-    }
-    pub fn get_lvar_tag(&self) -> &str {
-        &self.lvar_tag
-    }
-    pub fn get_call_lvar_tag(&self) -> &str {
-        &self.call_lvar_tag
-    }
-    pub fn get_expaux_tag(&self) -> &str {
-        &self.expaux_tag
-    }
-    pub fn get_temp_tag(&self) -> &str {
-        &self.temp_tag
-    }
-    pub fn get_aux_0_tag(&self) -> &str {
-        &self.aux_0_tag
-    }
-    pub fn get_aux_1_tag(&self) -> &str {
-        &self.aux_1_tag
-    }
-    pub fn get_aux_2_tag(&self) -> &str {
-        &self.aux_2_tag
-    }
-    pub fn get_counter_tag(&self) -> &str {
-        &self.counter_tag
-    }
-    pub fn get_store_aux_1_tag(&self) -> &str {
-        &self.store_aux_1_tag
-    }
-    pub fn get_store_aux_2_tag(&self) -> &str {
-        &self.store_aux_2_tag
-    }
-    pub fn get_copy_counter_tag(&self) -> &str {
-        &self.copy_counter_tag
-    }
-    pub fn get_create_loop_sub_cmp_tag(&self) -> &str {
-        &self.create_loop_sub_cmp_tag
-    }
-    pub fn get_create_loop_offset_tag(&self) -> &str {
-        &self.create_loop_offset_tag
-    }
-    pub fn get_create_loop_counter_tag(&self) -> &str {
-        &self.create_loop_counter_tag
-    }
-    pub fn get_merror_tag(&self) -> &str {
-	&self.merror_tag
     }
     pub fn needs_comments(&self) -> bool{
         self.wat_flag

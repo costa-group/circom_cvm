@@ -486,6 +486,10 @@ impl WriteCVM for ComputeBucket{
 	}
         let res = producer.fresh_var();
         let params = vresults.join(" ");
+        if producer.get_current_line() != self.line {
+            instructions.push(format!(";;line {}", self.line));
+            producer.set_current_line(self.line);
+        }
         match &self.op {
             OperatorType::AddAddress => {
                 instructions.push(format!("{} = {} {}", res, add64(), params));
@@ -568,6 +572,10 @@ impl WriteCVM for ComputeBucket{
                         }
                     } else {
                         instructions.push(format!("{} = i64.{}", counter, length));
+                    }
+                    if producer.get_current_line() != self.line {
+                        instructions.push(format!(";;line {}", self.line));
+                        producer.set_current_line(self.line);
                     }
                     instructions.push(add_loop());
                     instructions.push(format!("{} {} ", add_if64(), &counter));

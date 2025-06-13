@@ -464,12 +464,24 @@ impl WriteCVM for LoadBucket{
         if producer.needs_comments() {
             instructions.push(";; load bucket".to_string());
 	}
+        if producer.get_current_line() != self.line {
+            instructions.push(format!(";;line {}", self.line));
+            producer.set_current_line(self.line);
+        }
         let (mut instructions_src, lsrc) = self.src.produce_cvm(&self.address_type, &self.context,producer); 
         instructions.append(&mut instructions_src);
         let res = producer.fresh_var();
         match lsrc {
             ComputedAddress::Variable(dir) => {
-                instructions.push(format!("{} = {} {}", res, loadff(), dir));
+                let res1;
+                if self.context.in_function_returning_array && RETURN_PARAM_SIZE > 0 {
+                    res1 = producer.fresh_var();
+                    instructions.push(format!("{} = {} {} i64.{}",res1, add64(), dir, RETURN_PARAM_SIZE));
+                }
+                else {
+                    res1 = dir;
+                }
+                instructions.push(format!("{} = {} {}", res, loadff(), res1));
             }
             ComputedAddress::Signal(dir) => {
                 instructions.push(format!("{} = {}",res, &get_signal(&dir)));

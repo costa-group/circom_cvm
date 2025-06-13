@@ -841,11 +841,14 @@ impl WriteCVM for StoreBucket{
             return (vec![],"".to_string());
         }
         if producer.needs_comments() {
-	    instructions.push(format!(";; store bucket. Line {}", self.line)); //.to_string()
             if self.context.in_function {
 	        instructions.push(format!(";; store bucket in function")); //.to_string()
             }
 	}
+        if producer.get_current_line() != self.line {
+            instructions.push(format!(";;line {}", self.line));
+            producer.set_current_line(self.line);
+        }
         let mut sizeone = true;
         let mut n = 0; 
         if (is_multiple_dest || size_dest > 1) && (is_multiple_src || size_src > 1) {
@@ -858,9 +861,9 @@ impl WriteCVM for StoreBucket{
         }
         //let mut my_template_header = Option::<String>::None;
         if sizeone {
-            if producer.needs_comments() {
-                instructions.push(";; getting src".to_string());
-	    }
+            // if producer.needs_comments() {
+            //    instructions.push(";; getting src".to_string());
+	    // }
             let (mut instructions_src, vsrc) = self.src.produce_cvm(producer); // compute the source
             instructions.append(&mut instructions_src);
             if producer.needs_comments() {
@@ -868,9 +871,19 @@ impl WriteCVM for StoreBucket{
 	    }
             let (mut instructions_dest, ldest) = self.dest.produce_cvm(&self.dest_address_type,&self.context, producer);
             instructions.append(&mut instructions_dest);
+            if producer.get_current_line() != self.line {
+                instructions.push(format!(";;line {}", self.line));
+                producer.set_current_line(self.line);
+            }
             match ldest {
                 ComputedAddress::Variable(rvar) => {
-                    instructions.push(format!("{} {} {}", storeff(), rvar, vsrc));
+                    if self.context.in_function_returning_array && RETURN_PARAM_SIZE > 0 {
+                        let rvar2 = producer.fresh_var();
+                        instructions.push(format!("{} = {} {} i64.{}", rvar2, add64(), rvar, RETURN_PARAM_SIZE));
+                        instructions.push(format!("{} {} {}", storeff(), rvar, vsrc));
+                    } else {
+                        instructions.push(format!("{} {} {}", storeff(), rvar, vsrc));
+                    }
                 }
                 ComputedAddress::Signal(rvar) => {
                     instructions.push(set_signal(&rvar,&vsrc));
@@ -900,37 +913,46 @@ impl WriteCVM for StoreBucket{
                 }
             }
         } else {
-            if producer.needs_comments() {
-                instructions.push(";; getting src".to_string());
-	    }
+            //if producer.needs_comments() {
+            //    instructions.push(";; getting src".to_string());
+	    //}
             if let Instruction::Load(load) = &*self.src {
                 let (mut instructions_src, lsrc) = load.src.produce_cvm(&load.address_type, &load.context, producer); 
                 instructions.append(&mut instructions_src);
+                let location_var = producer.fresh_var();
+                let destination_var = producer.fresh_var();
+                let counter = producer.fresh_var(); 
                 let src_value = producer.fresh_var();
                 let src_location;
                 let instruction_get_src;
                 let mut cmp_src = "".to_string();
                 match lsrc {
                     ComputedAddress::Variable(rvar) => {
-                        src_location = rvar;
-                        instruction_get_src = format!("{} = {} {}", src_value, loadff(), src_location);
+                        if self.context.in_function_returning_array && RETURN_PARAM_SIZE > 0 {
+                            let rvar2 = producer.fresh_var();
+                            instructions.push(format!("{} = {} {} i64.{}", rvar2, add64(), rvar, RETURN_PARAM_SIZE));
+                            src_location = rvar2;
+                        } else {
+                            src_location = rvar;
+                        }
+                        instruction_get_src = format!("{} = {} {}", src_value, loadff(), location_var);
                     }
                     ComputedAddress::Signal(rsig) => {
                         src_location = rsig;
-                        instruction_get_src = format!("{} = {}",src_value, &get_signal(&src_location));
+                        instruction_get_src = format!("{} = {}",src_value, &get_signal(&location_var));
                     }
                     ComputedAddress::SubcmpSignal(rcmp,rsig) => {
                         cmp_src = rcmp.clone();
                         src_location = rsig;
-                        instruction_get_src = format!("{} = {}",src_value, &get_cmp_signal(&rcmp,&src_location));
+                        instruction_get_src = format!("{} = {}",src_value, &get_cmp_signal(&rcmp,&location_var));
                     }
                 }
-                if producer.needs_comments() {
-                    instructions.push(";; getting dest".to_string());
-	        }
+                if producer.get_current_line() != self.line {
+                    instructions.push(format!(";;line {}", self.line));
+                    producer.set_current_line(self.line);
+                }
                 let (mut instructions_dest, ldest) = self.dest.produce_cvm(&self.dest_address_type,&self.context, producer);
                 instructions.append(&mut instructions_dest);
-                let counter = producer.fresh_var(); 
                 let dest_location;
                 let mut instruction_set_dest = "".to_string();
                 let mut has_zero = false;
@@ -939,12 +961,18 @@ impl WriteCVM for StoreBucket{
                 let mut cmp_dest = "".to_string();
                 match ldest {
                     ComputedAddress::Variable(rvar) => {
-                        dest_location = rvar;
-                        instruction_set_dest = format!("{} {} {}", storeff(), dest_location, src_value);                       
+                        if self.context.in_function_returning_array && RETURN_PARAM_SIZE > 0 {
+                            let rvar2 = producer.fresh_var();
+                            instructions.push(format!("{} = {} {} i64.{}", rvar2, add64(), rvar, RETURN_PARAM_SIZE));
+                            dest_location = rvar2;
+                        } else {
+                            dest_location = rvar;
+                        }
+                        instruction_set_dest = format!("{} {} {}", storeff(), destination_var, src_value);
                     }
                     ComputedAddress::Signal(rsig) => {
                         dest_location = rsig;
-                        instruction_set_dest = set_signal(&dest_location,&src_value);
+                        instruction_set_dest = set_signal(&destination_var,&src_value);
                     }
                     ComputedAddress::SubcmpSignal(rcmp,rsig) => {
                         cmp_dest = rcmp.clone();
@@ -954,20 +982,20 @@ impl WriteCVM for StoreBucket{
 		                if let StatusInput::NoLast = status {
 			            // no need to run subcomponent
                                     if *needs_decrement{
-                                        instruction_set_dest = set_cmp_input_dec_no_last(&rcmp,&dest_location, &src_value);
+                                        instruction_set_dest = set_cmp_input_dec_no_last(&rcmp,&destination_var, &src_value);
                                     } else {
-                                        instruction_set_dest = set_cmp_input_no_dec_no_last(&rcmp,&dest_location, &src_value);
+                                        instruction_set_dest = set_cmp_input_no_dec_no_last(&rcmp,&destination_var, &src_value);
                                     }
                                 } else if let StatusInput::Last = status {
                                     last_out = true;
-                                    instruction_set_dest = set_cmp_input_no_dec_no_last(&rcmp,&dest_location, &src_value);
+                                    instruction_set_dest = set_cmp_input_no_dec_no_last(&rcmp,&destination_var, &src_value);
                                     last_instructions.push(instruction_get_src.clone());
-                                    last_instructions.push(set_cmp_input_and_run(&rcmp,&dest_location, &src_value));
+                                    last_instructions.push(set_cmp_input_and_run(&rcmp,&destination_var, &src_value));
                                 } else {
                                     last_out = true;
-                                    instruction_set_dest = set_cmp_input_dec_no_last(&rcmp,&dest_location, &src_value);
+                                    instruction_set_dest = set_cmp_input_dec_no_last(&rcmp,&destination_var, &src_value);
                                     last_instructions.push(instruction_get_src.clone());
-                                    last_instructions.push(set_cmp_input_dec_and_check_run(&rcmp,&dest_location, &src_value));
+                                    last_instructions.push(set_cmp_input_dec_and_check_run(&rcmp,&destination_var, &src_value));
                                 }
                             } else {
                                 assert!(false);
@@ -977,6 +1005,8 @@ impl WriteCVM for StoreBucket{
                         }
                     }
                 }
+                instructions.push(format!("{} = {}", &location_var, &src_location));
+                instructions.push(format!("{} = {}", &destination_var, &dest_location));
 	        if !is_multiple_dest && !is_multiple_src {
                     if last_out {
                         instructions.push(format!("{} = i64.{}", counter,n-1)); 
@@ -1022,17 +1052,13 @@ impl WriteCVM for StoreBucket{
                 if has_zero && last_out {
                     instructions.push(format!("{} {} ", add_if64(), &counter));
                 }
-                let location_var = producer.fresh_var();
-                let destination_var = producer.fresh_var();
-                instructions.push(format!("{} = {}", &location_var, &src_location));
-                instructions.push(format!("{} = {}", &destination_var, &dest_location));
                 instructions.push(add_loop());
                 instructions.push(format!("{} {} ", add_if64(), &counter));
                 instructions.push(instruction_get_src);
                 instructions.push(instruction_set_dest);
-                instructions.push(format!("{} = {} {} i64.1", &counter, sub64(), &counter));
                 instructions.push(format!("{} = {} {} i64.1", &location_var, add64(), &location_var));
                 instructions.push(format!("{} = {} {} i64.1", &destination_var ,add64(), &destination_var));
+                instructions.push(format!("{} = {} {} i64.1", &counter, sub64(), &counter));
                 instructions.push(add_continue());
                 instructions.push(add_end());
                 instructions.push(add_break());

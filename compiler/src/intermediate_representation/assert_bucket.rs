@@ -95,6 +95,10 @@ impl WriteCVM for AssertBucket{
         let (mut instructions_eval, avar) = self.evaluate.produce_cvm(producer);
         instructions.append(&mut instructions_eval);
         let cvar = producer.fresh_var();
+        if producer.get_current_line() != self.line {
+            instructions.push(format!(";;line {}", self.line));
+            producer.set_current_line(self.line);
+        }
         instructions.push(format!("{} = {} {}", cvar, eqzff(), avar));
         instructions.push(format!("{} {}", add_ifff(), cvar));
         instructions.push(exception(&"i64.0".to_string()));
