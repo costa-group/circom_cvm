@@ -213,7 +213,7 @@ impl WriteCVM for TemplateCodeInfo {
         
         let return_position = producer.fresh_var();
         producer.set_current_function_return_position_var(return_position.clone());
-        instructions.push(format!("{} = {}", return_position, &self.var_stack_depth));
+        instructions.push(format!("{} = i64.{}", return_position, &self.var_stack_depth));
 
         for t in &self.body {
             let (mut instructions_body,_) = t.produce_cvm(producer);
