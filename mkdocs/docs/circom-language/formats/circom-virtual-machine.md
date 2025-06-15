@@ -8,22 +8,6 @@ description: >-
 
 ## Type definitions
 
-## Predefined registers
-
-#### Function destination address
-
-```
-i64 destination
-```
-This is a local register availabe in the code of any function. This register contains the address given in the call to the fuction, when the call is made giving the address to place the result and the size of the result.
-
-#### Function destination size
-
-```
-i64 destination_size
-```
-This is a local register availabe in the code of any function. This register contains the size given in the call to the fuction, when the call is made giving the address to place the result and the size of the result.
-
 ## Instruction Set (opcodes)
 
 ### Arithmetic
@@ -267,7 +251,7 @@ i64.call <function-name> <parameters list>
 The parameter list contains element of the form:
 <value> | signal(indx,size) | subcmpsignal(cmp,indx,size) | i64.memory(indx,size) | ff.memory(indx,size) 
 
-When the call has no result a return address and size are expected to be provided in the list of parameters. The address will be used by a return statement to place the result in the local memory of the callee.  Examples:
+When the call has no result a return address and size are expected to be provided in the list of parameters. The address will be used by a return statement (in the callee) to place the result in the local memory of the caller.  Examples:
 
 ```text
 x = ff.call $foo y signal(s,3) ff.memory(0,1)
@@ -286,12 +270,12 @@ ff.return <value>
 i64.return <value>
 ```
 
-It copies value to the address given in the call (it can be in the local memory of the callee or in signals)
+It returns value to the caller (<values> is i64 or ff, depending of the return operation used).
 
-`return <address-of-the-result> <size of return>`
+`return <address-of-caller-mamory> <address-of-the-callee-memory> <size-of-return>`
 
-It compares the given size with the size provided in the function call and copies as many element given in size from the provided address to the address given in the call (it can be in the local memory of the callee or in signals).
-
+The three are i64, and the first and the second are memory adresses.
+It copies as many elements as given in size-of-return from the provided address-of-the-callee-memory to the given address-of-caller-mamory.
 
 
 
