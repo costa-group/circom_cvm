@@ -260,9 +260,9 @@ pub fn exception(code: &str) -> CVMInstruction {
 }
 
 pub const RETURN_PARAM_SIZE: usize = 2; 
-pub const RETURN_POSITION: &str = "spr"; 
-pub const FUNCTION_DESTINATION: &str = "destination"; 
-pub const FUNCTION_DESTINATION_SIZE: &str = "destination_size"; 
+//pub const RETURN_POSITION: &str = "spr"; 
+//pub const FUNCTION_DESTINATION: &str = "destination"; 
+//pub const FUNCTION_DESTINATION_SIZE: &str = "destination_size"; 
 
 pub fn create_if_selection(
     values: &Vec<(usize, usize)>,

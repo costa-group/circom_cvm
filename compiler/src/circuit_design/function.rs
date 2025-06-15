@@ -164,12 +164,18 @@ impl WriteCVM for FunctionCodeInfo {
         let size = self.max_number_of_vars;
         //instructions.push(format!("local.memory {}",size));
         //instructions.push(format!("{} = {}", RETURN_POSITION, size));
-        let return_position = producer.fresh_var();
-        producer.set_current_function_return_position_var(return_position.clone());
+        let return_call_position = producer.fresh_var();
+        producer.set_current_var_to_return_from_call(return_call_position.clone());
         if self.is_array_result {            
-            instructions.push(format!("{} = {}", return_position, size+2));
+            instructions.push(format!("{} = i64.{}", return_call_position, size+2));
+            let return_position = producer.fresh_var();
+            producer.set_current_function_return_position_var(return_position.clone());
+            instructions.push(format!("{} = i64.load i64.0", return_position));
+            let return_size = producer.fresh_var();
+            producer.set_current_function_return_size_var(return_size.clone());
+            instructions.push(format!("{} = i64.load i64.1", return_size));
         } else {
-            instructions.push(format!("{} = {}", return_position, size));
+            instructions.push(format!("{} = i64.{}", return_call_position, size));
         }
         for t in &self.body {
             let (mut instructions_body,_) = t.produce_cvm(producer);

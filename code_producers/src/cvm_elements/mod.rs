@@ -29,6 +29,7 @@ pub struct CVMProducer {
     pub minor_version: usize,
     pub patch_version: usize,
     current_line: usize,
+    current_var_to_return_from_call: String,
     current_function_return_position_var: String,
     current_function_return_size_var: String,
     var_no: usize,
@@ -91,6 +92,7 @@ impl Default for CVMProducer {
             minor_version: 0,
             patch_version: 0,
             current_line: 0,
+            current_var_to_return_from_call: "".to_string(),
             current_function_return_position_var: "".to_string(),
             current_function_return_size_var: "".to_string(),
             var_no: 0,
@@ -155,15 +157,21 @@ impl CVMProducer {
     pub fn get_prime(&self) -> &str {
         &self.prime
     }
-    pub fn get_current_function_return_position_var(&self) -> String {
-        self.current_function_return_position_var.clone()
-    }
     pub fn get_current_line(&mut self) -> usize {
         self.current_line
     }
     pub fn set_current_line(&mut self, line: usize) {
         self.current_line = line;
     }    
+    pub fn get_current_var_to_return_from_call(&self) -> String {
+        self.current_var_to_return_from_call.clone()
+    }
+    pub fn set_current_var_to_return_from_call(&mut self, name: String) {
+        self.current_var_to_return_from_call = name;
+    }
+    pub fn get_current_function_return_position_var(&self) -> String {
+        self.current_function_return_position_var.clone()
+    }
     pub fn set_current_function_return_position_var(&mut self, name: String) {
         self.current_function_return_position_var = name;
     }

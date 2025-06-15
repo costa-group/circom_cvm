@@ -138,18 +138,22 @@ impl WriteCVM for ReturnBucket{
             instructions.push(format!(";;line {}", self.line));
             producer.set_current_line(self.line);
         }
-        if self.with_size == 1 {
-            instructions.push(format!("{} {} i64.{}", add_return(), src, "1".to_string() ));
+        if !self.is_array {
+            let vsrc = producer.fresh_var();
+            instructions.push(format!("{} = ff.load {}", vsrc, src ));
+            instructions.push(format!("{} {}", add_return(), src ));
         } else {
+            let return_position = producer.get_current_function_return_position_var();
+            let return_size = producer.get_current_function_return_position_var();
             let vcond = producer.fresh_var();
-            instructions.push(format!("{} = {} i64.{} {}", vcond, "i64.le".to_string(), self.with_size, FUNCTION_DESTINATION_SIZE));
+            instructions.push(format!("{} = {} i64.{} {}", vcond, "i64.le".to_string(), self.with_size, return_size));
             let final_size = producer.fresh_var();
             instructions.push(format!("{} {}", add_if64(), vcond));
             instructions.push(format!("{} = i64.{}",final_size, self.with_size));
             instructions.push(add_else());
-            instructions.push(format!("{} = {}", final_size, FUNCTION_DESTINATION_SIZE));
+            instructions.push(format!("{} = {}", final_size, return_size));
             instructions.push(add_end());
-            instructions.push(format!("{} {} {}", add_return(), src, final_size));
+            instructions.push(format!("{} {} {} {}", add_return(), return_position, src, final_size));
         }
         (instructions,"".to_string())
     }
