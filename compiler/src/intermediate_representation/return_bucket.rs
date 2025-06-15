@@ -141,7 +141,7 @@ impl WriteCVM for ReturnBucket{
         if !self.is_array {
             let vsrc = producer.fresh_var();
             instructions.push(format!("{} = ff.load {}", vsrc, src ));
-            instructions.push(format!("{} {}", add_return(), src ));
+            instructions.push(format!("ff.{} {}", add_return(), src ));
         } else {
             let return_position = producer.get_current_function_return_position_var();
             let return_size = producer.get_current_function_return_position_var();
