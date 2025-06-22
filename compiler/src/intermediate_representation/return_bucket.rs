@@ -153,7 +153,7 @@ impl WriteCVM for ReturnBucket{
             instructions.push(add_else());
             instructions.push(format!("{} = {}", final_size, return_size));
             instructions.push(add_end());
-            instructions.push(format!("{} {} {} {}", add_return(), return_position, src, final_size));
+            instructions.push(format!("ff.{} {} {} {}", add_return(), return_position, src, final_size));
         }
         (instructions,"".to_string())
     }

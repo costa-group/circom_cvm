@@ -259,7 +259,7 @@ pub fn exception(code: &str) -> CVMInstruction {
     format!("error {}",code)
 }
 
-pub const RETURN_PARAM_SIZE: usize = 2; 
+pub const RETURN_PARAM_SIZE: usize = 0; // 2 if i64 and ff are in the same memory 
 //pub const RETURN_POSITION: &str = "spr"; 
 //pub const FUNCTION_DESTINATION: &str = "destination"; 
 //pub const FUNCTION_DESTINATION_SIZE: &str = "destination_size"; 

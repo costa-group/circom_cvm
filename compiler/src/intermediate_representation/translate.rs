@@ -1423,6 +1423,7 @@ impl ProcessedSymbol {
                 dest: LocationRule::Indexed { location: address, template_header: None },
             }
         };
+        let is_function_returning_array = context.functions[&id].len() > 0;
         CallBucket {
             line: self.line,
             message_id: self.message_id,
@@ -1431,7 +1432,7 @@ impl ProcessedSymbol {
             arguments: args.arguments,
             arena_size: 200,
             return_info: ReturnType::Final(data),
-            is_called_function_returning_array: false,
+            is_called_function_returning_array: is_function_returning_array,
         }
         .allocate()
     }
