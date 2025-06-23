@@ -4,9 +4,113 @@ description: >-
 ---
 # Circom Virtual Machine format
 
-## Sections
+
+## Prime definition
+
+%%prime 21888242871839275222246405745257275088548364400416034343698204186575808495617
+
+## Global memory of signals size
+
+It provides the total number of signals in the circuit.
+
+```text
+%%signals 5
+```
+
+## Size of the heap of components.
+
+It provides the total number of components in the circuit.
+
+```text
+%%components_heap <number>
+```
+
+##Definition of the component creation mode
+
+It can be `implicit` or `explicit`.
+
+When implicit, the offsets of the components are assigned following a depth-first traversal of the tree structure of the circuit given by the initial template and the template definitions. 
+
+When explicit a description of the offsets is explicitly given for each component assigning a number to each component:
+
+component #n #template #offset '['subcmp number list']'
+
+should be consistent with all other definitions
+
+This is still under construction.
+
+In both cases, the global number of each signal is obtained by adding the offset to the local number of the signal in the template. 
+
+```text
+%%components implicit
+```
 
 ## Type definitions
+
+```text
+%%type $name [dimensions_list] type_list
+```
+If dimension_list (sequence of numbers) is non-empty then typelist (sequence of numbers) has a single element.
+All types are numbered from 1 on (ff is $0) 
+
+```text
+%%type $name [dimensions_list] type_list
+```
+
+## Definition of the Initial template
+
+```text
+%%start TempName
+```
+
+## Witness list
+It provides the map from witness number (from 0 on) to signal number
+
+```text
+%%witness 0 1 2 4 5 9 11
+```
+
+## Templates 
+Every template has a local memory for i64 values and a local memory for ff. Each instance of a template can only access to its local memories.
+Templates have their signals numbered from 1 on, and when instantiated as a component and executed, the corresponding offset is added.
+A template can only access its own signals (with getters and setters) and the signals of its immediate subcomponents, with setters for the inputs and getters for the outputs).
+
+Templates are not explicitly executed, there are instructions to set inputs and run the template maybe after checking whether all inputs are set.
+
+## Functions
+
+The header of a function is of the form:
+
+```text
+%%function name output inputs
+code
+
+```
+where
+output is either the empty list [] if the output is void or a list [ff] or [i64] if it returns an ff element or an i64 element respectively.
+inputs is a list of simple (ff or i64) or array type parameters. The format to provide each inputs is: simple type (ff or i64) followed by the number of dimensions n and a sequence of n element providing the size of each dimension. For instance:
+
+```text
+%%function f1_0 [ff] [ ff 2 2 2 ff 0]
+
+or,
+
+```text
+%%function f1_0 [] [ i64 0 i64 0 ff 2 2 2 ff 0 i64 0]
+```
+
+Every function has a local memory for i64 values and a local memory for ff. There are no side-effects when calling a function (parameters are passed by value).
+When a function has no output it is because it is going to copy n elements (e.g. an array) from the local memory of the called function to the local memory of the callee (using one the available return operations), which can be another function or a component (template instantiation).
+
+Parameters are passed through the local memories of the called function and are placed in the upper position of these memories. Parameters that contain i64 (resp. ff) values are placed in the i64 (resp. ff) memory in the same relative order they appear. For instance in the second example above we have three parameters in the i64 memory and two in the ff memory. The first parameter is in position 0 of the i64 memory, the second one is in position 1 of the i64 memory, the third one starts in position 0 of the ff memory, the forth one is in position 4 of the ff memory (as the size of the previous one is 4) and the fifth parameter is in position 3 of the i64 memory.
+
+Functions returning an ff or i64 are called by assigning the result to a register and when there is no output the call is not assigned.
+
+Altogether, all memories are local and we have that the callee writes in the local memory of the called when passing the parameter and the called function may write in the callee memory when returning an array of elements.
+
+## Comment lines
+
+;; comment
 
 ## Instruction Set (opcodes)
 
@@ -242,39 +346,54 @@ end
 
 #### Function call  operations
 
-```text
+Function calls with result passed using registers:
 
-call <function-name> <parameters list>
+```text
 ff.call <function-name> <parameters list>
 i64.call <function-name> <parameters list>
 ```
 The parameter list contains element of the form:
 <value> | signal(indx,size) | subcmpsignal(cmp,indx,size) | i64.memory(indx,size) | ff.memory(indx,size) 
 
-When the call has no result a return address and size are expected to be provided in the list of parameters. The address will be used by a return statement (in the callee) to place the result in the local memory of the caller.  Examples:
+The result must be assigned to a register. Example:
 
 ```text
 x = ff.call $foo y signal(s,3) ff.memory(0,1)
 ```
 which calls the function $foo with the value in the register y, the tree signals starting from the signal index in the register s and with one field value at position 0 of the local memory and leaves the result in the register x.
 
+
+Function calls with results passed using the local memories:
+
 ```text
-call $mfoo r s y signal(s,3) ff.memory(0,1)
+ff.mcall <function-name> <parameters list>
+i64.mcall <function-name> <parameters list>
 ```
-which calls the function $mfoo with the same parameter as above but the result will be stored at the local memory from address given by register r on.
+
+
+```text
+ff.mcall $mfoo r s y signal(s,3) ff.memory(0,1)
+```
+which calls the function $mfoo with parameters similar to the avobe one but the result will be given using the corresponding return operation that stored the results in some address of the local memory (with this address normally given by a parameter together with the number of elements to be copied).
 
 #### Return operations
+
+Return operations for functions with a result returned in a register:
 
 ```text
 ff.return <value>
 i64.return <value>
 ```
-
 It returns value to the caller (<values> is i64 or ff, depending of the return operation used).
 
-`return <address-of-caller-mamory> <address-of-the-callee-memory> <size-of-return>`
 
-The three are i64, and the first and the second are memory adresses.
+Return operations for functions with a result returned in a register:
+
+ff.mreturn <address-of-caller-mamory> <address-of-the-callee-memory> <size-of-return>
+i64.mreturn <address-of-caller-mamory> <address-of-the-callee-memory> <size-of-return>
+```
+The three values are i64, and the first and the second are memory adresses in the ff memories in the first case and in the i64 memories in the second one.
+
 It copies as many elements as given in size-of-return from the provided address-of-the-callee-memory to the given address-of-caller-mamory.
 
 
