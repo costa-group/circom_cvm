@@ -105,7 +105,7 @@ impl Default for CVMProducer {
 	    num_of_bus_instances: 0,
 //	    size_of_bus_fields: 0,
 	    busid_field_info: Vec::new(), 
-        implicit_component_creation: false
+        implicit_component_creation: true
        }
     }
 }
