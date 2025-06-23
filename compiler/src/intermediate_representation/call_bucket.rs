@@ -918,7 +918,7 @@ impl WriteCVM for CallBucket{
                 }
                 if !self.is_called_function_returning_array {
                     let call_res = producer.fresh_var();
-                    instructions.push(format!("{} = call ${} {}", call_res, self.symbol.clone(), params));
+                    instructions.push(format!("{} = ff.call ${} {}", call_res, self.symbol.clone(), params));
                     match ldest {
                         ComputedAddress::Variable(rvar) => {
                             instructions.push(format!("{} {} {}", storeff(), &rvar, &call_res));
@@ -956,7 +956,7 @@ impl WriteCVM for CallBucket{
                     } else {
                         result_position = producer.get_current_var_to_return_from_call();
                     }
-                    instructions.push(format!("call ${} {} {} {}", self.symbol.clone(), result_position, size.clone(), params));
+                    instructions.push(format!("ff.mcall ${} {} {} {}", self.symbol.clone(), result_position, size.clone(), params));
                     instructions.append(&mut instructions_dest);
                     let src_value = producer.fresh_var();
                     let dest_location;
