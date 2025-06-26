@@ -211,9 +211,9 @@ ff.bnot
 
 ### Conversions
 
-i64.extend_ff
+ff.extend_i64
 
-ff.wrap_i64
+i64.wrap_ff
 
 ### Variable Memory operations 
 

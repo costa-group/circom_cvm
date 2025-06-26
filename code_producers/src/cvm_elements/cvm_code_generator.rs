@@ -72,10 +72,10 @@ pub fn pow64() -> CVMInstruction {
 }
 
 pub fn extend_i64_ff() -> CVMInstruction {
-    "i64.extend_ff".to_string()
+    "ff.extend_i64".to_string()
 }
 pub fn wrap_ff_i64() -> CVMInstruction {
-    "ff.wrap_i64".to_string()
+    "i64.wrap_ff".to_string()
 }
 
 pub fn load64() -> CVMInstruction {
