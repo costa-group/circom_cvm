@@ -5,7 +5,7 @@ pub mod type_checking;
 mod cfg_construction;
 mod tests;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 use ast::{Function, Template, AST};
 use cfg_construction::CfgConstructor;
@@ -290,6 +290,100 @@ impl CFG {
 
     #[deprecated(note = "This function is only for debugging purposes!")]
     #[doc(hidden)]
+    //TODO: Change error type
+    fn check_ssa(&self) -> Result<(), String> {
+        //First pass, check double declarations and add them to a map
+        //declarations:
+        //- Key: Variable declared
+        //- Value: Block in which it is declared
+        let mut declarations = HashMap::new();
+
+        for (index, block) in self.blocks.iter().enumerate() {
+            for stmt in &block.statements {
+                if let Some(var) = &stmt.output {
+                    if declarations.contains_key(var) {
+                        //Error: variable is declared more than once
+                        return Err(format!("Variable '{}' is declared more than once.", var));
+                    } else {
+                        declarations.insert(var.clone(), index);
+                    }
+                }
+            }
+        }
+
+        //Second pass, check uses of variables
+        //Every variable must be declared before it is used
+        let mut reachable = vec![vec![false; self.blocks.len()]; self.blocks.len()];
+        //Blocks in which we already have every reachable block
+        let mut closed_blocks = vec![false; self.blocks.len()];
+        //The entry block only has itself as reachable therefore
+        closed_blocks[0] = true;
+        for (index, block) in self.blocks.iter().enumerate() {
+            //A block is reachable by itself
+            reachable[index][index] = true;
+            for prec in &block.predecessors {
+                //A block can reach its predecessors
+                reachable[index][*prec] = true;
+            }
+
+            //Check the uses of each statement
+            for stmt in &block.statements {
+                let val = &stmt.value;
+                for operand in &val.operands {
+                    for var in get_variable_names(operand) {
+                        let position = declarations.get(&var).ok_or(format!("The variable '{}' was not declared in the program.", var))?;
+                        if reachable[index][*position] {
+                            continue;
+                        }
+                        //Error if the index block is closed, but the position block is not
+                        //reachable from it
+                        if !reachable[index][*position] && closed_blocks[index] {
+                            return Err(format!("Variable '{}' was declared in block '{}', but used in block '{}' and it is not reachable.", var, position, index));
+                        }
+
+                        //Case in which the block is not yet closed, we go backwards into the
+                        //predecessors with dfs marking the visited blocks
+                        let mut visited = vec![false; self.blocks.len()];
+                        let mut queue = VecDeque::new();
+
+                        visited[index] = true;
+                        queue.push_back(index);
+
+                        while let Some(node) = queue.pop_front() {
+                            //TODO: Improve this so that not only the index block is updated (also
+                            //all those that we visit)
+                            reachable[index][node] = true;
+                            if node == *position {
+                                break;
+                            }
+
+                            for &neighbor in &self.blocks[node].predecessors {
+                                if !visited[neighbor] {
+                                    visited[neighbor] = true;
+                                    queue.push_back(neighbor);
+                                }
+                            }
+                        }
+
+                        if queue.is_empty() {
+                            closed_blocks[index] = true;
+                        }
+
+                        //Error if the index block is closed, but the position block is not
+                        //reachable from it
+                        if !reachable[index][*position] && closed_blocks[index] {
+                            return Err(format!("Variable '{}' was declared in block '{}', but used in block '{}' and it is not reachable.", var, position, index));
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    #[deprecated(note = "This function is only for debugging purposes!")]
+    #[doc(hidden)]
     pub fn to_json(&self) -> String {
         serde_json::to_string_pretty(self).unwrap()
     }
@@ -376,6 +470,15 @@ impl CFGList {
         }
 
         Self { entry, cfgs }
+    }
+
+    #[deprecated(note = "This function is only for debugging purposes!")]
+    #[doc(hidden)]
+    pub fn check_ssa(&self) -> Result<(), String> {
+        for cfg in &self.cfgs {
+            cfg.check_ssa()?;
+        }
+        Ok(())
     }
 
     #[deprecated(note = "This function is only for debugging purposes!")]

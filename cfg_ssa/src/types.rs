@@ -182,6 +182,33 @@ pub enum Expression {
     Parameter(Parameter),
 }
 
+pub fn get_variable_names(expression: &Expression) -> Vec<String> {
+    match expression {
+        Expression::Atomic(atomic) => match atomic {
+            Atomic::Variable(name) => vec![name.clone()],
+            Atomic::Constant(_) => vec![],
+        },
+        Expression::Parameter(parameter) => match parameter {
+            Parameter::Signal { index, size } => {
+                let mut names = get_variable_names(&Expression::Atomic(index.clone()));
+                names.extend(get_variable_names(&Expression::Atomic(size.clone())));
+                names
+            }
+            Parameter::SubcmpSignal { component, index, size } => {
+                let mut names = get_variable_names(&Expression::Atomic(component.clone()));
+                names.extend(get_variable_names(&Expression::Atomic(index.clone())));
+                names.extend(get_variable_names(&Expression::Atomic(size.clone())));
+                names
+            }
+            Parameter::I64Memory { index, size } | Parameter::FfMemory { index, size } => {
+                let mut names = get_variable_names(&Expression::Atomic(index.clone()));
+                names.extend(get_variable_names(&Expression::Atomic(size.clone())));
+                names
+            }
+        },
+    }
+}
+
 impl fmt::Debug for Expression {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
