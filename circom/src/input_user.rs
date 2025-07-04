@@ -19,6 +19,7 @@ pub struct Input {
     pub out_cvm_name: String,
     //pub field: &'static str,
     pub c_flag: bool,
+    pub cvm_multi_assign_flag: bool,
     pub cvm_flag: bool,
     pub wasm_flag: bool,
     pub wat_flag: bool,
@@ -103,6 +104,7 @@ impl Input {
             wat_flag:input_processing::get_wat(&matches),
             wasm_flag: input_processing::get_wasm(&matches),
             c_flag: c_flag,
+            cvm_multi_assign_flag: input_processing::get_cvm_multi_assign(&matches),
             cvm_flag: input_processing::get_cvm(&matches),
             no_asm_flag:input_processing::get_no_asm(&matches),
             r1cs_flag: input_processing::get_r1cs(&matches),
@@ -200,6 +202,9 @@ impl Input {
     }
     pub fn c_flag(&self) -> bool {
         self.c_flag
+    }
+    pub fn cvm_multi_assign_flag(&self) -> bool {
+        self.cvm_multi_assign_flag
     }
     pub fn cvm_flag(&self) -> bool {
         self.cvm_flag
@@ -331,6 +336,10 @@ mod input_processing {
 
     pub fn get_cvm(matches: &ArgMatches) -> bool {
         matches.is_present("print_cvm")
+    }
+
+    pub fn get_cvm_multi_assign(matches: &ArgMatches) -> bool {
+        matches.is_present("cvm_multi_assign")
     }
 
     pub fn get_no_asm(matches: &ArgMatches) -> bool {
@@ -512,6 +521,13 @@ mod input_processing {
                     .takes_value(false)
                     .display_order(90)
                     .help("Compiles the circuit to CVM (Circom Virtual Machine)"),
+            )
+            .arg(
+                Arg::with_name("cvm_multi_assign")
+                    .long("cvm_multi_assign")
+                    .takes_value(false)
+                    .display_order(90)
+                    .help("Uses multiassignments in the CVM code (Circom Virtual Machine)"),
             )
             .arg(
                 Arg::with_name("no_asm")

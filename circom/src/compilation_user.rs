@@ -23,6 +23,7 @@ pub struct CompilerConfig {
     pub wasm_flag: bool,
     pub c_flag: bool,
     pub cvm_flag: bool,
+    pub cvm_multi_assign_flag: bool,
     pub debug_output: bool,
     pub produce_input_log: bool,
     pub constraint_assert_disabled_flag: bool,
