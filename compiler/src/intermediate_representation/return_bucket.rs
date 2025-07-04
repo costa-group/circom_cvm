@@ -132,28 +132,39 @@ impl WriteCVM for ReturnBucket{
             instructions.push(format!(";;line {}", self.line));
             producer.set_current_line(self.line);
         }
-        let (mut instructions_src, src) = self.value.produce_cvm(producer); // compute the source
-        instructions.append(&mut instructions_src);
-        if producer.get_current_line() != self.line {
-            instructions.push(format!(";;line {}", self.line));
-            producer.set_current_line(self.line);
-        }
         if !self.is_array {
+            let (mut instructions_src, src) = self.value.produce_cvm(producer); // compute the source
+            instructions.append(&mut instructions_src);
+            if producer.get_current_line() != self.line {
+                instructions.push(format!(";;line {}", self.line));
+                producer.set_current_line(self.line);
+            }
             let vsrc = producer.fresh_var();
             instructions.push(format!("{} = ff.load {}", vsrc, src ));
             instructions.push(format!("ff.{} {}", add_return(), src ));
         } else {
-            let return_position = producer.get_current_function_return_position_var();
-            let return_size = producer.get_current_function_return_position_var();
-            let vcond = producer.fresh_var();
-            instructions.push(format!("{} = {} i64.{} {}", vcond, "i64.le".to_string(), self.with_size, return_size));
-            let final_size = producer.fresh_var();
-            instructions.push(format!("{} {}", add_if64(), vcond));
-            instructions.push(format!("{} = i64.{}",final_size, self.with_size));
-            instructions.push(add_else());
-            instructions.push(format!("{} = {}", final_size, return_size));
-            instructions.push(add_end());
-            instructions.push(format!("ff.mreturn {} {} {}", return_position, src, final_size));
+            if let Instruction::Load(load) = &*self.value {
+                use super::location_rule::*;
+                let (mut instructions_src, lsrc) = load.src.produce_cvm(&load.address_type, &load.context, producer);
+                if let ComputedAddress::Variable(src) = &lsrc {
+                    instructions.append(&mut instructions_src);
+                    let return_position = producer.get_current_function_return_position_var();
+                    let return_size = producer.get_current_function_return_size_var();
+                    let vcond = producer.fresh_var();
+                    instructions.push(format!("{} = {} i64.{} {}", vcond, "i64.le".to_string(), self.with_size, return_size));
+                    let final_size = producer.fresh_var();
+                    instructions.push(format!("{} {}", add_if64(), vcond));
+                    instructions.push(format!("{} = i64.{}",final_size, self.with_size));
+                    instructions.push(add_else());
+                    instructions.push(format!("{} = {}", final_size, return_size));
+                    instructions.push(add_end());
+                    instructions.push(format!("ff.mreturn {} {} {}", return_position, src, final_size));
+                } else {
+                    assert!(false);
+                }
+            } else {
+                assert!(false);
+            }    
         }
         (instructions,"".to_string())
     }
