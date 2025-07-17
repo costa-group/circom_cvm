@@ -60,7 +60,6 @@ fn add_instance(name: &str, args: Vec<Param>, state: &mut State) {
         let inferred = infer_function_result(name, args.clone(), state);
         let id = state.vcf_collector.len();
         let body = state.generic_functions.get(name).unwrap().body.clone();
-        let constant_variables = state.generic_functions.get(name).unwrap().constant_variables.clone();
 
         let new_vcf = VCF {
             name: name.to_string(),
@@ -68,7 +67,6 @@ fn add_instance(name: &str, args: Vec<Param>, state: &mut State) {
             params_types: args.to_vec(),
             return_type: inferred,
             body,
-            constant_variables
         };
         state.quick_knowledge.insert(new_vcf.header.clone(), new_vcf.return_type.clone());
         state.vcf_collector.push(new_vcf);

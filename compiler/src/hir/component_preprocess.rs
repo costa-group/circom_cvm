@@ -1,47 +1,45 @@
 use crate::hir::very_concrete_program::VCP;
 use program_structure::ast::*;
-use std::collections::BTreeMap;
-use num_bigint_dig::BigInt;
 
 pub fn rm_component_ci(vcp: &mut VCP) {
     for template in &mut vcp.templates {
-        rm_statement(&mut template.code, &template.constant_variables);
+        rm_statement(&mut template.code);
     }
     for function in &mut vcp.functions {
-        rm_statement(&mut function.body, &function.constant_variables);
+        rm_statement(&mut function.body);
     }
 }
 
-fn rm_statement(stmt: &mut Statement, constants: &BTreeMap<String, (Vec<usize>, Vec<BigInt>)>) {
+fn rm_statement(stmt: &mut Statement) {
     if stmt.is_while() {
-        rm_while(stmt, constants);
+        rm_while(stmt);
     } else if stmt.is_if_then_else() {
-        rm_if_then_else(stmt, constants);
+        rm_if_then_else(stmt);
     } else if stmt.is_block() {
-        rm_block(stmt, constants);
+        rm_block(stmt);
     } else if stmt.is_initialization_block() {
-        rm_init(stmt, constants);
+        rm_init(stmt);
     } else if stmt.is_substitution(){ 
-        rm_substitution(stmt, constants);
+        rm_substitution(stmt);
     } else if stmt.is_underscore_substitution(){ 
-        rm_underscore_substitution(stmt, constants);
+        rm_underscore_substitution(stmt);
     }
 }
 
-fn rm_underscore_substitution(stmt: &mut Statement, _constants: &BTreeMap<String, (Vec<usize>, Vec<BigInt>)>){
+fn rm_underscore_substitution(stmt: &mut Statement){
     use Statement::{Block, UnderscoreSubstitution};
     if let UnderscoreSubstitution { meta, .. } = stmt{
         *stmt = Block{ meta: meta.clone(), stmts: Vec::new() };
     }
 }
 
-fn rm_block(stmt: &mut Statement, constants: &BTreeMap<String, (Vec<usize>, Vec<BigInt>)>) {
+fn rm_block(stmt: &mut Statement) {
     use Statement::Block;
     if let Block { stmts, .. } = stmt {
         let filter = std::mem::take(stmts);
         for mut s in filter {
-            rm_statement(&mut s, constants);
-            if !should_be_removed(&s, constants) {
+            rm_statement(&mut s);
+            if !should_be_removed(&s) {
                 stmts.push(s);
             }
         }
@@ -50,28 +48,28 @@ fn rm_block(stmt: &mut Statement, constants: &BTreeMap<String, (Vec<usize>, Vec<
     }
 }
 
-fn rm_if_then_else(stmt: &mut Statement, constants: &BTreeMap<String, (Vec<usize>, Vec<BigInt>)>) {
+fn rm_if_then_else(stmt: &mut Statement) {
     use Statement::IfThenElse;
     if let IfThenElse { if_case, else_case, .. } = stmt {
-        rm_statement(if_case, constants);
+        rm_statement(if_case);
         if let Option::Some(s) = else_case {
-            rm_statement(s, constants);
+            rm_statement(s);
         }
     } else {
         unreachable!()
     }
 }
 
-fn rm_while(stmt: &mut Statement, constants: &BTreeMap<String, (Vec<usize>, Vec<BigInt>)>) {
+fn rm_while(stmt: &mut Statement) {
     use Statement::While;
     if let While { stmt, .. } = stmt {
-        rm_statement(stmt, constants);
+        rm_statement(stmt);
     } else {
         unreachable!()
     }
 }
 
-fn rm_init(stmt: &mut Statement, constants: &BTreeMap<String, (Vec<usize>, Vec<BigInt>)>) {
+fn rm_init(stmt: &mut Statement) {
     use Statement::InitializationBlock;
     use VariableType::*;
     if let InitializationBlock { initializations, xtype, .. } = stmt {
@@ -82,7 +80,7 @@ fn rm_init(stmt: &mut Statement, constants: &BTreeMap<String, (Vec<usize>, Vec<B
                 if i.is_substitution() {
                     initializations.push(i);
                 } else if i.is_block(){
-                    rm_block(&mut i, constants);
+                    rm_block(&mut i);
                     initializations.push(i);
                 }
             }
@@ -90,19 +88,19 @@ fn rm_init(stmt: &mut Statement, constants: &BTreeMap<String, (Vec<usize>, Vec<B
             let work = std::mem::take(initializations);
             for mut i in work {
                 if i.is_substitution() {
-                    if !should_be_removed(&i, constants) {
+                    if !should_be_removed(&i) {
                         initializations.push(i);
                     }
                 } else if i.is_block(){
-                    rm_block(&mut i, constants);
+                    rm_block(&mut i);
                     initializations.push(i);
                 }
             }
         }else {
             let filter = std::mem::take(initializations);
             for mut s in filter {
-                rm_statement(&mut s, constants);
-                if !should_be_removed(&s, constants) {
+                rm_statement(&mut s);
+                if !should_be_removed(&s) {
                     initializations.push(s);
                 }
             }
@@ -112,25 +110,24 @@ fn rm_init(stmt: &mut Statement, constants: &BTreeMap<String, (Vec<usize>, Vec<B
     }
 }
 
-fn rm_substitution(stmt: &mut Statement, constants: &BTreeMap<String, (Vec<usize>, Vec<BigInt>)>){
+fn rm_substitution(stmt: &mut Statement){
     use Statement::{Block, Substitution};
-    if should_be_removed(stmt, constants){
+    if should_be_removed(stmt){
         if let Substitution { meta, .. } = stmt{
             *stmt = Block{ meta: meta.clone(), stmts: Vec::new() };
         }
     }
 }
 
-fn should_be_removed(stmt: &Statement, constants: &BTreeMap<String, (Vec<usize>, Vec<BigInt>)>) -> bool {
+fn should_be_removed(stmt: &Statement) -> bool {
     use Statement::{InitializationBlock, Substitution};
     use VariableType::*;
     if let InitializationBlock { xtype, .. } = stmt {
         Component == *xtype || AnonymousComponent == *xtype
-    } else if let Substitution { meta, rhe, var, is_initialization, .. } = stmt {
+    } else if let Substitution { meta, rhe,.. } = stmt {
             meta.get_type_knowledge().is_component() 
             || meta.get_type_knowledge().is_tag()
             || rhe.is_bus_call() || rhe.is_bus_call_array()
-            || (*is_initialization && constants.contains_key(var))
     } else {
         false
     }

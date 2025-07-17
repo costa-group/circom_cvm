@@ -2,7 +2,7 @@ extern crate num_bigint_dig as num_bigint;
 extern crate num_traits;
 
 mod compute_constants;
-mod environment_utils;
+mod environment_utils; 
 mod execute;
 mod execution_data;
 mod assignment_utils;

@@ -29,7 +29,6 @@ pub struct TemplateCodeInfo {
     pub signal_stack_depth: usize, // Not used now
     pub number_of_components: usize,
     pub components_instances: Vec<Vec<Option<usize>>>,
-    pub constant_variables: Vec<(String, Vec<usize>)>,
     pub subcomponents: Vec<usize>,
 
 }

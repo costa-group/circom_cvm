@@ -1,8 +1,7 @@
 use super::ast::{FillMeta, Statement};
 use super::file_definition::FileID;
 use crate::file_definition::FileLocation;
-use std::collections::{HashMap, BTreeMap};
-use num_bigint_dig::BigInt;
+use std::collections::HashMap;
 
 pub type FunctionInfo = HashMap<String, FunctionData>;
 
@@ -14,8 +13,6 @@ pub struct FunctionData {
     name_of_params: Vec<String>,
     param_location: FileLocation,
     body: Statement,
-    // to store the info about the variables that are constants
-    constant_variables: BTreeMap<String, (Vec<usize>, Vec<BigInt>)>
 }
 
 impl FunctionData {
@@ -29,7 +26,7 @@ impl FunctionData {
         elem_id: &mut usize,
     ) -> FunctionData {
         body.fill(file_id, elem_id);
-        FunctionData { name, file_id, body, name_of_params, param_location, num_of_params, constant_variables: BTreeMap::new() }
+        FunctionData { name, file_id, body, name_of_params, param_location, num_of_params }
     }
     pub fn get_file_id(&self) -> FileID {
         self.file_id
@@ -58,12 +55,7 @@ impl FunctionData {
             _ => panic!("Function body should be a block"),
         }
     }
-    pub fn set_constant_variables(
-        &mut self, 
-        constant_variables: BTreeMap<String, (Vec<usize>, Vec<BigInt>)>
-    ){
-        self.constant_variables = constant_variables;
-    }
+
     pub fn get_param_location(&self) -> FileLocation {
         self.param_location.clone()
     }
@@ -76,7 +68,5 @@ impl FunctionData {
     pub fn get_name(&self) -> &str {
         &self.name
     }
-    pub fn get_constant_variables(&self) -> &BTreeMap<String, (Vec<usize>, Vec<BigInt>)> {
-        &self.constant_variables
-    }
+
 }

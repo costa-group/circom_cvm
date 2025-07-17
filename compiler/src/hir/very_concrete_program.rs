@@ -203,7 +203,6 @@ pub struct TemplateInstance {
     pub triggers: Vec<Trigger>,
     pub clusters: Vec<TriggerCluster>,
     pub code: Code,
-    pub constant_variables: BTreeMap<String, (Vec<usize>, Vec<BigInt>)>,
 }
 
 pub struct TemplateConfig {
@@ -241,7 +240,6 @@ impl TemplateInstance {
             triggers: config.triggers,
             clusters: config.clusters,
             signals_to_tags: config.signals_to_tags,
-            constant_variables: BTreeMap::new(),
         }
     }
 
@@ -262,12 +260,6 @@ impl TemplateInstance {
         self.wires.push(wire);
     }
 
-    pub fn set_constant_variables(
-        &mut self, 
-        constant_variables: BTreeMap<String, (Vec<usize>, Vec<BigInt>)>
-    ){
-        self.constant_variables = constant_variables;
-    }
 }
 
 #[derive(Eq, PartialEq, Clone)]
@@ -283,7 +275,6 @@ pub struct VCF {
     pub params_types: Vec<Param>,
     pub return_type: VCT,
     pub body: Statement,
-    pub constant_variables: BTreeMap<String, (Vec<usize>, Vec<BigInt>)>
 }
 
 #[derive(Clone)]

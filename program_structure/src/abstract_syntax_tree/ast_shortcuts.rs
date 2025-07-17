@@ -24,7 +24,7 @@ pub fn assign_with_op_shortcut(
     let (var, access) = variable;
     let variable = build_variable(meta.clone(), var.clone(), access.clone());
     let infix = build_infix(meta.clone(), variable, op, rhe);
-    build_substitution(meta, var, access, AssignOp::AssignVar, infix, false)
+    build_substitution(meta, var, access, AssignOp::AssignVar, infix)
 }
 
 pub fn plusplus(meta: Meta, variable: (String, Vec<Access>), field: &BigInt) -> Statement {
@@ -80,13 +80,13 @@ pub fn split_declaration_into_single_nodes(
             }
 
             let substitution = 
-                build_substitution(meta.clone(), symbol.name.clone(), vec![], op, value, true);
+                build_substitution(meta.clone(), symbol.name.clone(), vec![], op, value);
             initializations.push(substitution);
         }
         
         if let Option::Some(init) = possible_init {
             let substitution =
-                build_substitution(meta.clone(), symbol.name, vec![], op, init, true);
+                build_substitution(meta.clone(), symbol.name, vec![], op, init);
             initializations.push(substitution);
         }
 
@@ -121,7 +121,7 @@ pub fn split_declaration_into_single_nodes_and_multisubstitution(
             }
 
             let substitution = 
-                build_substitution(meta.clone(), symbol.name, vec![], AssignOp::AssignVar, value, true);
+                build_substitution(meta.clone(), symbol.name, vec![], AssignOp::AssignVar, value);
             initializations.push(substitution);
         }
         values.push(Expression::Variable { meta: with_meta.clone(), name: name, access: Vec::new() })
@@ -130,7 +130,7 @@ pub fn split_declaration_into_single_nodes_and_multisubstitution(
         let (op,expression) = tuple.tuple_init;
         let multi_sub = if values.len() == 1 {
             if let Expression::Variable { name, .. } = values.get(0).unwrap() {
-                build_substitution(meta.clone(), name.clone(), Vec::new(), op, expression, true)
+                build_substitution(meta.clone(), name.clone(), Vec::new(), op, expression)
             } else { unreachable!();}
         } else{
             build_mult_substitution(meta.clone(), build_tuple(meta.clone(),values), op, expression)
@@ -166,13 +166,13 @@ pub fn split_bus_declaration_into_single_nodes(
             value = build_uniform_array(meta.clone(), value, dim_expr.clone());
         }
         
-        let bus_declaration = build_substitution(meta.clone(), symbol.name.clone(), vec![], AssignVar, value, false);
+        let bus_declaration = build_substitution(meta.clone(), symbol.name.clone(), vec![], AssignVar, value);
         initializations.push(single_declaration);
         initializations.push(bus_declaration);
 
         if let Option::Some(init) = possible_init {
             let substitution =
-                build_substitution(meta.clone(), symbol.name, vec![], op, init, false);
+                build_substitution(meta.clone(), symbol.name, vec![], op, init);
             initializations.push(substitution);
         }
     }
@@ -197,7 +197,7 @@ pub fn split_bus_declaration_into_single_nodes_and_multisubstitution(
         let dimensions = symbol.is_array;
         debug_assert!(symbol.init.is_none());
         let single_declaration = build_declaration(with_meta.clone(), has_type, name.clone(), dimensions.clone(), false);
-        let bus_declaration = build_substitution(meta.clone(), symbol.name.clone(), vec![], AssignVar, bustype.clone(), false);
+        let bus_declaration = build_substitution(meta.clone(), symbol.name.clone(), vec![], AssignVar, bustype.clone());
         initializations.push(single_declaration);
         initializations.push(bus_declaration);
         values.push(Expression::Variable { meta: with_meta.clone(), name: name, access: Vec::new() })

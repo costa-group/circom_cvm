@@ -2,8 +2,7 @@ use crate::hir::very_concrete_program::*;
 use program_structure::ast::Statement;
 use program_structure::environment::VarEnvironment;
 use program_structure::program_archive::ProgramArchive;
-use std::collections::{HashMap,BTreeMap};
-use num_bigint_dig::BigInt;
+use std::collections::HashMap;
 
 pub type E = VarEnvironment<VCT>;
 
@@ -19,7 +18,6 @@ pub struct GenericFunction {
     pub name: String,
     pub params_names: Vec<String>,
     pub body: Statement,
-    pub constant_variables: BTreeMap<String, (Vec<usize>, Vec<BigInt>)>,
     pub concrete_instances: Vec<usize>,
 }
 
@@ -40,7 +38,6 @@ pub fn build_function_knowledge(program: ProgramArchive) -> State {
             name: name.clone(),
             params_names: f.get_name_of_params().clone(),
             body: f.get_body().clone(),
-            constant_variables: f.get_constant_variables().clone(),
             concrete_instances: Vec::new(),
         };
         generic_functions.insert(name, gen_function);

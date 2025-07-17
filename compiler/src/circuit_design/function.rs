@@ -16,7 +16,6 @@ pub struct FunctionCodeInfo {
     pub params: Vec<Param>,
     pub returns: Vec<Dimension>,
     pub body: InstructionList,
-    pub constant_variables: Vec<(String, Vec<usize>)>,
     pub max_number_of_vars: usize,
     pub max_number_of_ops_in_expression: usize,
     pub is_array_result: bool,
