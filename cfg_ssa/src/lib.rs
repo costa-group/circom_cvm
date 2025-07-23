@@ -133,6 +133,7 @@ pub struct BasicBlock {
     successors: Option<Successor>,
     //The position in which a variable is declared
     declarations: HashMap<String, usize>,
+    num_phis: usize,
 }
 
 impl BasicBlock {
@@ -143,12 +144,14 @@ impl BasicBlock {
             predecessors: Vec::new(),
             successors: None,
             declarations: HashMap::new(),
+            num_phis: 0,
         }
     }
 
     fn add_phi_function(&mut self, stmt: Statement) {
-        self.declarations.insert(stmt.output.clone().expect("Phi functions require an output name for declaration"), 0);
-        self.statements.insert(0, stmt);
+        self.declarations.insert(stmt.output.clone().expect("Phi functions require an output name for declaration"), self.num_phis);
+        self.statements.insert(self.num_phis, stmt);
+        self.num_phis += 1;
     }
 
     fn add_instruction(&mut self, stmt: Statement) {

@@ -3,15 +3,15 @@ use std::collections::{HashMap, HashSet};
 use crate::{ast::ASTNode, types::{Atomic, Expression, Operator, Parameter}, OperatorOrPhi, Statement, Value, CFG};
 
 /// Enum to represent the possible uses:
-/// - In memoization (the block has written in its definitions this variable)
-/// - In a statement (block and line in the block)
-/// - A declaration (block and which variable is being declared)
-/// - In a condition (block with the branch)
 #[derive (Eq, Hash, PartialEq, Clone)]
 enum Use {
+    /// - In memoization (the block has written in its definitions this variable)
     InMemoization(usize),
+    /// - In a condition (block with the branch)
     InCondition(usize),
+    /// - A declaration (block and which variable is being declared)
     InDeclaration(usize, String),
+    /// - In a statement (block and line in the block)
     InStmt(usize, usize),
 }
 
@@ -38,7 +38,7 @@ pub struct CfgConstructor<'a> {
     exception_blocks: HashSet<usize>,
 
     sealed_blocks: Vec<bool>,
-    next_var: usize,
+    next_ssa_num: usize,
 }
 
 
@@ -53,12 +53,13 @@ impl<'a> CfgConstructor<'a> {
             uses: HashMap::new(),
             exception_blocks: HashSet::new(),
             sealed_blocks: vec![true],
-            next_var: 0,
+            next_ssa_num: 0,
         }
     }
 
-    //Create a new block for the cfg, but, at the same time, increase the size of the block
-    //variable definition
+    /// Create a new block for the cfg, but, at the same time, increase the size of the block
+    /// variable definition
+    /// Returns position of block
     fn create_block(&mut self) -> usize {
         self.definitions.push(HashMap::new());
         self.incomplete_phis.push(HashSet::new());
@@ -67,133 +68,152 @@ impl<'a> CfgConstructor<'a> {
     }
 
     /// Create a fresh SSA name
+    /// Returns ssa name
     fn fresh(&mut self) -> String {
-        let new_var = format!("v{}", self.next_var);
-        self.next_var += 1;
-        new_var
+        let ssa_name = format!("v{}", self.next_ssa_num);
+        self.next_ssa_num += 1;
+        ssa_name
     }
 
     /// Seal a block: finish φ-nodes
     fn seal_block(&mut self, block: usize) {
-        let pending = std::mem::take(&mut self.incomplete_phis[block]);
-        for (name, phi) in pending {
-            self.add_phi_operands(&name, &phi, block);
+        let pending_phis = std::mem::take(&mut self.incomplete_phis[block]);
+        for (non_ssa_name, ssa_phi_name) in pending_phis {
+            self.add_phi_operands(&non_ssa_name, &ssa_phi_name, block);
         }
         self.sealed_blocks[block] = true;
     }
 
     /// Write a new SSA binding for source `src` in `block` with `val`
-    fn write_variable(&mut self, src: &str, block: usize, val: Value) -> String {
-        let dest = self.fresh();
-        self.values.insert(dest.clone(), val);
-        self.to_non_ssa.insert(dest.clone(), src.to_string());
-        self.definitions[block].insert(src.to_string(), dest.clone());
-        dest
+    /// Returns ssa name
+    fn write_variable(&mut self, non_ssa_name: &str, block: usize, val: Value) -> String {
+        let ssa_name = self.fresh();
+        self.values.insert(ssa_name.clone(), val);
+        self.to_non_ssa.insert(ssa_name.clone(), non_ssa_name.to_string());
+        self.definitions[block].insert(non_ssa_name.to_string(), ssa_name.clone());
+        ssa_name
     }
 
     /// Read a variable, inserting φ if needed
-    fn read_variable(&mut self, name: &str, block: usize) -> String {
-        if let Some(ssa) = self.definitions[block].get(name) {
-            return ssa.clone();
+    /// Returns ssa name
+    fn read_variable(&mut self, non_ssa_name: &str, block: usize) -> String {
+        if let Some(ssa_name) = self.definitions[block].get(non_ssa_name) {
+            return ssa_name.clone();
         }
-        self.read_recursive(name, block)
+        self.read_recursive(non_ssa_name, block)
     }
 
-    fn read_recursive(&mut self, name: &str, block: usize) -> String {
+    /// Recursively tries to read a variable, inserting φ if needed
+    /// Returns ssa name
+    fn read_recursive(&mut self, non_ssa_name: &str, block: usize) -> String {
         if !self.sealed_blocks[block] {
             // Incomplete block: create φ placeholder
             let val = Value { operator: Some(OperatorOrPhi::Phi), operands: Vec::new() };
-            let phi = self.write_variable(name, block, val);
-            self.incomplete_phis[block].insert((name.to_string(), phi.clone()));
-            return phi;
+            let ssa_phi_name = self.write_variable(non_ssa_name, block, val);
+            self.incomplete_phis[block].insert((non_ssa_name.to_string(), ssa_phi_name.clone()));
+            return ssa_phi_name;
         }
-        let preds = self.cfg.predecessors(block);
-        if preds.len() == 1 {
-            // Single predecessor -> no φ needed
-            let v = self.read_variable(name, preds[0]);
-            // Avoid the recursive lookup in future cases
+
+        let predecessors = self.cfg.predecessors(block);
+
+        // Single predecessor -> no φ needed
+        if predecessors.len() == 1 {
+            let v = self.read_variable(non_ssa_name, predecessors[0]);
+
             // Don't write_variable because it creates a new SSA name
-            self.definitions[block].insert(name.to_string(), v.clone());
+
+            // Avoid the recursive lookup in future cases
+            self.definitions[block].insert(non_ssa_name.to_string(), v.clone());
             let usage = Use::InMemoization(block);
             self.uses.entry(v.clone()).or_default().insert(usage);
+
             return v;
         }
+
         // Multiple predecessors -> φ
         // Break potential cycles with operandless phi
         let val = Value { operator: Some(OperatorOrPhi::Phi), operands: Vec::new() };
-        let phi = self.write_variable(name, block, val);
-        self.add_phi_operands(name, &phi, block);
+        let ssa_phi_name = self.write_variable(non_ssa_name, block, val);
+        self.add_phi_operands(non_ssa_name, &ssa_phi_name, block);
+
         // In case phi is trivial, we read again
-        self.read_variable(name, block)
+        self.read_variable(non_ssa_name, block)
     }
 
     /// Add φ operands from all predecessors for `name` in `block`
-    fn add_phi_operands(&mut self, name: &str, phi: &str, block: usize) {
-        let mut ops = Vec::new();
+    fn add_phi_operands(&mut self, non_ssa_name: &str, ssa_phi_name: &str, block: usize) {
+        let mut operands = Vec::new();
         let predecessors: Vec<_> = self.cfg.predecessors(block).to_vec();
         for &pred in &predecessors {
-            ops.push(self.read_variable(name, pred));
+            operands.push(self.read_variable(non_ssa_name, pred));
         }
-        let entry = self.values.get_mut(phi).expect("Phi node missing");
-        entry.operands.extend(ops.into_iter().map(|op| Expression::Atomic(Atomic::Variable(op))));
+        let phi_operation = self.values.get_mut(ssa_phi_name).expect("Phi node missing");
+        // The operands are in the same order as the predecessor it corresponds to
+        phi_operation.operands.extend(operands.into_iter().map(|op|
+                Expression::Atomic(Atomic::Variable(op))));
 
-        let entry_clone = entry.clone();
-        if !self.try_remove_trivial(phi, name, block) {
-            let stmt = Statement { num_type: None, output: Some(phi.to_string()), value: entry_clone };
+        let phi_op_clone = phi_operation.clone();
+        if !self.try_remove_trivial(ssa_phi_name, non_ssa_name, block) {
+            let stmt = Statement { num_type: None, output: Some(ssa_phi_name.to_string()), value: phi_op_clone };
             self.cfg.add_phi_function(block, stmt);
         }
     }
 
     /// Simplify trivial φ-nodes with identical operands
-    fn try_remove_trivial(&mut self, phi: &str, name: &str, block: usize) -> bool{
-        let val = match self.values.get(phi) {
+    /// Returns whether the 
+    fn try_remove_trivial(&mut self, ssa_phi_name: &str, non_ssa_name: &str, block: usize) -> bool {
+        let val = match self.values.get(ssa_phi_name) {
             Some(v) if v.is_phi() => v.clone(),
             _ => return false,
         };
-        let mut same: Option<String> = None;
+        let mut repeated_operand: Option<String> = None;
         for op in &val.operands {
             if let Expression::Atomic(Atomic::Variable(var)) = op {
-                if var == phi { continue; }     //Self reference
-                if let Some(r) = &same {
+                if var == ssa_phi_name { continue; }     //Self reference
+                if let Some(r) = &repeated_operand {
                     //The phi merges at least two different values: not trivial
                     if r != var { return false; }
                 }
-                same = Some(var.clone());
+                repeated_operand = Some(var.clone());
             }
             else {
                 panic!("Phi functions should only have variables as operands");
             }
         }
 
-        if let Some(same_v) = same {
-            if let Some(users) = self.uses.remove(phi) {
+        if let Some(repeated_op_name) = repeated_operand {
+            if let Some(users) = self.uses.remove(ssa_phi_name) {
                 for user in users {
                     match user {
-                        Use::InDeclaration(block_u, user_ssa_name) => {
-                            self.cfg.change_declaration_operands(block_u, &user_ssa_name, phi, &same_v);
+                        Use::InDeclaration(block_user, user_ssa_name) => {
+                            self.cfg.change_declaration_operands(block_user, &user_ssa_name, ssa_phi_name, &repeated_op_name);
                             let non_ssa_name = self.to_non_ssa.get(&user_ssa_name).expect("Phi function not found").clone();
 
                             //TODO: Possibly we need to remove the phi from the block if it has
                             //been written
-                            let _ = self.try_remove_trivial(&user_ssa_name, &non_ssa_name, block_u);
+                            let _ = self.try_remove_trivial(&user_ssa_name, &non_ssa_name, block_user);
                         }
-                        Use::InStmt(block_u, line) => {
-                            self.cfg.change_statement_operands(block_u, line, phi, &same_v);
+                        Use::InStmt(block_user, line) => {
+                            self.cfg.change_statement_operands(block_user, line, ssa_phi_name, &repeated_op_name);
                         }
                         Use::InCondition(block_u) => {
-                            self.cfg.change_condition(block_u, phi, &same_v);
+                            self.cfg.change_condition(block_u, ssa_phi_name, &repeated_op_name);
                         }
                         Use::InMemoization(block_u) => {
-                            self.definitions[block_u].insert(name.to_string(), same_v.clone());
+                            self.definitions[block_u].insert(non_ssa_name.to_string(), repeated_op_name.clone());
                         }
                     }
                 }
             }
-            self.definitions[block].insert(name.to_string(), same_v);
-            self.values.remove(phi);
-            self.to_non_ssa.remove(phi);
+            self.definitions[block].insert(non_ssa_name.to_string(), repeated_op_name.clone());
+            let usage = Use::InMemoization(block);
+            self.uses.entry(repeated_op_name.clone()).or_default().insert(usage);
+
+            self.values.remove(ssa_phi_name);
+            self.to_non_ssa.remove(ssa_phi_name);
         }
-        //TODO: Case of same is None → Remove its users recursively
+        //TODO: Case of same is None is impossible?
+
         true
     }
 
@@ -264,11 +284,11 @@ impl<'a> CfgConstructor<'a> {
         curr
     }
 
-    fn track_use_declaration(&mut self, op: &Expression, dest: &str, block: usize) {
-        let usage = Use::InDeclaration(block, dest.to_string());
-        if let Expression::Atomic(Atomic::Variable(var)) = op {
+    fn track_use_declaration(&mut self, used: &Expression, user: &str, block: usize) {
+        let usage = Use::InDeclaration(block, user.to_string());
+        if let Expression::Atomic(Atomic::Variable(var)) = used {
             self.uses.entry(var.clone()).or_default().insert(usage);
-        } else if let Expression::Parameter(param) = op {
+        } else if let Expression::Parameter(param) = used {
             let mut track_atomic = |a: &Atomic| {
                 if let Atomic::Variable(var) = a {
                     self.uses.entry(var.clone()).or_default().insert(usage.clone());
@@ -292,11 +312,11 @@ impl<'a> CfgConstructor<'a> {
         }
     }
 
-    fn track_use_stmt(&mut self, op: &Expression, line: usize, block: usize) {
+    fn track_use_stmt(&mut self, used: &Expression, line: usize, block: usize) {
         let usage = Use::InStmt(block, line);
-        if let Expression::Atomic(Atomic::Variable(var)) = op {
+        if let Expression::Atomic(Atomic::Variable(var)) = used {
             self.uses.entry(var.clone()).or_default().insert(usage);
-        } else if let Expression::Parameter(param) = op {
+        } else if let Expression::Parameter(param) = used {
             let mut track_atomic = |a: &Atomic| {
                 if let Atomic::Variable(var) = a {
                     self.uses.entry(var.clone()).or_default().insert(usage.clone());
