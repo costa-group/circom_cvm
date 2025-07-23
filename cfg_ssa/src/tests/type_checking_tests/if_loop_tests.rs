@@ -10,6 +10,7 @@ mod if_loop_tests {
     fn test_simple_if_success() {
         let mut type_checker = TypeChecker::new();
         let node = ASTNode::IfThenElse {
+            num_type: NumericType::Integer,
             condition: Expression::Atomic(Atomic::Constant(ConstantType::I64(1))),
             if_case: vec![ASTNode::Operation {
                 num_type: Some(NumericType::FiniteField),

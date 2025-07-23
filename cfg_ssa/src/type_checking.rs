@@ -91,12 +91,11 @@ impl TypeChecker {
             ASTNode::Operation { num_type, operator, output, operands } => {
                 self.check_operation(num_type, operator, output, operands)
             },
-            ASTNode::IfThenElse { condition, if_case, else_case } => {
-                // TODO: Check if the condition is an integer, error otherwise?
-                // self.type_expression(condition)?;
-                // if self.type_expression(condition)? != Type::Variable(NumericType::Integer) {
-                //     return Err("Condition must be an integer".to_string());
-                // }
+            ASTNode::IfThenElse { num_type, condition, if_case, else_case } => {
+                self.type_expression(condition)?;
+                if self.type_expression(condition)? != Type::Variable(num_type.clone()) {
+                    return Err("Condition must be an integer".to_string());
+                }
 
                 // Create a new environment for the if-case
                 let if_case_env = HashMap::new();

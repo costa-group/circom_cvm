@@ -61,6 +61,7 @@ pub enum ASTNode {
         operands: Vec<Expression>,
     },
     IfThenElse {
+        num_type: NumericType,
         condition: Expression,
         if_case: Vec<ASTNode>,
         else_case: Option<Vec<ASTNode>>,

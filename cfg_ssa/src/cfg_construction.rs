@@ -263,7 +263,7 @@ impl<'a> CfgConstructor<'a> {
                     self.handle_operation(curr, num_type, operator, output, operands)
                 }
                 ASTNode::Loop { body: loop_body } => self.handle_loop(loop_body, curr),
-                ASTNode::IfThenElse { condition, if_case, else_case } => {
+                ASTNode::IfThenElse { num_type: _, condition, if_case, else_case } => {
                     let cond = self.read_expression(condition, curr);
                     self.track_use_condition(&cond, curr);
                     self.handle_if(&cond, if_case, else_case, curr, loop_blocks)
@@ -525,6 +525,7 @@ mod tests {
                     operands: vec![Expression::Atomic(Atomic::Constant(ConstantType::I64(1)))],
                 },
                 ASTNode::IfThenElse {
+                    num_type: NumericType::FiniteField,
                     condition: Expression::Atomic(Atomic::Variable("condition".to_string())),
                     if_case: vec![
                         ASTNode::Operation {
@@ -551,6 +552,7 @@ mod tests {
                             ],
                         },
                         ASTNode::IfThenElse {
+                            num_type: NumericType::FiniteField,
                             condition: Expression::Atomic(Atomic::Variable("loop_condition".to_string())),
                             if_case: vec![
                                 ASTNode::Operation {
