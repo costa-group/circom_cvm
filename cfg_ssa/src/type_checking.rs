@@ -204,13 +204,12 @@ impl TypeChecker {
                     Some(Operator::Call) => {
                         self.check_call(operator, operands, Some(NumericType::FiniteField))?;
                     }
-                    Some(Operator::Wrap) => {
-                        check_len(1)?;
-                        check_operand(0, NumericType::FiniteField)?;
-                        var_type = Type::Variable(NumericType::Integer);
-                    }
                     Some(Operator::Extend) => {
-                        return Err("Extend operator must have type Integer".to_string());
+                        check_len(1)?;
+                        check_operand(0, NumericType::Integer)?;
+                    }
+                    Some(Operator::Wrap) => {
+                        return Err("Wrap operator must have type Finite Field".to_string());
                     }
                     Some(Operator::GetSignal) | Some(Operator::GetCmpSignal) | Some(Operator::SetSignal)
                         | Some(Operator::SetCmpIn) | Some(Operator::SetCmpInCnt) | Some(Operator::SetCmpInRun)
@@ -230,9 +229,6 @@ impl TypeChecker {
                         ));
                     }
                     None => {
-                        if !matches!(operands.first(), Some(Expression::Atomic(Atomic::Constant(ConstantType::FF(_))))) {
-                            return Err("Operand must be a constant number in finite field for finite field assignment.".to_string());
-                        }
                     }
                 }
             }
@@ -263,14 +259,15 @@ impl TypeChecker {
                     Some(Operator::Call) => {
                         self.check_call(operator, operands, Some(NumericType::Integer))?;
                     }
-                    Some(Operator::Extend) => {
+                    Some(Operator::Wrap) => {
                         check_len(1)?;
-                        check_operand(0, NumericType::Integer)?;
-                        var_type = Type::Variable(NumericType::FiniteField);
+                        check_operand(0, NumericType::FiniteField)?;
                     }
-                    Some(Operator::Wrap) | Some(Operator::MStore) | Some(Operator::MStoreFromSignal)
+                    Some(Operator::Extend) | Some(Operator::MStore) | Some(Operator::MStoreFromSignal)
                     | Some(Operator::MStoreFromCmpSignal) => {
-                        return Err("Wrap operator must have type Finite Field".to_string());
+                        return Err(format!(
+                            "Operator {:?} must have type Finite Field", operator
+                        ));
                     }
                     Some(Operator::GetSignal) | Some(Operator::GetCmpSignal) | Some(Operator::SetSignal)
                         | Some(Operator::SetCmpIn) | Some(Operator::SetCmpInCnt) | Some(Operator::SetCmpInRun)
@@ -290,13 +287,7 @@ impl TypeChecker {
                         ));
                     }
                     None => {
-                        //Case x = i64.number
-                        if operands.len() != 1 {
-                            return Err("Assignment of an integer to a variable must only have one operand (the value).".to_string());
-                        }
-                        if !matches!(operands.first(), Some(Expression::Atomic(Atomic::Constant(ConstantType::I64(_))))) {
-                            return Err("Operand must be a constant integer for integer assignment.".to_string());
-                        }
+
                     }
                 }
             }
@@ -387,21 +378,33 @@ impl TypeChecker {
                         ));
                     },
                     None => {
-                        //Case x = y
                         if operands.len() != 1 {
-                            return Err("Assignment of a variable to another variable must only have one operand (the value).".to_string());
+                            return Err("Assignment of a variable or a constant to another variable must only have one operand (the value).".to_string());
                         }
-                        if let Some(Expression::Atomic(Atomic::Variable(variable))) = operands.first() {
-                            let input_type = self.type_enviroment.iter().rev()
-                                .find_map(|env| env.get(variable));
-                            var_type = input_type
-                                .ok_or(format!("Variable {} not found in environment", variable))?
-                                .clone();
-                            } else {
-                                return Err(format!(
-                                    "Operand {:?} must be a variable for variable assignment.",
-                                    operands.first()
-                                ));
+                        //Case x = constant
+                        //FF
+                        if let Some(Expression::Atomic(Atomic::Constant(ConstantType::FF(_)))) = operands.first() {
+                            var_type = Type::Variable(NumericType::FiniteField);
+                        }
+                        //I64
+                        else if let Some(Expression::Atomic(Atomic::Constant(ConstantType::I64(_)))) = operands.first() {
+                            var_type = Type::Variable(NumericType::Integer);
+                        }
+                        else {
+                            //If the operand is not a constant, it must be a variable
+                            //Case x = y
+                            if let Some(Expression::Atomic(Atomic::Variable(variable))) = operands.first() {
+                                let input_type = self.type_enviroment.iter().rev()
+                                    .find_map(|env| env.get(variable));
+                                var_type = input_type
+                                    .ok_or(format!("Variable {} not found in environment", variable))?
+                                    .clone();
+                                } else {
+                                    return Err(format!(
+                                        "Operand {:?} must be a variable for variable assignment.",
+                                        operands.first()
+                                    ));
+                            }
                         }
                     }
                 }

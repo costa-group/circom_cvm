@@ -63,8 +63,8 @@ fn parse_operator(input: &str) -> IResult<&str, Operator> {
         value(Operator::MStoreFromSignal, tag("mstore_from_signal")),
         value(Operator::MStoreFromCmpSignal, tag("mstore_from_cmp_signal")),
 
-        value(Operator::Extend, tag("extend_ff")),
-        value(Operator::Wrap, tag("wrap_i64")),
+        value(Operator::Extend, tag("extend_i64")),
+        value(Operator::Wrap, tag("wrap_ff")),
         value(Operator::MStore, tag("mstore")),
         value(Operator::Load, tag("load")),
         value(Operator::Store, tag("store")),
@@ -309,8 +309,8 @@ mod tests {
         assert_eq!(parse_operator("bxor"), Ok(("", Operator::BitXor)));
         assert_eq!(parse_operator("bnot"), Ok(("", Operator::BitNot)));
 
-        assert_eq!(parse_operator("extend_ff"), Ok(("", Operator::Extend)));
-        assert_eq!(parse_operator("wrap_i64"), Ok(("", Operator::Wrap)));
+        assert_eq!(parse_operator("extend_i64"), Ok(("", Operator::Extend)));
+        assert_eq!(parse_operator("wrap_ff"), Ok(("", Operator::Wrap)));
 
         assert_eq!(parse_operator("load"), Ok(("", Operator::Load)));
         assert_eq!(parse_operator("store"), Ok(("", Operator::Store)));
