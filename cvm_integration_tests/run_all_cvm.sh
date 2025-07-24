@@ -20,6 +20,7 @@ if [ ! -x "$BIN_PATH" ]; then
 fi
 
 # Create logs directory and clean previous failed log
+rm -rf "$LOG_DIR"
 mkdir -p "$LOG_DIR"
 
 # Counters

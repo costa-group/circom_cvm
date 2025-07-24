@@ -3,31 +3,25 @@ use crate::types::*;
 
 use std::collections::HashMap;
 
-type Stack<T> = Vec<T>;
-
 #[derive(Debug, Clone)]
 pub struct TypeChecker {
     // Crate public to allow testing
-    pub(crate) type_enviroment: Stack<HashMap<String, Type>>,
+    pub(crate) variables_enviroment: HashMap<String, Type>,
+    pub(crate) functions_enviroment: HashMap<String, Type>,
 }
 
 impl TypeChecker {
     pub fn new() -> Self {
-        // Initialize the type environment with a new stack
-        // and push an empty environment onto the stack
-        // This will be the main environment where all global variables are stored
-        let mut enviroment = Stack::new();
-        enviroment.push(HashMap::new());
         Self {
-            type_enviroment: enviroment,
+            variables_enviroment: HashMap::new(),
+            functions_enviroment: HashMap::new()
         }
     }
 
     pub fn check(&mut self, ast: &AST) -> Result<(), String> {
         //Add functions to the enviroment
         for function in &ast.functions {
-            self.type_enviroment.last_mut()
-                .ok_or("No main enviroment created")?
+            self.functions_enviroment
                 .insert(function.name.clone(), Type::Function(function.output.clone(), function.inputs.clone()));
         }
 
@@ -45,32 +39,23 @@ impl TypeChecker {
     }
 
     fn check_template(&mut self, template: &Template) -> Result<(), String> {
-        // Create a new environment for the template
-        let template_env = HashMap::new();
-
-        // Push the new environment onto the stack
-        self.type_enviroment.push(template_env);
-
         // Check the body of the template
         for node in &template.body {
             self.check_node(node)?;
         }
 
-        // Pop the environment after checking the template
-        self.type_enviroment.pop();
+        // Clear the environment after checking the template
+        self.variables_enviroment.clear();
 
         Ok(())
     }
 
     fn check_function(&mut self, function: &Function) -> Result<(), String> {
-        // Function enviroment
-        self.type_enviroment.push(HashMap::new());
-
         for node in &function.body {
             self.check_node(node)?;
         }
 
-        self.type_enviroment.pop();
+        self.variables_enviroment.clear();
 
         Ok(())
     }
@@ -87,34 +72,24 @@ impl TypeChecker {
                     return Err("Condition must be an integer".to_string());
                 }
 
-                // Create a new environment for the if-case
-                let if_case_env = HashMap::new();
-                self.type_enviroment.push(if_case_env);
                 for inner_node in if_case {
                     self.check_node(inner_node)?;
                 }
-                self.type_enviroment.pop();
 
                 // Check the else-case if it exists
                 // Create a new environment for the else-case
                 if let Some(else_case) = else_case {
-                    let else_case_env = HashMap::new();
-                    self.type_enviroment.push(else_case_env);
                     for inner_node in else_case {
                         self.check_node(inner_node)?;
                     }
-                    self.type_enviroment.pop();
                 }
 
                 Ok(())
             }
             ASTNode::Loop { body } => {
-                let loop_env = HashMap::new();
-                self.type_enviroment.push(loop_env);
                 for inner_node in body {
                     self.check_node(inner_node)?;
                 }
-                self.type_enviroment.pop();
                 Ok(())
             }
             ASTNode::Break | ASTNode::Continue => {
@@ -391,15 +366,16 @@ impl TypeChecker {
                             //If the operand is not a constant, it must be a variable
                             //Case x = y
                             if let Some(Expression::Atomic(Atomic::Variable(variable))) = operands.first() {
-                                let input_type = self.type_enviroment.iter().rev()
-                                    .find_map(|env| env.get(variable));
+
+                                let input_type = self.variables_enviroment.get(variable);
+
                                 var_type = input_type
                                     .ok_or(format!("Variable {} not found in environment", variable))?
                                     .clone();
-                                } else {
+                            } else {
                                     return Err(format!(
-                                        "Operand {:?} must be a variable for variable assignment.",
-                                        operands.first()
+                                            "Operand {:?} must be a variable for variable assignment.",
+                                            operands.first()
                                     ));
                             }
                         }
@@ -409,12 +385,7 @@ impl TypeChecker {
         }
 
         if let Some(o) = output {
-            if let Some(env) = self.type_enviroment.last_mut() {
-                env.insert(o.clone(), var_type);
-            }
-            else {
-                return Err("No enviroment found".to_string());
-            }
+            self.variables_enviroment.insert(o.clone(), var_type);
         }
         Ok(())
     }
@@ -433,8 +404,8 @@ impl TypeChecker {
             let name = &name[1..];
 
             //Find the function in the environment
-            let function_type = self.type_enviroment.iter().rev()
-                .find_map(|env| env.get(name))
+            let function_type = self.functions_enviroment
+                .get(name)
                 .ok_or(format!("Function {} not found in environment", name))?;
             if let Type::Function(output_type, input_types) = function_type {
                 // Check if the number of operands matches the number of input types
@@ -515,7 +486,7 @@ impl TypeChecker {
             }
             Expression::Atomic(Atomic::Variable(variable)) => {
                 // Check if the variable is in the environment
-                if let Some(ty) = self.type_enviroment.iter().rev().find_map(|env| env.get(variable)) {
+                if let Some(ty) = self.variables_enviroment.get(variable) {
                     Ok(ty.clone())
                 } else {
                     Err(format!("Variable {} not found in environment", variable))

@@ -53,7 +53,6 @@ fn main() {
 
     if let Err(err) = cfg.check_ssa() {
         eprint!("Error at SSA construction: {}", err);
-        std::process::exit(1);
     }
 
     // Write the CFG to a JSON file

@@ -67,7 +67,7 @@ mod if_loop_tests {
                 ],
             }],
         };
-        type_checker.type_enviroment.last_mut().unwrap().insert(
+        type_checker.variables_enviroment.insert(
             "counter".to_string(),
             Type::Variable(NumericType::Integer),
         );
