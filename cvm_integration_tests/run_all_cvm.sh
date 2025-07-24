@@ -4,7 +4,6 @@ SEARCH_DIR="$1"
 BINARY_NAME="cvm_integration_tests"
 BIN_PATH="target/debug/$BINARY_NAME"
 LOG_DIR="logs"
-FAILED_LOG="$LOG_DIR/failed.log"
 
 if [ -z "$SEARCH_DIR" ]; then
   echo "Usage: $0 <directory>"
@@ -22,20 +21,34 @@ fi
 
 # Create logs directory and clean previous failed log
 mkdir -p "$LOG_DIR"
-> "$FAILED_LOG"
+
+# Counters
+total=0
+passed=0
 
 # Run on each .cvm file
-find "$SEARCH_DIR" -type f -name "*.cvm" | while read -r file; do
+while read -r file; do
+  ((total++))
   base_name=$(basename "$file" .cvm)
   log_file="$LOG_DIR/${base_name}.log"
 
-  "$BIN_PATH" "$file" > "$log_file" 2>&1
+  # Run and capture output to a temporary file
+  tmp_log=$(mktemp)
+  "$BIN_PATH" "$file" > "$tmp_log" 2>&1
 
   # Check if log starts with "Error"
-  if head -n 1 "$log_file" | grep -q '^Error'; then
+  if head -n 1 "$tmp_log" | grep -q '^Error'; then
     echo "❌ $file → error (see $log_file)"
-    echo "$file" >> "$FAILED_LOG"
+    mv "$tmp_log" "$log_file"
   else
-    echo "✅ $file → ok (see $log_file)"
+    echo "✅ $file → ok"
+    ((passed++))
+    rm -f "$tmp_log"
   fi
-done
+done < <(find "$SEARCH_DIR" -type f -name "*.cvm" | sort)
+
+# Final summary
+echo "======================================"
+echo "Finished running $total test(s)."
+echo "✅ Passed: $passed"
+echo "❌ Failed: $((total - passed))"

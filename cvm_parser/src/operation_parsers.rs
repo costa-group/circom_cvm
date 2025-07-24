@@ -15,7 +15,7 @@ use nom::{
     IResult, Parser,
 };
 
-fn parse_numeric_type(input: &str) -> IResult<&str, NumericType> {
+pub fn parse_numeric_type(input: &str) -> IResult<&str, NumericType> {
     alt((value(NumericType::Integer, tag("i64")), value(NumericType::FiniteField, tag("ff"))))
         .parse(input)
 }
@@ -70,6 +70,8 @@ fn parse_operator(input: &str) -> IResult<&str, Operator> {
         value(Operator::Store, tag("store")),
         value(Operator::Return, tag("return")),
         value(Operator::Call, tag("call")),
+        value(Operator::MReturn, tag("mreturn")),
+        value(Operator::MCall, tag("mcall")),
         value(Operator::Error, tag("error")),
 
 
@@ -357,6 +359,8 @@ mod tests {
 
         assert_eq!(parse_operator("return"), Ok(("", Operator::Return)));
         assert_eq!(parse_operator("call"), Ok(("", Operator::Call)));
+        assert_eq!(parse_operator("mreturn"), Ok(("", Operator::MReturn)));
+        assert_eq!(parse_operator("mcall"), Ok(("", Operator::MCall)));
         assert_eq!(parse_operator("error"), Ok(("", Operator::Error)));
 
         assert!(parse_operator("unknown").is_err());

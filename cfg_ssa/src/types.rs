@@ -13,7 +13,8 @@ pub enum NumericType {
 pub enum Type {
     //TODO: Change in the future, identifiers are not i64 (cannot be used to sum)
     Variable(NumericType),
-    Function(Vec<NumericType>, Vec<NumericType>),
+    /// Type of the output and type of the inputs
+    Function(Option<NumericType>, Vec<(NumericType, Vec<usize>)>),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -89,8 +90,10 @@ pub enum Operator {
     MSetCmpInFromMemoryCntCheck,
 
     //Functions
-    Return,
     Call,
+    MCall,
+    Return,
+    MReturn,
 
     //Templates
     GetTemplateId,

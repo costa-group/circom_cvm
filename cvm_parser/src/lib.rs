@@ -8,7 +8,7 @@ use nom::{
         streaming::space1,
     },
     combinator::{complete, cut, eof, map, opt, peek, recognize, value},
-    multi::{many0, many_till, separated_list0,},
+    multi::{count, many0, many_till, separated_list0},
     sequence::{
         delimited, pair, preceded,
     },
@@ -20,7 +20,7 @@ mod initial_parsers;
 mod operation_parsers;
 use initial_parsers::*;
 use num_bigint::BigInt;
-use operation_parsers::{parse_expression, parse_operation};
+use operation_parsers::{parse_expression, parse_operation, parse_numeric_type};
 
 fn parse_variable_name(input: &str) -> IResult<&str, String> {
     recognize(
@@ -104,8 +104,18 @@ fn parse_id_name(input: &str) -> Result<usize, nom::Err<nom::error::Error<&str>>
     Ok(id)
 }
 
-fn parse_local_memory(input: &str) -> IResult<&str, usize> {
-    preceded(tag("local.memory"), preceded(space0, usize)).parse(input)
+fn parse_function_input(input: &str) -> IResult<&str, (NumericType, Vec<usize>)> {
+    let (input, (in_type, _, n)) = (parse_numeric_type, space1, usize).parse(input)?;
+    let (input, dims) = count(
+        preceded(space1, usize),
+        n,
+    ).parse(input)?;
+
+    Ok((input, (in_type, dims)))
+}
+
+fn parse_function_inputs(input: &str) -> IResult<&str, Vec<(NumericType, Vec<usize>)>> {
+    separated_list0(space1, parse_function_input).parse(input)
 }
 
 fn parse_function(input: &str) -> IResult<&str, Function> {
@@ -121,28 +131,33 @@ fn parse_function(input: &str) -> IResult<&str, Function> {
         Err(_) => return Err(nom::Err::Failure(nom::error::Error::new(input, nom::error::ErrorKind::Fail))),
     };
 
-    let (input, outputs) = delimited(tag("["),
-    delimited(space0, separated_list0(space1, alphanumeric1), space0), 
-    tag("]")).parse(input)?;
-    let outputs = outputs.iter().map(|x| x.to_string()).collect();
+    //Parse output type
+    let (input, output) = delimited(
+        (tag("["), space0),
+            alt((
+                map(parse_numeric_type, Some),
+                value(None, tag("")),
+            )),
+        (space0, tag("]"))
+    ).parse(input)?;
+    
     let (input, _) = space0(input)?;
 
-    let (input, inputs) = delimited(tag("["),
-    delimited(space0, separated_list0(space1, alphanumeric1), space0), 
-    tag("]")).parse(input)?;
-    let inputs = inputs.iter().map(|x| x.to_string()).collect();
+    //Parse inputs types
+    let (input, inputs) = delimited(
+        (tag("["), space0),
+    parse_function_inputs, 
+    (space0, tag("]")),
+    ).parse(input)?;
     let (input, _) = parse_useless(input)?;
-
-    let (input, local_memory) = parse_local_memory(input)?;
 
     let (input, (body, _)) = many_till(parse_ast_node, alt((peek(eof), peek(tag("%%"))))).parse(input)?;
 
     Ok((input, Function {
         id,
         name,
-        outputs,
+        output,
         inputs,
-        memory_size: local_memory,
         body,
     }))
 }
@@ -404,13 +419,40 @@ mod tests {
 
     #[test]
     fn test_parse_function() {
-        let input = "%%function my_function_0 [output1 output2] [input1 input2]\nlocal.memory 10\n  ;; body\n x = ff.add y z\n\n";
+        let input = "%%function my_function_0 [ff] [ff 1 1 i64 0]\n\n  ;; body\n x = ff.add y z\n\n";
         let expected = Function {
             id: 0,
             name: "my_function_0".to_string(),
-            outputs: vec!["output1".to_string(), "output2".to_string()],
-            inputs: vec!["input1".to_string(), "input2".to_string()],
-            memory_size: 10,
+            output: Some(NumericType::FiniteField),
+            inputs: vec![
+                (NumericType::FiniteField, vec![1]),
+                (NumericType::Integer, vec![]),
+            ],
+            body: vec![ASTNode::Operation {
+                num_type: Some(NumericType::FiniteField),
+                operator: Some(Operator::Add),
+                output: Some("x".to_string()),
+                operands: vec![
+                    Expression::Atomic(Atomic::Variable("y".to_string())),
+                    Expression::Atomic(Atomic::Variable("z".to_string())),
+                ],
+            }],
+        };
+        assert_eq!(parse_function(input), Ok(("", expected)));
+    }
+
+    #[test]
+    fn test_parse_function2() {
+        let input = "%%function POSEIDON_C_0 [] [ i64 0 i64 0 ff 0 ]\n\n  ;; body\n x = ff.add y z\n\n";
+        let expected = Function {
+            id: 0,
+            name: "POSEIDON_C_0".to_string(),
+            output: None,
+            inputs: vec![
+                (NumericType::Integer, vec![]),
+                (NumericType::Integer, vec![]),
+                (NumericType::FiniteField, vec![]),
+            ],
             body: vec![ASTNode::Operation {
                 num_type: Some(NumericType::FiniteField),
                 operator: Some(Operator::Add),

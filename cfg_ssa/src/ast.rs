@@ -25,20 +25,9 @@ pub struct AST {
 pub struct Function {
     pub id: usize,
     pub name: String,
-    pub inputs: Vec<String>,
-    pub outputs: Vec<String>,
-    pub memory_size: usize,
+    pub inputs: Vec<(NumericType, Vec<usize>)>,
+    pub output: Option<NumericType>,
     pub body: Vec<ASTNode>,
-}
-
-impl Function {
-    //TODO
-    pub fn get_input_types(&self) -> Vec<NumericType> {
-        self.inputs.iter().map(|_| NumericType::Integer).collect()
-    }
-    pub fn get_output_types(&self) -> Vec<NumericType> {
-        self.outputs.iter().map(|_| NumericType::Integer).collect()
-    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -24,11 +24,15 @@ impl TypeChecker {
     }
 
     pub fn check(&mut self, ast: &AST) -> Result<(), String> {
-        // Check all functions
+        //Add functions to the enviroment
         for function in &ast.functions {
             self.type_enviroment.last_mut()
                 .ok_or("No main enviroment created")?
-                .insert(function.name.clone(), Type::Function(function.get_input_types(), function.get_output_types()));
+                .insert(function.name.clone(), Type::Function(function.output.clone(), function.inputs.clone()));
+        }
+
+        // Check all functions
+        for function in &ast.functions {
             self.check_function(function)?;
         }
 
@@ -59,22 +63,8 @@ impl TypeChecker {
     }
 
     fn check_function(&mut self, function: &Function) -> Result<(), String> {
-        let mut function_env = HashMap::new();
-
-        for (input, input_type) in function.inputs.iter().zip(function.get_input_types()) {
-            function_env.insert(input.clone(), Type::Variable(input_type));
-        }
-
-        for (output, output_type) in function.outputs.iter().zip(function.get_output_types()) {
-            function_env.insert(output.clone(), Type::Variable(output_type));
-        }
-
-        // Add the predefined registers
-        // TODO: Move this to the creation of the function?
-        function_env.insert("destination".to_string(), Type::Variable(NumericType::Integer));
-        function_env.insert("destination_size".to_string(), Type::Variable(NumericType::Integer));
-
-        self.type_enviroment.push(function_env);
+        // Function enviroment
+        self.type_enviroment.push(HashMap::new());
 
         for node in &function.body {
             self.check_node(node)?;
@@ -195,13 +185,15 @@ impl TypeChecker {
                         check_operand(0, NumericType::Integer)?;
                         check_operand(1, NumericType::FiniteField)?;
                     }
-                    Some(Operator::MStore) | Some(Operator::MStoreFromSignal) | Some(Operator::MStoreFromCmpSignal) => {
+                    Some(Operator::MStore) | Some(Operator::MStoreFromSignal) | Some(Operator::MStoreFromCmpSignal)
+                        | Some(Operator::MReturn)
+                    => {
                         check_len(3)?;
                         check_operand(0, NumericType::Integer)?;
                         check_operand(1, NumericType::Integer)?;
                         check_operand(2, NumericType::Integer)?;
                     }
-                    Some(Operator::Call) => {
+                    Some(Operator::Call) | Some(Operator::MCall) => {
                         self.check_call(operator, operands, Some(NumericType::FiniteField))?;
                     }
                     Some(Operator::Extend) => {
@@ -229,6 +221,9 @@ impl TypeChecker {
                         ));
                     }
                     None => {
+                        return Err(format!(
+                            "No operator given for type Finite Field"
+                        ));
                     }
                 }
             }
@@ -256,12 +251,18 @@ impl TypeChecker {
                         check_len(1)?;
                         check_operand(0, NumericType::Integer)?;
                     }
-                    Some(Operator::Call) => {
+                    Some(Operator::Call) | Some(Operator::MCall) => {
                         self.check_call(operator, operands, Some(NumericType::Integer))?;
                     }
                     Some(Operator::Wrap) => {
                         check_len(1)?;
                         check_operand(0, NumericType::FiniteField)?;
+                    }
+                    Some(Operator::MReturn) => {
+                        check_len(3)?;
+                        check_operand(0, NumericType::Integer)?;
+                        check_operand(1, NumericType::Integer)?;
+                        check_operand(2, NumericType::Integer)?;
                     }
                     Some(Operator::Extend) | Some(Operator::MStore) | Some(Operator::MStoreFromSignal)
                     | Some(Operator::MStoreFromCmpSignal) => {
@@ -287,7 +288,9 @@ impl TypeChecker {
                         ));
                     }
                     None => {
-
+                        return Err(format!(
+                            "No operator given for type Integer"
+                        ));
                     }
                 }
             }
@@ -353,14 +356,6 @@ impl TypeChecker {
                         check_operand(1, NumericType::Integer)?;
                         var_type = Type::Variable(NumericType::Integer);
                     }
-                    Some(Operator::Call) => {
-                        self.check_call(operator, operands, None)?;
-                    }
-                    Some(Operator::Return) => {
-                        check_len(2)?;
-                        check_operand(0, NumericType::Integer)?;
-                        check_operand(1, NumericType::Integer)?;
-                    }
                     Some(Operator::Add) | Some(Operator::Sub) | Some(Operator::Mul)
                     | Some(Operator::Div) | Some(Operator::Rem) | Some(Operator::IDiv)
                     | Some(Operator::Pow) | Some(Operator::Greater) | Some(Operator::GreaterEqual)
@@ -371,6 +366,8 @@ impl TypeChecker {
                     | Some(Operator::BitNot) | Some(Operator::Extend) | Some(Operator::Wrap)
                     | Some(Operator::Load) | Some(Operator::Store) | Some(Operator::MStore)
                     | Some(Operator::MStoreFromSignal) | Some(Operator::MStoreFromCmpSignal)
+                    | Some(Operator::Call) | Some(Operator::MCall)
+                    | Some(Operator::Return) | Some(Operator::MReturn)
                     => {
                     return Err(format!(
                                 "Operator {:?} requires a numeric type, but none was provided.",
@@ -422,8 +419,8 @@ impl TypeChecker {
         Ok(())
     }
 
-    fn check_call(&mut self, operator: &Option<Operator>, operands: &[Expression], expected_type: Option<NumericType>) -> Result<(), String> {
-        if !operands.is_empty() {
+    fn check_call(&mut self, operator: &Option<Operator>, operands: &[Expression], expected_call_type: Option<NumericType>) -> Result<(), String> {
+        if operands.is_empty() {
             return Err(format!(
                     "Operator {:?} requires at least a function to call, but none was provided.",
                     operator,
@@ -439,7 +436,7 @@ impl TypeChecker {
             let function_type = self.type_enviroment.iter().rev()
                 .find_map(|env| env.get(name))
                 .ok_or(format!("Function {} not found in environment", name))?;
-            if let Type::Function(input_types, output_types) = function_type {
+            if let Type::Function(output_type, input_types) = function_type {
                 // Check if the number of operands matches the number of input types
                 // The first operand is the function name, so we skip it
                 if input_types.len() != operands.len() - 1 {
@@ -454,7 +451,8 @@ impl TypeChecker {
                 // Check if the types of the operands match the types of the inputs
                 // The first operand is the function name, so we skip it
                 for (operand, param) in operands.iter().skip(1).zip(input_types) {
-                    if self.type_expression(operand)? != Type::Variable(param.clone()) {
+                    //TODO: Properly check the parameters
+                    if self.type_expression(operand)? != Type::Variable(param.0.clone()) {
                         return Err(format!(
                                 "Operand {:?} does not match the required type {:?}.",
                                 operand,
@@ -462,38 +460,34 @@ impl TypeChecker {
                         ));
                     }
                 }
-                if output_types.len() != 1 {
-                    //TODO: Implement
-                    return Err(format!(
-                            "Functions that output more than one thing are not implemented: {}.",
-                            name,
-                    ));
-                }
 
-                // Check if the output type matches the expected type
-                if let Some(output_type) = output_types.first() {
-                    if let Some(expected) = expected_type {
-                        //Output type in definition and in call, but not equal
-                        if *output_type != expected {
+                // Check if the output type matches the expected type.
+                // Only do this if the operator is a normal call, not a Memory Call
+                if let Some(Operator::Call) = operator {
+                    if let Some(output_type) = output_type {
+                        if let Some(expected) = expected_call_type {
+                            //Output type in definition and in call, but not equal
+                            if *output_type != expected {
+                                return Err(format!(
+                                        "Function {} must output a {:?}, but call expects {:?}.",
+                                        name, output_type, expected
+                                ));
+                            }
+                        } else {
+                            //Output type in definition, but not in call
                             return Err(format!(
-                                    "Function {} must output a {:?}, but it does not.",
-                                    name, expected
+                                    "Function {} must output a {:?}, but call expects none.",
+                                    name, output_type
                             ));
                         }
-                    } else {
-                        //Output type in definition, but not in call
+                    }
+                    else if let Some(expected) = expected_call_type {
+                        //Output type in call, but not in definition
                         return Err(format!(
-                                "Function {} must output a type, but none was provided.",
-                                name
+                                "Function {} call expects {:?}, but it must not.",
+                                name, expected
                         ));
                     }
-                }
-                else if let Some(expected) = expected_type {
-                    //Output type in call, but not in definition
-                    return Err(format!(
-                            "Function {} must output a {:?}, but it does not.",
-                            name, expected
-                    ));
                 }
             } else {
                 //The first operand is not an identifier of a function
@@ -527,6 +521,7 @@ impl TypeChecker {
                     Err(format!("Variable {} not found in environment", variable))
                 }
             }
+            //TODO: Properly check the parameters
             Expression::Parameter(parameter) => {
                 match parameter {
                     Parameter::I64Memory { index: _, size: _ } => {

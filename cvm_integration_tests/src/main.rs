@@ -6,17 +6,20 @@ use cfg_ssa::type_checking::TypeChecker;
 use cfg_ssa::CFGList;
 
 fn main() {
-    // Get the command-line arguments
-    let args: Vec<String> = env::args().collect();
-    // let default_file_path = "/home/mario/compilados/sum_test_cvm/sum_test.cvm".to_string();
+    // One case
+    // let default_file_path = "".to_string();
     // let file_path = &default_file_path;
 
+    // General
+    let args: Vec<String> = env::args().collect();
     if args.len() != 2 {
         eprintln!("Usage: {} <file.cvm>", args[0]);
         std::process::exit(1);
     }
-    
     let file_path = &args[1];
+
+
+
     let file_no_suffix = file_path.strip_suffix(".cvm").unwrap_or(file_path);
 
     // Read the .cvm file
