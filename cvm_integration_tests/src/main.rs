@@ -52,7 +52,7 @@ fn main() {
     let cfg = CFGList::new(parsed_program);
 
     if let Err(err) = cfg.check_ssa() {
-        eprint!("Error at SSA construction: {}", err);
+        eprintln!("Error at SSA construction: {}", err);
     }
 
     // Write the CFG to a JSON file
