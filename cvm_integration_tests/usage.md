@@ -1,11 +1,11 @@
 # Usage of this tests
 ## Run a single cvm file
 To run a single file there are two options.
-- With `cargo` is as simple as executing inside the project folder:
+- With `cargo` is as simple as executing the following inside the project folder:
 ```
 cargo run -p cvm_integration_tests <route/to/the/file.cvm>
 ```
-- Compiling and the running the main file of the crate `cvm_integration_tests`
+- Compiling and running the main file of the crate `cvm_integration_tests`
     using as argument the route to the cvm file.
 
 ## Run a folder with multiple cvm files
@@ -18,6 +18,7 @@ script (`cvm_integration_tests/run_all_cvm.sh`) that works as follows:
 3. Once executed it will print which files where successfully compiled and which
    ones were not. Furthermore, it will create a `logs/` folder with the
    information about the files which failed in its compilation.
+
 The execution command is:
 ```
 bash cvm_integration_tests/run_all_cvm.sh <route/to/the/folder/>
