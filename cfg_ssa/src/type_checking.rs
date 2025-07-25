@@ -399,21 +399,18 @@ impl TypeChecker {
         }
 
         // Check if the first operand is a function name
-        if let Some(Expression::Atomic(Atomic::Variable(name))) = operands.first() {
-            //TODO: Remove the first character of the name (which is a '$')?
-            let name = &name[1..];
-
+        if let Some(Expression::Atomic(Atomic::Function(fun_name))) = operands.first() {
             //Find the function in the environment
             let function_type = self.functions_enviroment
-                .get(name)
-                .ok_or(format!("Function {} not found in environment", name))?;
+                .get(fun_name)
+                .ok_or(format!("Function {} not found in environment", fun_name))?;
             if let Type::Function(output_type, input_types) = function_type {
                 // Check if the number of operands matches the number of input types
                 // The first operand is the function name, so we skip it
                 if input_types.len() != operands.len() - 1 {
                     return Err(format!(
                             "Function {} requires {} inputs, but {} were provided.",
-                            name,
+                            fun_name,
                             input_types.len(),
                             operands.len() - 1
                     ));
@@ -441,14 +438,14 @@ impl TypeChecker {
                             if *output_type != expected {
                                 return Err(format!(
                                         "Function {} must output a {:?}, but call expects {:?}.",
-                                        name, output_type, expected
+                                        fun_name, output_type, expected
                                 ));
                             }
                         } else {
                             //Output type in definition, but not in call
                             return Err(format!(
                                     "Function {} must output a {:?}, but call expects none.",
-                                    name, output_type
+                                    fun_name, output_type
                             ));
                         }
                     }
@@ -456,13 +453,13 @@ impl TypeChecker {
                         //Output type in call, but not in definition
                         return Err(format!(
                                 "Function {} call expects {:?}, but it must not.",
-                                name, expected
+                                fun_name, expected
                         ));
                     }
                 }
             } else {
                 //The first operand is not an identifier of a function
-                return Err(format!("{} is not a function", name));
+                return Err(format!("{} is not a function", fun_name));
             }
         }
         else {
@@ -490,6 +487,14 @@ impl TypeChecker {
                     Ok(ty.clone())
                 } else {
                     Err(format!("Variable {} not found in environment", variable))
+                }
+            }
+            Expression::Atomic(Atomic::Function(function)) => {
+                // Check if the function is in the environment
+                if let Some(ty) = self.functions_enviroment.get(function) {
+                    Ok(ty.clone())
+                } else {
+                    Err(format!("Function {} not found in environment", function))
                 }
             }
             //TODO: Properly check the parameters

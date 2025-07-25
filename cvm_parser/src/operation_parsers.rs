@@ -3,7 +3,7 @@ use cfg_ssa::{
     types::{Atomic, ConstantType, Expression, NumericType, Operator, Parameter},
 };
 use num_bigint::BigInt;
-use crate::parse_variable_name;
+use crate::{parse_variable_name, parse_function_name};
 
 use nom::{
     branch::alt,
@@ -120,7 +120,12 @@ fn parse_constant(input: &str) -> IResult<&str, ConstantType> {
 }
 
 fn parse_atomic(input: &str) -> IResult<&str, Atomic> {
-    alt((map(parse_constant, Atomic::Constant), map(parse_variable_name, Atomic::Variable))).parse(input)
+    alt((
+        map(parse_constant, Atomic::Constant),
+        map(parse_variable_name, Atomic::Variable),
+        map(parse_function_name, Atomic::Function),
+    ))
+    .parse(input)
 }
 
 //TODO: This probably is suppossed to be a pair Atomic and list of Atomics
@@ -509,7 +514,7 @@ mod tests {
                     operator: Some(Operator::Call),
                     output: None,
                     operands: vec![
-                        Expression::Atomic(Atomic::Variable("$foo".to_string())),
+                        Expression::Atomic(Atomic::Function("foo".to_string())),
                         Expression::Atomic(Atomic::Variable("y".to_string())),
                         Expression::Parameter(Parameter::Signal {
                             index: Atomic::Variable("s".to_string()),
@@ -551,7 +556,7 @@ mod tests {
                 operator: Some(Operator::Call),
                 output: Some("x".to_string()),
                 operands: vec![
-                Expression::Atomic(Atomic::Variable("$foo".to_string())),
+                Expression::Atomic(Atomic::Function("foo".to_string())),
                 Expression::Atomic(Atomic::Variable("y".to_string())),
                 Expression::Parameter(Parameter::Signal {
                     index: Atomic::Variable("s".to_string()),

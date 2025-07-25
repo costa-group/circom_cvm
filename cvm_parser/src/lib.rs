@@ -25,9 +25,17 @@ use operation_parsers::{parse_expression, parse_operation, parse_numeric_type};
 fn parse_variable_name(input: &str) -> IResult<&str, String> {
     recognize(
         pair(
-            satisfy(|c| c.is_ascii_alphabetic() || c == '_' || c == '$'),
+            satisfy(|c| c.is_ascii_alphabetic() || c == '_'),
             many0(satisfy(|c| c.is_ascii_alphanumeric() || c == '_'))
         )
+    ).parse(input)
+    .map(|(remain, var)| (remain, var.to_string()))
+}
+
+fn parse_function_name(input: &str) -> IResult<&str, String> {
+    preceded(
+        satisfy(|c| c == '$'),
+        recognize(many0(satisfy(|c| c.is_ascii_alphanumeric() || c == '_')))
     ).parse(input)
     .map(|(remain, var)| (remain, var.to_string()))
 }
@@ -331,10 +339,16 @@ mod tests {
     #[test]
     fn test_parse_variable_name() {
         assert_eq!(parse_variable_name("_var1"), Ok(("", "_var1".to_string())));
-        assert_eq!(parse_variable_name("$var2"), Ok(("", "$var2".to_string())));
         assert_eq!(parse_variable_name("var3"), Ok(("", "var3".to_string())));
         assert_eq!(parse_variable_name("var"), Ok(("", "var".to_string())));
         assert!(parse_variable_name("1var").is_err());
+    }
+
+    #[test]
+    fn test_parse_function_name() {
+        assert_eq!(parse_function_name("$func1"), Ok(("", "func1".to_string())));
+        assert!(parse_function_name("1func").is_err());
+        assert!(parse_function_name("func").is_err());
     }
 
     #[test]

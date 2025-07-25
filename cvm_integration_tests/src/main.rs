@@ -71,6 +71,6 @@ fn main() {
             std::process::exit(1);
         }
     }
-
+    
     println!("CFGList successfully written to {}", json_output_path);
 }

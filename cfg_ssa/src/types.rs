@@ -132,6 +132,7 @@ impl fmt::Debug for ConstantType {
 pub enum Atomic {
     Constant(ConstantType),
     Variable(String),
+    Function(String),
 }
 
 impl fmt::Debug for Atomic {
@@ -139,6 +140,7 @@ impl fmt::Debug for Atomic {
         match self {
             Atomic::Constant(constant) => write!(f, "{:?}", constant),
             Atomic::Variable(var) => write!(f, "{}", var),
+            Atomic::Function(fun) => write!(f, "${}", fun),
         }
     }
 }
@@ -189,6 +191,9 @@ pub fn get_variable_names(expression: &Expression) -> Vec<String> {
     match expression {
         Expression::Atomic(atomic) => match atomic {
             Atomic::Variable(name) => vec![name.clone()],
+            //TODO: I don't add them to the vector because they are not ssa variables in the same
+            //sense as the rest of the variables. Maybe should be changed.
+            Atomic::Function(name) => vec![],
             Atomic::Constant(_) => vec![],
         },
         Expression::Parameter(parameter) => match parameter {

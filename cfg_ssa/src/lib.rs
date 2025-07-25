@@ -478,8 +478,8 @@ impl CFGList {
     #[deprecated(note = "This function is only for debugging purposes!")]
     #[doc(hidden)]
     pub fn check_ssa(&self) -> Result<(), String> {
-        for cfg in &self.cfgs {
-            cfg.check_ssa()?;
+        for (i, cfg) in self.cfgs.iter().enumerate() {
+            cfg.check_ssa().map_err(|e| format!("cfg[{}] failed SSA check: {}", i, e))?;
         }
         Ok(())
     }
