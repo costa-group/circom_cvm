@@ -121,24 +121,31 @@ pub enum Successor {
     },
 }
 
+#[derive(Debug, Clone, Serialize)]
+struct PositionDeclaration {
+    is_phi: bool,
+    line: usize,
+}
+
 #[derive(Debug, Serialize)]
 pub struct BasicBlock {
     id: usize,
-    statements: Vec<Statement>,
     phi_functions: Vec<PhiFunction>,
+    statements: Vec<Statement>,
     predecessors: Vec<usize>,
     successors: Option<Successor>,
     ///Whether a variable is declared as a phi function and its position in the list of phi
     ///functions or statements accordingly
-    declarations: HashMap<String, (bool, usize)>,
+    //TODO: Maybe search directly in the vectors if they are usually small?
+    declarations: HashMap<String, PositionDeclaration>,
 }
 
 impl BasicBlock {
     pub fn new(id: usize) -> Self {
         Self {
             id,
-            statements: Vec::new(),
             phi_functions: Vec::new(),
+            statements: Vec::new(),
             predecessors: Vec::new(),
             successors: None,
             declarations: HashMap::new(),
@@ -146,25 +153,25 @@ impl BasicBlock {
     }
 
     fn add_phi_function(&mut self, phi: PhiFunction) {
-        self.declarations.insert(phi.output.clone(), (true, self.phi_functions.len()));
+        self.declarations.insert(phi.output.clone(), PositionDeclaration { is_phi: true, line: self.phi_functions.len() });
         self.phi_functions.push(phi);
     }
 
     fn add_instruction(&mut self, stmt: Statement) {
         if let Some(output) = &stmt.output {
-            self.declarations.insert(output.clone(), (false, self.statements.len()));
+            self.declarations.insert(output.clone(), PositionDeclaration { is_phi: false, line: self.statements.len() });
         }
         self.statements.push(stmt);
     }
 
     fn change_declaration_operands(&mut self, name: &str, target: &str, replacement: &str) {
-        if let Some((false, decl)) = self.declarations.get(name) {
-            let stmt = self.statements.get_mut(*decl).expect("Missing statement");
+        if let Some(PositionDeclaration { is_phi: false, line }) = self.declarations.get(name) {
+            let stmt = self.statements.get_mut(*line).expect("Missing statement");
             for op in stmt.value.operands.iter_mut() {
                 replace_variable_in_expression(op, target, replacement);
             }
-        } else if let Some((true, decl)) = self.declarations.get(name) {
-            let phi = self.phi_functions.get_mut(*decl).expect("Missing phi function");
+        } else if let Some(PositionDeclaration { is_phi: true, line }) = self.declarations.get(name) {
+            let phi = self.phi_functions.get_mut(*line).expect("Missing phi function");
             for possibility in phi.possibilities.iter_mut() {
                 if possibility.variable == target {
                     possibility.variable = replacement.to_string();
@@ -342,7 +349,7 @@ impl CFG {
 
         //use_line represents whether it is used in a phi function or a statement and the line in
         //the corresponding vector of the simple block with id "use_block"
-        let mut ensure_reachability = |var: &str, use_block: usize, use_line: (bool, usize)| -> Result<(), String> {
+        let mut ensure_reachability = |var: &str, use_block: usize, use_line: PositionDeclaration| -> Result<(), String> {
             let declaration_block = *declarations
                 .get(var)
                 .ok_or_else(|| format!("Variable '{}' was not declared in the program.", var))?;
@@ -354,11 +361,11 @@ impl CFG {
                 // - Declared as a phi function and used in one, but before declaration
                 // - Declared in stmt and used in one, but before declaration
                 // - Declared in stmt, but used in a phi
-                if (decl_line.0 == use_line.0 && use_line.1 < decl_line.1)
-                   || (decl_line.0 && !use_line.0) {
+                if (decl_line.is_phi == use_line.is_phi && use_line.line < decl_line.line)
+                   || (decl_line.is_phi && !use_line.is_phi) {
                     return Err(format!(
                             "Variable '{}' was declared in block {} (line {}), but used in line {}.",
-                            var, declaration_block, decl_line.1, use_line.1
+                            var, declaration_block, decl_line.line, use_line.line
                     ))
                 }
             }
@@ -416,19 +423,19 @@ impl CFG {
 
         for (block_index, block) in self.blocks.iter().enumerate() {
             //Check the uses of each phi function
-            for (phi_index, phi) in block.phi_functions.iter().enumerate() {
+            for (line, phi) in block.phi_functions.iter().enumerate() {
                 for pos in &phi.possibilities {
-                    let use_line = (true, phi_index);
+                    let use_line = PositionDeclaration { is_phi: true, line };
                     ensure_reachability(&pos.variable, block_index, use_line)?;
                 }
             }
 
             //Check the uses of each statement
-            for (stmt_index, stmt) in block.statements.iter().enumerate() {
+            for (line, stmt) in block.statements.iter().enumerate() {
                 let val = &stmt.value;
                 for operand in &val.operands {
                     for var in get_variable_names(operand) {
-                        let use_line = (true, stmt_index);
+                        let use_line = PositionDeclaration { is_phi: false, line };
                         ensure_reachability(&var, block_index, use_line)?;
                     }
                 }
