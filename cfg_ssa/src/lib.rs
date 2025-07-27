@@ -14,7 +14,6 @@ use serde::Serialize;
 
 use crate::types::*;
 
-
 fn replace_variable_in_expression(expr: &mut Expression, target: &str, replacement: &str) {
     match expr {
         Expression::Atomic(Atomic::Variable(v)) if v == target => {
@@ -47,30 +46,10 @@ fn replace_variable_in_expression(expr: &mut Expression, target: &str, replaceme
     }
 }
 
-
-#[derive(Debug, Clone, Serialize)]
-enum OperatorOrPhi {
-    Operator(Operator),
-    // TODO: Make sure the operands in the phi function have the same order as their corresponding
-    // predecessors
-    Phi,
-}
-
 #[derive(Debug, Clone, Serialize)]
 struct Value {
-    operator: Option<OperatorOrPhi>,
+    operator: Option<Operator>,
     operands: Vec<Expression>,
-}
-
-impl Value {
-    //This should only be used for phi functions
-    // pub fn append_operand(&mut self, var: String) {
-    //     self.operands.push(Expression::Atomic(Atomic::Variable(var)));
-    // }
-
-    pub fn is_phi(&self) -> bool {
-        matches!(self.operator, Some(OperatorOrPhi::Phi))
-    }
 }
 
 #[derive(Clone, Serialize)]
@@ -95,17 +74,36 @@ impl fmt::Debug for Statement {
             })
         }
         if let Some(op) = &self.value.operator {
-            match op {
-                OperatorOrPhi::Phi => {
-                    s.push_str("φ ");
-                }
-                OperatorOrPhi::Operator(ope) => {
-                    s.push_str(&format!("{:?} ", ope).to_lowercase());
-                }
-            }
+            s.push_str(&format!("{:?} ", op).to_lowercase());
         }
         for op in self.value.operands.iter() {
             s.push_str(&format!("{:?} ", op));
+        }
+        write!(f, "{}", s)
+    }
+}
+
+
+/// The list of possibilities are the name of the ssa variable and the block where it comes from
+#[derive(Debug, Clone, Serialize)]
+pub struct PhiPossibility {
+    variable: String,
+    block: usize,
+}
+
+#[derive(Clone, Serialize)]
+pub struct PhiFunction {
+    output: String,
+    possibilities: Vec<PhiPossibility>,
+}
+
+impl fmt::Debug for PhiFunction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut s = String::new();
+        s.push_str(&self.output);
+        s.push_str(" = φ ");
+        for phi in self.possibilities.iter() {
+            s.push_str(&format!("{} (B{}), ", phi.variable, phi.block));
         }
         write!(f, "{}", s)
     }
@@ -126,14 +124,13 @@ pub enum Successor {
 #[derive(Debug, Serialize)]
 pub struct BasicBlock {
     id: usize,
-    //TODO: Maybe create another list only for phi functions in the case that we have to remove
-    //some trivial ones we don't mess the order of the rest of statements (necessary for the uses)
     statements: Vec<Statement>,
+    phi_functions: Vec<PhiFunction>,
     predecessors: Vec<usize>,
     successors: Option<Successor>,
-    //The position in which a variable is declared
-    declarations: HashMap<String, usize>,
-    num_phis: usize,
+    ///Whether a variable is declared as a phi function and its position in the list of phi
+    ///functions or statements accordingly
+    declarations: HashMap<String, (bool, usize)>,
 }
 
 impl BasicBlock {
@@ -141,31 +138,37 @@ impl BasicBlock {
         Self {
             id,
             statements: Vec::new(),
+            phi_functions: Vec::new(),
             predecessors: Vec::new(),
             successors: None,
             declarations: HashMap::new(),
-            num_phis: 0,
         }
     }
 
-    fn add_phi_function(&mut self, stmt: Statement) {
-        self.declarations.insert(stmt.output.clone().expect("Phi functions require an output name for declaration"), self.num_phis);
-        self.statements.insert(self.num_phis, stmt);
-        self.num_phis += 1;
+    fn add_phi_function(&mut self, phi: PhiFunction) {
+        self.declarations.insert(phi.output.clone(), (true, self.phi_functions.len()));
+        self.phi_functions.push(phi);
     }
 
     fn add_instruction(&mut self, stmt: Statement) {
         if let Some(output) = &stmt.output {
-            self.declarations.insert(output.clone(), self.statements.len());
+            self.declarations.insert(output.clone(), (false, self.statements.len()));
         }
         self.statements.push(stmt);
     }
 
     fn change_declaration_operands(&mut self, name: &str, target: &str, replacement: &str) {
-        if let Some(decl) = self.declarations.get(name) {
+        if let Some((false, decl)) = self.declarations.get(name) {
             let stmt = self.statements.get_mut(*decl).expect("Missing statement");
             for op in stmt.value.operands.iter_mut() {
                 replace_variable_in_expression(op, target, replacement);
+            }
+        } else if let Some((true, decl)) = self.declarations.get(name) {
+            let phi = self.phi_functions.get_mut(*decl).expect("Missing phi function");
+            for possibility in phi.possibilities.iter_mut() {
+                if possibility.variable == target {
+                    possibility.variable = replacement.to_string();
+                }
             }
         } else {
             panic!("Variable {} not found in block {}", name, self.id);
@@ -194,7 +197,6 @@ impl BasicBlock {
             panic!("Expected conditional successors");
         }
     }
-
 }
 
 #[derive(Default, Debug, Serialize)]
@@ -211,7 +213,6 @@ impl CFG {
     pub fn new_from_fun(f: Function) -> Self {
         let entry = 0;
         let mut cfg = CFG::new(entry);
-        //TODO: add declarations of parameters
 
         let mut constructor = CfgConstructor::new(&mut cfg);
         constructor.process_body(&f.body, entry, None);
@@ -222,7 +223,6 @@ impl CFG {
     pub fn new_from_template(t: Template) -> Self {
         let entry = 0;
         let mut cfg = CFG::new(entry);
-        //TODO: add declarations of inputs
 
         let mut constructor = CfgConstructor::new(&mut cfg);
         constructor.process_body(&t.body, entry, None);
@@ -230,8 +230,8 @@ impl CFG {
         cfg
     }
 
-    pub fn add_phi_function(&mut self, block: usize, stmt: Statement) {
-        self.blocks[block].add_phi_function(stmt);
+    pub fn add_phi_function(&mut self, block: usize, phi: PhiFunction) {
+        self.blocks[block].add_phi_function(phi);
     }
 
     pub fn add_instruction(&mut self, block: usize, stmt: Statement) {
@@ -294,6 +294,7 @@ impl CFG {
     #[deprecated(note = "This function is only for debugging purposes!")]
     #[doc(hidden)]
     //TODO: Change error type
+    //TODO: Fix
     fn check_ssa(&self) -> Result<(), String> {
         //First pass, check double declarations and add them to a map
         //declarations:
@@ -302,6 +303,14 @@ impl CFG {
         let mut declarations = HashMap::new();
 
         for (index, block) in self.blocks.iter().enumerate() {
+            for phi in &block.phi_functions {
+                if declarations.contains_key(&phi.output) {
+                    //Error: variable is declared more than once
+                    return Err(format!("Variable '{}' is declared more than once.", phi.output));
+                } else {
+                    declarations.insert(phi.output.clone(), index);
+                }
+            }
             for stmt in &block.statements {
                 if let Some(var) = &stmt.output {
                     if declarations.contains_key(var) {
@@ -321,6 +330,7 @@ impl CFG {
         let mut closed_blocks = vec![false; self.blocks.len()];
         //The entry block only has itself as reachable therefore
         closed_blocks[0] = true;
+
         for (index, block) in self.blocks.iter().enumerate() {
             //A block is reachable by itself
             reachable[index][index] = true;
@@ -328,55 +338,98 @@ impl CFG {
                 //A block can reach its predecessors
                 reachable[index][*prec] = true;
             }
+        }
+
+        //use_line represents whether it is used in a phi function or a statement and the line in
+        //the corresponding vector of the simple block with id "use_block"
+        let mut ensure_reachability = |var: &str, use_block: usize, use_line: (bool, usize)| -> Result<(), String> {
+            let declaration_block = *declarations
+                .get(var)
+                .ok_or_else(|| format!("Variable '{}' was not declared in the program.", var))?;
+
+            if use_block == declaration_block {
+                //TODO: Change unwrap
+                let decl_line = self.blocks[declaration_block].declarations.get(var).unwrap();
+                // Error cases:
+                // - Declared as a phi function and used in one, but before declaration
+                // - Declared in stmt and used in one, but before declaration
+                // - Declared in stmt, but used in a phi
+                if (decl_line.0 == use_line.0 && use_line.1 < decl_line.1)
+                   || (decl_line.0 && !use_line.0) {
+                    return Err(format!(
+                            "Variable '{}' was declared in block {} (line {}), but used in line {}.",
+                            var, declaration_block, decl_line.1, use_line.1
+                    ))
+                }
+            }
+
+            if reachable[use_block][declaration_block] {
+                return Ok(());
+            }
+
+            if closed_blocks[use_block] {
+                return Err(format!(
+                        "Variable '{}' was declared in block '{}', but used in block '{}' which is not reachable.",
+                        var, declaration_block, use_block
+                ));
+            }
+
+            //Case in which the block is not yet closed, we go backwards into the
+            //predecessors with dfs marking the visited blocks
+            let mut visited = vec![false; self.blocks.len()];
+            let mut queue = VecDeque::new();
+
+            visited[use_block] = true;
+            queue.push_back(use_block);
+
+            while let Some(node) = queue.pop_front() {
+                //TODO: Improve this so that not only the index block is updated (also
+                //all those that we visit)
+                reachable[use_block][node] = true;
+                if node == declaration_block {
+                    break;
+                }
+
+                for &neighbor in &self.blocks[node].predecessors {
+                    if !visited[neighbor] {
+                        visited[neighbor] = true;
+                        queue.push_back(neighbor);
+                    }
+                }
+            }
+
+            if queue.is_empty() {
+                closed_blocks[use_block] = true;
+            }
+
+            //Error if the index block is closed, but the position block is not
+            //reachable from it
+            if !reachable[use_block][declaration_block] && closed_blocks[use_block] {
+                return Err(format!(
+                        "Variable '{}' was declared in block '{}', but used in block '{}' and it is not reachable.",
+                        var, declaration_block, use_block
+                ));
+            }
+
+            Ok(())
+        };
+
+        for (block_index, block) in self.blocks.iter().enumerate() {
+            //Check the uses of each phi function
+            for (phi_index, phi) in block.phi_functions.iter().enumerate() {
+                for pos in &phi.possibilities {
+                    let use_line = (true, phi_index);
+                    ensure_reachability(&pos.variable, block_index, use_line)?;
+                }
+            }
 
             //Check the uses of each statement
-            for stmt in &block.statements {
+            for (stmt_index, stmt) in block.statements.iter().enumerate() {
                 let val = &stmt.value;
                 for operand in &val.operands {
                     for var in get_variable_names(operand) {
-                        let position = declarations.get(&var).ok_or(format!("The variable '{}' was not declared in the program.", var))?;
-                        if reachable[index][*position] {
-                            continue;
-                        }
-                        //Error if the index block is closed, but the position block is not
-                        //reachable from it
-                        if !reachable[index][*position] && closed_blocks[index] {
-                            return Err(format!("Variable '{}' was declared in block '{}', but used in block '{}' and it is not reachable.", var, position, index));
-                        }
-
-                        //Case in which the block is not yet closed, we go backwards into the
-                        //predecessors with dfs marking the visited blocks
-                        let mut visited = vec![false; self.blocks.len()];
-                        let mut queue = VecDeque::new();
-
-                        visited[index] = true;
-                        queue.push_back(index);
-
-                        while let Some(node) = queue.pop_front() {
-                            //TODO: Improve this so that not only the index block is updated (also
-                            //all those that we visit)
-                            reachable[index][node] = true;
-                            if node == *position {
-                                break;
-                            }
-
-                            for &neighbor in &self.blocks[node].predecessors {
-                                if !visited[neighbor] {
-                                    visited[neighbor] = true;
-                                    queue.push_back(neighbor);
-                                }
-                            }
-                        }
-
-                        if queue.is_empty() {
-                            closed_blocks[index] = true;
-                        }
-
-                        //Error if the index block is closed, but the position block is not
-                        //reachable from it
-                        if !reachable[index][*position] && closed_blocks[index] {
-                            return Err(format!("Variable '{}' was declared in block '{}', but used in block '{}' and it is not reachable.", var, position, index));
-                        }
+                        let use_line = (true, stmt_index);
+                        ensure_reachability(&var, block_index, use_line)?;
                     }
                 }
             }
@@ -406,6 +459,10 @@ impl CFG {
             // 1) collect one line per statement (with Debug)
             let mut lines = Vec::new();
             lines.push(format!("Block {}", block.id));
+            for phi in &block.phi_functions {
+                lines.push(format!("{:?}", phi));
+            }
+
             for stmt in &block.statements {
                 lines.push(format!("{:?}", stmt));
             }

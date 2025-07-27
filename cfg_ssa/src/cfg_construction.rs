@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::{ast::ASTNode, types::{Atomic, Expression, Operator, Parameter}, OperatorOrPhi, Statement, Value, CFG};
+use crate::{ast::ASTNode, types::{Atomic, Expression, Operator, Parameter}, Statement, Value, PhiPossibility, CFG};
 
 /// Enum to represent the possible uses:
 #[derive (Eq, Hash, PartialEq, Clone)]
@@ -20,10 +20,14 @@ pub struct CfgConstructor<'a> {
     cfg: &'a mut CFG,
 
     /// Save for each block the definition of the variables it contains (the new name)
+    /// Old name → SSA name
     definitions: Vec<HashMap<String, String>>,
 
-    /// Current SSA values: name -> concrete Value
+    /// SSA name of a variable -> concrete Value it has
     values: HashMap<String, Value>,
+
+    /// SSA name of the phi → List of possible values it can have depending on the execution
+    phis: HashMap<String, Vec<PhiPossibility>>,
 
     /// Current SSA values: ssa name -> original name
     to_non_ssa: HashMap<String, String>,
@@ -48,6 +52,7 @@ impl<'a> CfgConstructor<'a> {
             cfg,
             definitions: vec![HashMap::new()],
             values: HashMap::new(),
+            phis: HashMap::new(),
             to_non_ssa: HashMap::new(),
             incomplete_phis: vec![HashSet::new()],
             uses: HashMap::new(),
@@ -94,6 +99,15 @@ impl<'a> CfgConstructor<'a> {
         ssa_name
     }
 
+    /// Write a new empty phi function for source `src` in `block`
+    fn write_phi_function(&mut self, non_ssa_name: &str, block: usize) -> String {
+        let ssa_name = self.fresh();
+        self.phis.insert(ssa_name.clone(), Vec::new());
+        self.to_non_ssa.insert(ssa_name.clone(), non_ssa_name.to_string());
+        self.definitions[block].insert(non_ssa_name.to_string(), ssa_name.clone());
+        ssa_name
+    }
+
     /// Read a variable, inserting φ if needed
     /// Returns ssa name
     fn read_variable(&mut self, non_ssa_name: &str, block: usize) -> String {
@@ -108,8 +122,7 @@ impl<'a> CfgConstructor<'a> {
     fn read_recursive(&mut self, non_ssa_name: &str, block: usize) -> String {
         if !self.sealed_blocks[block] {
             // Incomplete block: create φ placeholder
-            let val = Value { operator: Some(OperatorOrPhi::Phi), operands: Vec::new() };
-            let ssa_phi_name = self.write_variable(non_ssa_name, block, val);
+            let ssa_phi_name = self.write_phi_function(non_ssa_name, block);
             self.incomplete_phis[block].insert((non_ssa_name.to_string(), ssa_phi_name.clone()));
             return ssa_phi_name;
         }
@@ -132,8 +145,7 @@ impl<'a> CfgConstructor<'a> {
 
         // Multiple predecessors -> φ
         // Break potential cycles with operandless phi
-        let val = Value { operator: Some(OperatorOrPhi::Phi), operands: Vec::new() };
-        let ssa_phi_name = self.write_variable(non_ssa_name, block, val);
+        let ssa_phi_name = self.write_phi_function(non_ssa_name, block);
         self.add_phi_operands(non_ssa_name, &ssa_phi_name, block);
 
         // In case phi is trivial, we read again
@@ -145,40 +157,37 @@ impl<'a> CfgConstructor<'a> {
         let mut operands = Vec::new();
         let predecessors: Vec<_> = self.cfg.predecessors(block).to_vec();
         for &pred in &predecessors {
-            operands.push(self.read_variable(non_ssa_name, pred));
+            operands.push((self.read_variable(non_ssa_name, pred), pred));
         }
-        let phi_operation = self.values.get_mut(ssa_phi_name).expect("Phi node missing");
-        // The operands are in the same order as the predecessor it corresponds to
-        phi_operation.operands.extend(operands.into_iter().map(|op|
-                Expression::Atomic(Atomic::Variable(op))));
+        let phi_operation = self.phis.get_mut(ssa_phi_name).expect("Phi node missing");
+        phi_operation.extend(
+            operands
+                .into_iter()
+                .map(|(variable, block)| PhiPossibility { variable, block})
+        );
 
         let phi_op_clone = phi_operation.clone();
         if !self.try_remove_trivial(ssa_phi_name, non_ssa_name, block) {
-            let stmt = Statement { num_type: None, output: Some(ssa_phi_name.to_string()), value: phi_op_clone };
-            self.cfg.add_phi_function(block, stmt);
+            let phi = crate::PhiFunction { output: ssa_phi_name.to_string(), possibilities: phi_op_clone };
+            self.cfg.add_phi_function(block, phi);
         }
     }
 
     /// Simplify trivial φ-nodes with identical operands
     /// Returns whether the 
     fn try_remove_trivial(&mut self, ssa_phi_name: &str, non_ssa_name: &str, block: usize) -> bool {
-        let val = match self.values.get(ssa_phi_name) {
-            Some(v) if v.is_phi() => v.clone(),
+        let possibilities = match self.phis.get(ssa_phi_name) {
+            Some(v) => v.clone(),
             _ => return false,
         };
         let mut repeated_operand: Option<String> = None;
-        for op in &val.operands {
-            if let Expression::Atomic(Atomic::Variable(var)) = op {
-                if var == ssa_phi_name { continue; }     //Self reference
-                if let Some(r) = &repeated_operand {
-                    //The phi merges at least two different values: not trivial
-                    if r != var { return false; }
-                }
-                repeated_operand = Some(var.clone());
+        for pos in possibilities.iter() {
+            if pos.variable == ssa_phi_name { continue; }   //Self reference
+            if let Some(r) = &repeated_operand {
+                //The phi merges at least two different values: not trivial
+                if *r != pos.variable { return false; }
             }
-            else {
-                panic!("Phi functions should only have variables as operands");
-            }
+            repeated_operand = Some(pos.variable.clone());
         }
 
         if let Some(repeated_op_name) = repeated_operand {
@@ -362,7 +371,7 @@ impl<'a> CfgConstructor<'a> {
             ops.push(self.read_expression(op, curr));
         }
 
-        let val = Value { operator: operator.clone().map(OperatorOrPhi::Operator), operands: ops.clone() };
+        let val = Value { operator: operator.clone(), operands: ops.clone() };
 
         let var;
         if let Some(v) = output {
