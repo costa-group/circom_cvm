@@ -334,6 +334,7 @@ impl ExecutedTemplate {
         self.components = filtered_components.0;
         self.number_of_components = filtered_components.1;
         for cnn in &mut self.connexions {
+            
             cnn.dag_offset = dag.get_entry().unwrap().get_out();
             cnn.dag_component_offset = dag.get_entry().unwrap().get_out_component();
             dag.add_edge(cnn.inspect.goes_to, &cnn.full_name, cnn.inspect.is_parallel);
@@ -394,6 +395,7 @@ impl ExecutedTemplate {
 
         fn build_components(components: ComponentCollector) -> Vec<Component> {
             let mut cmp = vec![];
+
             for c in components {
                 cmp.push(Component { 
                     name: c.name, 
@@ -401,6 +403,9 @@ impl ExecutedTemplate {
                     is_anonymous: c.is_anonymous,
                 })
             }
+            cmp.sort_by(|l, r| {
+                l.name.cmp(&r.name)
+            });
             cmp
         }
 
@@ -735,6 +740,8 @@ fn mixed_components(exec_tmp: &ExecutedTemplate) -> Vec<bool> {
 }
 
 fn build_clusters(tmp: &ExecutedTemplate, instances: &[TemplateInstance]) -> Vec<TriggerCluster> {
+    
+    
     let components = &tmp.components;
     let connexions = &tmp.connexions;
     let mixed = mixed_components(tmp);
@@ -788,6 +795,7 @@ fn build_clusters(tmp: &ExecutedTemplate, instances: &[TemplateInstance]) -> Vec
         result.push(cluster);
         index += 1;
     }
+
     result
 }
 
