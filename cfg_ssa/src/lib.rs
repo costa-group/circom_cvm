@@ -5,7 +5,7 @@ pub mod type_checking;
 mod cfg_construction;
 mod tests;
 
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 
 use ast::{Function, Template, AST};
 use cfg_construction::CfgConstructor;
@@ -122,7 +122,7 @@ pub enum Successor {
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
-struct LineInstruction {
+pub struct LineInstruction {
     is_phi: bool,
     line: usize,
 }
@@ -152,19 +152,26 @@ impl BasicBlock {
         }
     }
 
-    fn add_phi_function(&mut self, phi: PhiFunction) {
-        self.declarations.insert(phi.output.clone(), LineInstruction { is_phi: true, line: self.phi_functions.len() });
+    /// Returns the position of the new PhiFunction
+    fn add_phi_function(&mut self, phi: PhiFunction) -> LineInstruction {
+        let line = LineInstruction { is_phi: true, line: self.phi_functions.len() };
+        self.declarations.insert(phi.output.clone(), line.clone());
         self.phi_functions.push(phi);
+        line
     }
 
-    fn add_instruction(&mut self, stmt: Statement) {
+    /// Returns the position of the new Statement
+    fn add_instruction(&mut self, stmt: Statement) -> LineInstruction {
+        let line = LineInstruction { is_phi: false, line: self.statements.len() };
         if let Some(output) = &stmt.output {
-            self.declarations.insert(output.clone(), LineInstruction { is_phi: false, line: self.statements.len() });
+            self.declarations.insert(output.clone(), line.clone());
         }
         self.statements.push(stmt);
+        line
     }
 
-    fn change_instruction_operands(&mut self, line: &LineInstruction, target: &str, replacement: &str) {
+    /// Returns the declared variable in the instruction (if such variable exists)
+    fn change_instruction_operands(&mut self, line: &LineInstruction, target: &str, replacement: &str) -> Option<String> {
         match line {
             LineInstruction { is_phi: true, line } => {
                 let phi = self.phi_functions.get_mut(*line).expect("Missing phi function");
@@ -173,12 +180,14 @@ impl BasicBlock {
                         possibility.variable = replacement.to_string();
                     }
                 }
+                Some(phi.output.clone())
             }
             LineInstruction { is_phi: false, line} => {
                 let stmt = self.statements.get_mut(*line).expect("Missing statement");
                 for op in stmt.value.operands.iter_mut() {
                     replace_variable_in_expression(op, target, replacement);
                 }
+                stmt.output.clone()
             }
         }
     }
@@ -212,12 +221,15 @@ enum Use {
 pub struct CFG {
     entry: usize,
     blocks: Vec<BasicBlock>,
+    /// Key: Variable, Value: Block and line in that block where it is defined
+    definitions: BTreeMap<String, (usize, LineInstruction)>,
+    /// Key: Variable, Value: Set with all its uses
     def_use: BTreeMap<String, BTreeSet<Use>>,
 }
 
 impl CFG {
     pub fn new(entry: usize) -> Self {
-        CFG { entry, blocks: vec![BasicBlock::new(entry)], def_use: BTreeMap::new() }
+        CFG { entry, blocks: vec![BasicBlock::new(entry)], definitions: BTreeMap::new(), def_use: BTreeMap::new() }
     }
 
     pub fn new_from_fun(f: Function) -> Self {
@@ -240,12 +252,29 @@ impl CFG {
         cfg
     }
 
-    pub fn add_phi_function(&mut self, block: usize, phi: PhiFunction) {
-        self.blocks[block].add_phi_function(phi);
+    pub fn add_phi_function(&mut self, block: usize, phi: PhiFunction) -> LineInstruction{
+        let var = phi.output.clone();
+        let line = self.blocks[block].add_phi_function(phi);
+        if self.definitions.contains_key(&var) {
+            //TODO: Improve error handling
+            panic!("Variable '{}' was defined twice", var);
+        } else {
+            self.definitions.insert(var, (block, line.clone()));
+        }
+        line
     }
 
     pub fn add_instruction(&mut self, block: usize, stmt: Statement) {
-        self.blocks[block].add_instruction(stmt);
+        let var = stmt.output.clone();
+        let line = self.blocks[block].add_instruction(stmt);
+        if let Some(output) = var {
+            if self.definitions.contains_key(&output) {
+                //TODO: Improve error handling
+                panic!("Variable '{}' was defined twice", output);
+            } else {
+                self.definitions.insert(output, (block, line));
+            }
+        }
     }
 
     pub fn create_new_block(&mut self) -> usize {
@@ -285,10 +314,6 @@ impl CFG {
         }
     }
 
-    pub(crate) fn get_declaration_line(&self, block_u: usize, variable: &str) -> Option<LineInstruction> {
-        self.blocks[block_u].declarations.get(variable).cloned()
-    }
-
     pub fn get_entry(&self) -> usize {
         self.entry
     }
@@ -301,8 +326,8 @@ impl CFG {
         self.def_use.entry(target).or_insert_with(BTreeSet::new).insert(Use::InCondition(block));
     }
 
-    fn change_instruction_operands(&mut self, block: usize, line: &LineInstruction, target: &str, replacement: &str) {
-        self.blocks[block].change_instruction_operands(line, target, replacement);
+    fn change_instruction_operands(&mut self, block: usize, line: &LineInstruction, target: &str, replacement: &str) -> Option<String> {
+        let declared_var = self.blocks[block].change_instruction_operands(line, target, replacement);
         if let Some(uses) = self.def_use.get_mut(target) {
             uses.remove(&Use::InInstruction(block, line.clone()));
             if uses.is_empty() {
@@ -310,15 +335,7 @@ impl CFG {
             }
         }
         self.def_use.entry(replacement.to_string()).or_insert_with(BTreeSet::new).insert(Use::InInstruction(block, line.clone()));
-    }
-
-
-    fn get_declared_variable(&self, block_u: usize, line_instruction: &LineInstruction) -> Option<String> {
-        if line_instruction.is_phi {
-            self.blocks[block_u].phi_functions.get(line_instruction.line).map(|phi| phi.output.clone())
-        } else {
-            self.blocks[block_u].statements.get(line_instruction.line).and_then(|stmt| stmt.output.as_deref()).map(|s| s.to_string())
-        }
+        declared_var
     }
 
     fn change_condition_use(&mut self, block: usize, target: &str, replacement: &str) {
@@ -563,6 +580,28 @@ impl CFG {
         dot.push_str(&format!(
             "  DU [shape=box, label=\"{}\"];\n",
             du_label
+        ));
+
+        // Variable definitions
+        // Collect all definitions in a single box with id "DEF"
+        // Each definition is "var → BID:line(φ?)"
+        let mut def_lines = Vec::new();
+        def_lines.push("Definitions".to_string());
+        for (var, (bid, inst)) in &self.definitions {
+            let suffix = if inst.is_phi { "(φ)" } else { "" };
+            def_lines.push(format!(
+                "{} → {}:{}{}",
+                var,
+                bid,
+                inst.line,
+                suffix
+            ));
+        }
+        let def_label = esc(&def_lines.join("\\l")) + "\\l";
+
+        dot.push_str(&format!(
+            "  DEF [shape=box, label=\"{}\"];\n",
+            def_label
         ));
 
         dot.push_str("}\n");

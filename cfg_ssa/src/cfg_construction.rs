@@ -171,10 +171,8 @@ impl<'a> CfgConstructor<'a> {
         let phi_operation = phi_operation.clone();
         if !self.try_remove_trivial(ssa_phi_name, non_ssa_name, block) {
             let phi = crate::PhiFunction { output: ssa_phi_name.to_string(), possibilities: phi_operation.clone() };
-            self.cfg.add_phi_function(block, phi);
-            //Get line of the phi node
-            let line = self.cfg.get_declaration_line(block, ssa_phi_name)
-                                .expect(&format!("Phi node {} not declared in block {}", ssa_phi_name, block));
+            let line = self.cfg.add_phi_function(block, phi);
+
             for op in phi_operation {
                 self.track_use_instruction(&Expression::Atomic(Atomic::Variable(op.variable.to_string())), block, line.clone());
             }
@@ -209,9 +207,9 @@ impl<'a> CfgConstructor<'a> {
                             self.cfg.change_condition_use(block_u, ssa_phi_name, &repeated_op_name);
                         }
                         UseTemp::InBlock(Use::InInstruction(block_u, line_instruction)) => {
-                            self.cfg.change_instruction_operands(block_u, &line_instruction, ssa_phi_name, &repeated_op_name);
+                            let declared_var = self.cfg.change_instruction_operands(block_u, &line_instruction, ssa_phi_name, &repeated_op_name);
 
-                            if let Some(user_ssa_name) = self.cfg.get_declared_variable(block_u, &line_instruction) {
+                            if let Some(user_ssa_name) = declared_var {
                                 let non_ssa_name = self.to_non_ssa.get(&user_ssa_name).expect("Declaration not found").to_string();
 
                                 //TODO: Possibly we need to remove the phi from the block if it has
