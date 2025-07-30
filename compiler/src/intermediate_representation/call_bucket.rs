@@ -953,11 +953,13 @@ impl WriteCVM for CallBucket{
                     let result_position;
                     if let  ComputedAddress::Variable(rvar) = &ldest {
                         result_position = rvar.clone();
+                        instructions.append(&mut instructions_dest);
+                        instructions.push(format!("ff.mcall ${} {} {} {}", self.symbol.clone(), result_position, size.clone(), params));
                     } else {
                         result_position = producer.get_current_var_to_return_from_call();
+                        instructions.push(format!("ff.mcall ${} {} {} {}", self.symbol.clone(), result_position, size.clone(), params));
+                        instructions.append(&mut instructions_dest);
                     }
-                    instructions.push(format!("ff.mcall ${} {} {} {}", self.symbol.clone(), result_position, size.clone(), params));
-                    instructions.append(&mut instructions_dest);
                     let src_value = producer.fresh_var();
                     let dest_location;
                     let dest_position = producer.fresh_var();

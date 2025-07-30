@@ -139,8 +139,6 @@ impl WriteCVM for ReturnBucket{
                 instructions.push(format!(";;line {}", self.line));
                 producer.set_current_line(self.line);
             }
-            let vsrc = producer.fresh_var();
-            instructions.push(format!("{} = ff.load {}", vsrc, src ));
             instructions.push(format!("ff.{} {}", add_return(), src ));
         } else {
             if let Instruction::Load(load) = &*self.value {
