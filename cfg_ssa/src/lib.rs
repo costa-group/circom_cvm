@@ -5,7 +5,7 @@ pub mod type_checking;
 mod cfg_construction;
 mod tests;
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 
 use ast::{Function, Template, AST};
 use cfg_construction::CfgConstructor;
@@ -121,8 +121,8 @@ pub enum Successor {
     },
 }
 
-#[derive(Debug, Clone, Serialize)]
-struct PositionDeclaration {
+#[derive(Debug, Clone, Serialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
+struct LineInstruction {
     is_phi: bool,
     line: usize,
 }
@@ -137,7 +137,7 @@ pub struct BasicBlock {
     ///Whether a variable is declared as a phi function and its position in the list of phi
     ///functions or statements accordingly
     //TODO: Maybe search directly in the vectors if they are usually small?
-    declarations: HashMap<String, PositionDeclaration>,
+    declarations: HashMap<String, LineInstruction>,
 }
 
 impl BasicBlock {
@@ -153,39 +153,33 @@ impl BasicBlock {
     }
 
     fn add_phi_function(&mut self, phi: PhiFunction) {
-        self.declarations.insert(phi.output.clone(), PositionDeclaration { is_phi: true, line: self.phi_functions.len() });
+        self.declarations.insert(phi.output.clone(), LineInstruction { is_phi: true, line: self.phi_functions.len() });
         self.phi_functions.push(phi);
     }
 
     fn add_instruction(&mut self, stmt: Statement) {
         if let Some(output) = &stmt.output {
-            self.declarations.insert(output.clone(), PositionDeclaration { is_phi: false, line: self.statements.len() });
+            self.declarations.insert(output.clone(), LineInstruction { is_phi: false, line: self.statements.len() });
         }
         self.statements.push(stmt);
     }
 
-    fn change_declaration_operands(&mut self, name: &str, target: &str, replacement: &str) {
-        if let Some(PositionDeclaration { is_phi: false, line }) = self.declarations.get(name) {
-            let stmt = self.statements.get_mut(*line).expect("Missing statement");
-            for op in stmt.value.operands.iter_mut() {
-                replace_variable_in_expression(op, target, replacement);
-            }
-        } else if let Some(PositionDeclaration { is_phi: true, line }) = self.declarations.get(name) {
-            let phi = self.phi_functions.get_mut(*line).expect("Missing phi function");
-            for possibility in phi.possibilities.iter_mut() {
-                if possibility.variable == target {
-                    possibility.variable = replacement.to_string();
+    fn change_instruction_operands(&mut self, line: &LineInstruction, target: &str, replacement: &str) {
+        match line {
+            LineInstruction { is_phi: true, line } => {
+                let phi = self.phi_functions.get_mut(*line).expect("Missing phi function");
+                for possibility in phi.possibilities.iter_mut() {
+                    if possibility.variable == target {
+                        possibility.variable = replacement.to_string();
+                    }
                 }
             }
-        } else {
-            panic!("Variable {} not found in block {}", name, self.id);
-        }
-    }
-
-    fn change_statement_operands(&mut self, line: usize, target: &str, replacement: &str) {
-        let stmt = self.statements.get_mut(line).expect("Missing statement");
-        for op in stmt.value.operands.iter_mut() {
-            replace_variable_in_expression(op, target, replacement);
+            LineInstruction { is_phi: false, line} => {
+                let stmt = self.statements.get_mut(*line).expect("Missing statement");
+                for op in stmt.value.operands.iter_mut() {
+                    replace_variable_in_expression(op, target, replacement);
+                }
+            }
         }
     }
 
@@ -206,15 +200,24 @@ impl BasicBlock {
     }
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
+enum Use {
+    /// Block and line in the block
+    InInstruction(usize, LineInstruction),
+    /// Block whose successor is conditional successor
+    InCondition(usize),
+}
+
 #[derive(Default, Debug, Serialize)]
 pub struct CFG {
     entry: usize,
     blocks: Vec<BasicBlock>,
+    def_use: BTreeMap<String, BTreeSet<Use>>,
 }
 
 impl CFG {
     pub fn new(entry: usize) -> Self {
-        CFG { entry, blocks: vec![BasicBlock::new(entry)] }
+        CFG { entry, blocks: vec![BasicBlock::new(entry)], def_use: BTreeMap::new() }
     }
 
     pub fn new_from_fun(f: Function) -> Self {
@@ -282,19 +285,50 @@ impl CFG {
         }
     }
 
+    pub(crate) fn get_declaration_line(&self, block_u: usize, variable: &str) -> Option<LineInstruction> {
+        self.blocks[block_u].declarations.get(variable).cloned()
+    }
+
     pub fn get_entry(&self) -> usize {
         self.entry
     }
 
-    fn change_declaration_operands(&mut self, block: usize, name: &str, target: &str, replacement: &str) {
-        self.blocks[block].change_declaration_operands(name, target, replacement);
+    fn track_use_instruction(&mut self, block: usize, target: String, line: LineInstruction) {
+        self.def_use.entry(target).or_insert_with(BTreeSet::new).insert(Use::InInstruction(block, line));
     }
 
-    fn change_statement_operands(&mut self, block: usize, line: usize, target: &str, replacement: &str) {
-        self.blocks[block].change_statement_operands(line, target, replacement);
+    fn track_use_condition(&mut self, block: usize, target: String) {
+        self.def_use.entry(target).or_insert_with(BTreeSet::new).insert(Use::InCondition(block));
     }
 
-    fn change_condition(&mut self, block: usize, target: &str, replacement: &str) {
+    fn change_instruction_operands(&mut self, block: usize, line: &LineInstruction, target: &str, replacement: &str) {
+        self.blocks[block].change_instruction_operands(line, target, replacement);
+        if let Some(uses) = self.def_use.get_mut(target) {
+            uses.remove(&Use::InInstruction(block, line.clone()));
+            if uses.is_empty() {
+                self.def_use.remove(target);
+            }
+        }
+        self.def_use.entry(replacement.to_string()).or_insert_with(BTreeSet::new).insert(Use::InInstruction(block, line.clone()));
+    }
+
+
+    fn get_declared_variable(&self, block_u: usize, line_instruction: &LineInstruction) -> Option<String> {
+        if line_instruction.is_phi {
+            self.blocks[block_u].phi_functions.get(line_instruction.line).map(|phi| phi.output.clone())
+        } else {
+            self.blocks[block_u].statements.get(line_instruction.line).and_then(|stmt| stmt.output.as_deref()).map(|s| s.to_string())
+        }
+    }
+
+    fn change_condition_use(&mut self, block: usize, target: &str, replacement: &str) {
+        if let Some(uses) = self.def_use.get_mut(target) {
+            uses.remove(&Use::InCondition(block));
+            if uses.is_empty() {
+                self.def_use.remove(target);
+            }
+        }
+        self.def_use.entry(replacement.to_string()).or_insert_with(BTreeSet::new).insert(Use::InCondition(block));
         self.blocks[block].change_condition(target, replacement);
     }
 
@@ -349,7 +383,7 @@ impl CFG {
 
         //use_line represents whether it is used in a phi function or a statement and the line in
         //the corresponding vector of the simple block with id "use_block"
-        let mut ensure_reachability = |var: &str, use_block: usize, use_line: PositionDeclaration| -> Result<(), String> {
+        let mut ensure_reachability = |var: &str, use_block: usize, use_line: LineInstruction| -> Result<(), String> {
             let declaration_block = *declarations
                 .get(var)
                 .ok_or_else(|| format!("Variable '{}' was not declared in the program.", var))?;
@@ -362,7 +396,7 @@ impl CFG {
                 // - Declared in stmt and used in one, but before declaration
                 // - Declared in stmt, but used in a phi
                 if (decl_line.is_phi == use_line.is_phi && use_line.line < decl_line.line)
-                   || (decl_line.is_phi && !use_line.is_phi) {
+                   || (!decl_line.is_phi && use_line.is_phi) {
                     return Err(format!(
                             "Variable '{}' was declared in block {} (line {}), but used in line {}.",
                             var, declaration_block, decl_line.line, use_line.line
@@ -425,7 +459,7 @@ impl CFG {
             //Check the uses of each phi function
             for (line, phi) in block.phi_functions.iter().enumerate() {
                 for pos in &phi.possibilities {
-                    let use_line = PositionDeclaration { is_phi: true, line };
+                    let use_line = LineInstruction { is_phi: true, line };
                     ensure_reachability(&pos.variable, block_index, use_line)?;
                 }
             }
@@ -435,7 +469,7 @@ impl CFG {
                 let val = &stmt.value;
                 for operand in &val.operands {
                     for var in get_variable_names(operand) {
-                        let use_line = PositionDeclaration { is_phi: false, line };
+                        let use_line = LineInstruction { is_phi: false, line };
                         ensure_reachability(&var, block_index, use_line)?;
                     }
                 }
@@ -502,6 +536,34 @@ impl CFG {
                 }
             }
         }
+
+
+        let mut du_lines = Vec::new();
+        du_lines.push("Def‑Use Chains".to_string());
+        for (var, uses) in &self.def_use {
+            // render each use as "BID:L(φ?)" or "BID:cond"
+            let locs: Vec<String> = uses.iter().map(|u| {
+                match u {
+                    Use::InInstruction(bid, inst) => {
+                        format!("{}:{}", bid, inst.line) +
+                        if inst.is_phi { "(φ)" } else { "" }
+                    }
+                    Use::InCondition(bid) => {
+                        format!("{}:c", bid)
+                    }
+                }
+            }).collect();
+
+            du_lines.push(format!("{} → {}", var, locs.join(", ")));
+        }
+        // join lines with Graphviz left‑justified line breaks (\l)
+        let du_label = esc(&du_lines.join("\\l")) + "\\l";
+
+        // emit a single box with id "DU"
+        dot.push_str(&format!(
+            "  DU [shape=box, label=\"{}\"];\n",
+            du_label
+        ));
 
         dot.push_str("}\n");
         dot

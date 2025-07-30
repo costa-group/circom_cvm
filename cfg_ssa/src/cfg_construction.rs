@@ -1,18 +1,16 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::{ast::ASTNode, types::{Atomic, Expression, Operator, Parameter}, Statement, Value, PhiPossibility, CFG};
+use crate::{ast::ASTNode, types::{Atomic, Expression, Operator, Parameter}, LineInstruction, PhiPossibility, Statement, Use, Value, CFG};
 
+//TODO: These uses are duplicated in lib.rs, the problem is InMemoization which is neccesary when removing trivial phis
+//but it is not when we have the final CFG.
 /// Enum to represent the possible uses:
 #[derive (Eq, Hash, PartialEq, Clone)]
-enum Use {
+enum UseTemp {
     /// - In memoization (the block has written in its definitions this variable)
     InMemoization(usize),
-    /// - In a condition (block with the branch)
-    InCondition(usize),
-    /// - A declaration (block and which variable is being declared)
-    InDeclaration(usize, String),
-    /// - In a statement (block and line in the block)
-    InStmt(usize, usize),
+    /// - In block (the block uses the variable in one of its instructions)
+    InBlock(Use),
 }
 
 /// A SSA-based CFG builder
@@ -36,7 +34,7 @@ pub struct CfgConstructor<'a> {
     incomplete_phis: Vec<HashSet<(String, String)>>,
 
     /// For each variable, we save a set of blocks where it is used and how
-    uses: HashMap<String, HashSet<Use>>,
+    uses: HashMap<String, HashSet<UseTemp>>,
 
     /// We keep track of the blocks that lead to exceptions (i.e., errors)
     exception_blocks: HashSet<usize>,
@@ -75,7 +73,8 @@ impl<'a> CfgConstructor<'a> {
     /// Create a fresh SSA name
     /// Returns ssa name
     fn fresh(&mut self) -> String {
-        let ssa_name = format!("v{}", self.next_ssa_num);
+        //TODO: The ssa name could just be a number, no need of string
+        let ssa_name = format!("v{:03}", self.next_ssa_num);
         self.next_ssa_num += 1;
         ssa_name
     }
@@ -137,7 +136,7 @@ impl<'a> CfgConstructor<'a> {
 
             // Avoid the recursive lookup in future cases
             self.definitions[block].insert(non_ssa_name.to_string(), v.clone());
-            let usage = Use::InMemoization(block);
+            let usage = UseTemp::InMemoization(block);
             self.uses.entry(v.clone()).or_default().insert(usage);
 
             return v;
@@ -156,20 +155,29 @@ impl<'a> CfgConstructor<'a> {
     fn add_phi_operands(&mut self, non_ssa_name: &str, ssa_phi_name: &str, block: usize) {
         let mut operands = Vec::new();
         let predecessors: Vec<_> = self.cfg.predecessors(block).to_vec();
+
+
         for &pred in &predecessors {
-            operands.push((self.read_variable(non_ssa_name, pred), pred));
+            let operand = self.read_variable(non_ssa_name, pred);
+            operands.push((operand.clone(), pred));
         }
         let phi_operation = self.phis.get_mut(ssa_phi_name).expect("Phi node missing");
         phi_operation.extend(
             operands
                 .into_iter()
-                .map(|(variable, block)| PhiPossibility { variable, block})
+                .map(|(variable, block)| PhiPossibility { variable, block })
         );
 
-        let phi_op_clone = phi_operation.clone();
+        let phi_operation = phi_operation.clone();
         if !self.try_remove_trivial(ssa_phi_name, non_ssa_name, block) {
-            let phi = crate::PhiFunction { output: ssa_phi_name.to_string(), possibilities: phi_op_clone };
+            let phi = crate::PhiFunction { output: ssa_phi_name.to_string(), possibilities: phi_operation.clone() };
             self.cfg.add_phi_function(block, phi);
+            //Get line of the phi node
+            let line = self.cfg.get_declaration_line(block, ssa_phi_name)
+                                .expect(&format!("Phi node {} not declared in block {}", ssa_phi_name, block));
+            for op in phi_operation {
+                self.track_use_instruction(&Expression::Atomic(Atomic::Variable(op.variable.to_string())), block, line.clone());
+            }
         }
     }
 
@@ -194,31 +202,31 @@ impl<'a> CfgConstructor<'a> {
             if let Some(users) = self.uses.remove(ssa_phi_name) {
                 for user in users {
                     match user {
-                        Use::InDeclaration(block_user, user_ssa_name) => {
-                            self.cfg.change_declaration_operands(block_user, &user_ssa_name, ssa_phi_name, &repeated_op_name);
-                            let non_ssa_name = self.to_non_ssa.get(&user_ssa_name).expect("Phi function not found").clone();
-
-                            //TODO: Possibly we need to remove the phi from the block if it has
-                            //been written
-                            let _ = self.try_remove_trivial(&user_ssa_name, &non_ssa_name, block_user);
-                        }
-                        Use::InStmt(block_user, line) => {
-                            self.cfg.change_statement_operands(block_user, line, ssa_phi_name, &repeated_op_name);
-                        }
-                        Use::InCondition(block_u) => {
-                            self.cfg.change_condition(block_u, ssa_phi_name, &repeated_op_name);
-                        }
-                        Use::InMemoization(block_u) => {
+                        UseTemp::InMemoization(block_u) => {
                             self.definitions[block_u].insert(non_ssa_name.to_string(), repeated_op_name.clone());
+                        }
+                        UseTemp::InBlock(Use::InCondition(block_u)) => {
+                            self.cfg.change_condition_use(block_u, ssa_phi_name, &repeated_op_name);
+                        }
+                        UseTemp::InBlock(Use::InInstruction(block_u, line_instruction)) => {
+                            self.cfg.change_instruction_operands(block_u, &line_instruction, ssa_phi_name, &repeated_op_name);
+
+                            if let Some(user_ssa_name) = self.cfg.get_declared_variable(block_u, &line_instruction) {
+                                let non_ssa_name = self.to_non_ssa.get(&user_ssa_name).expect("Declaration not found").to_string();
+
+                                //TODO: Possibly we need to remove the phi from the block if it has
+                                //been written
+                                let _ = self.try_remove_trivial(&user_ssa_name, &non_ssa_name, block_u);
+                            }
                         }
                     }
                 }
             }
             self.definitions[block].insert(non_ssa_name.to_string(), repeated_op_name.clone());
-            let usage = Use::InMemoization(block);
+            let usage = UseTemp::InMemoization(block);
             self.uses.entry(repeated_op_name.clone()).or_default().insert(usage);
 
-            self.values.remove(ssa_phi_name);
+            self.phis.remove(ssa_phi_name);
             self.to_non_ssa.remove(ssa_phi_name);
         }
         //TODO: Case of same is None is impossible?
@@ -293,42 +301,17 @@ impl<'a> CfgConstructor<'a> {
         curr
     }
 
-    fn track_use_declaration(&mut self, used: &Expression, user: &str, block: usize) {
-        let usage = Use::InDeclaration(block, user.to_string());
+
+    fn track_use_instruction(&mut self, used: &Expression, block: usize, line: LineInstruction) {
+        let usage = UseTemp::InBlock(Use::InInstruction(block, line.clone()));
         if let Expression::Atomic(Atomic::Variable(var)) = used {
             self.uses.entry(var.clone()).or_default().insert(usage);
+            self.cfg.track_use_instruction(block, var.clone(), line);
         } else if let Expression::Parameter(param) = used {
             let mut track_atomic = |a: &Atomic| {
                 if let Atomic::Variable(var) = a {
                     self.uses.entry(var.clone()).or_default().insert(usage.clone());
-                }
-            };
-
-            match param {
-                Parameter::Signal { index, size }
-                | Parameter::I64Memory { index, size }
-                | Parameter::FfMemory { index, size } => {
-                    track_atomic(index);
-                    track_atomic(size);
-                }
-
-                Parameter::SubcmpSignal { component, index, size } => {
-                    track_atomic(component);
-                    track_atomic(index);
-                    track_atomic(size);
-                }
-            }
-        }
-    }
-
-    fn track_use_stmt(&mut self, used: &Expression, line: usize, block: usize) {
-        let usage = Use::InStmt(block, line);
-        if let Expression::Atomic(Atomic::Variable(var)) = used {
-            self.uses.entry(var.clone()).or_default().insert(usage);
-        } else if let Expression::Parameter(param) = used {
-            let mut track_atomic = |a: &Atomic| {
-                if let Atomic::Variable(var) = a {
-                    self.uses.entry(var.clone()).or_default().insert(usage.clone());
+                    self.cfg.track_use_instruction(block, var.clone(), line.clone());
                 }
             };
 
@@ -350,9 +333,10 @@ impl<'a> CfgConstructor<'a> {
     }
 
     fn track_use_condition(&mut self, op: &Expression, block: usize) {
-        let usage = Use::InCondition(block);
+        let usage = UseTemp::InBlock(Use::InCondition(block));
         if let Expression::Atomic(Atomic::Variable(var)) = op {
             self.uses.entry(var.clone()).or_default().insert(usage);
+            self.cfg.track_use_condition(block, var.clone());
         }
         else if let Expression::Parameter(_) = op {
             panic!("The condition of a branch cannot be a parameter for a function");
@@ -373,20 +357,12 @@ impl<'a> CfgConstructor<'a> {
 
         let val = Value { operator: operator.clone(), operands: ops.clone() };
 
-        let var;
-        if let Some(v) = output {
-            let aux = self.write_variable(v, curr, val.clone());
-            for op in &ops {
-                self.track_use_declaration(op, &aux, curr);
-            }
-            var = Some(aux);
-        }
-        else {
-            let line = self.cfg.get_block_size(curr);
-            for op in &ops {
-                self.track_use_stmt(op, line, curr);
-            }
-            var = None;
+        let var = output.as_ref().map(|v|
+                                  self.write_variable(v, curr, val.clone()));
+
+        let pos = self.cfg.get_block_size(curr);
+        for op in &ops {
+            self.track_use_instruction(op, curr, LineInstruction { is_phi: false, line: pos });
         }
 
         let stmt = Statement { num_type: num_type.clone(), output: var, value: val };
@@ -602,12 +578,14 @@ mod tests {
                 ],
         };
         let cfg = CFG::new_from_template(template);
-        let check_ssa = cfg.check_ssa();
-        assert!(check_ssa.is_ok(), "CFG construction failed: {:?}", check_ssa.err());
+
         let dot_representation = cfg.to_dot(0);
         std::fs::create_dir_all("./test").expect("Unable to create test directory");
         std::fs::write("./test/cfg_output.dot", dot_representation).expect("Unable to write DOT file");
         let json_representation = cfg.to_json();
         std::fs::write("./test/cfg_output.json", json_representation).expect("Unable to write JSON file");
+
+        let check_ssa = cfg.check_ssa();
+        assert!(check_ssa.is_ok(), "CFG construction failed: {:?}", check_ssa.err());
     }
 }
