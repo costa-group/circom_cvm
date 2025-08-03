@@ -562,11 +562,17 @@ impl CFG {
             let locs: Vec<String> = uses.iter().map(|u| {
                 match u {
                     Use::InInstruction(bid, inst) => {
-                        format!("{}:{}", bid, inst.line) +
-                        if inst.is_phi { "(φ)" } else { "" }
+                        if inst.is_phi {
+                            format!("{}:{}(φ)", bid, inst.line)
+                        }
+                        else {
+                            format!("{}:{}", bid, inst.line + self.blocks.get(*bid).unwrap().phi_functions.len())
+                        }
+                        // format!("{}:{}", bid, inst.line) +
+                        // if inst.is_phi { "(φ)" } else { "" }
                     }
                     Use::InCondition(bid) => {
-                        format!("{}:c", bid)
+                        format!("{bid}:c")
                     }
                 }
             }).collect();
