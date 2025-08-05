@@ -127,6 +127,8 @@ pub struct LineInstruction {
     line: usize,
 }
 
+type Stack<T> = Vec<T>;
+
 #[derive(Debug, Serialize)]
 pub struct BasicBlock {
     id: usize,
@@ -138,6 +140,13 @@ pub struct BasicBlock {
     ///functions or statements accordingly
     //TODO: Maybe search directly in the vectors if they are usually small?
     declarations: HashMap<String, LineInstruction>,
+    //Necessary data for liveness analysis
+    ///Set with the variables that are used in phi functions in the successors of the block
+    phi_uses: BTreeSet<String>,
+    ///Set with the variables that are live in at the beginning of the block
+    live_in: Stack<String>,
+    ///Set with the variables that are live out at the end of the block
+    live_out: Stack<String>,
 }
 
 impl BasicBlock {
@@ -149,6 +158,9 @@ impl BasicBlock {
             predecessors: Vec::new(),
             successors: None,
             declarations: HashMap::new(),
+            phi_uses: BTreeSet::new(),
+            live_in: Stack::new(),
+            live_out: Stack::new(),
         }
     }
 
@@ -207,6 +219,39 @@ impl BasicBlock {
             panic!("Expected conditional successors");
         }
     }
+
+    fn add_phi_use(&mut self, var: &str) {
+        self.phi_uses.insert(var.to_string());
+    }
+
+    fn check_phi_use(&self, var: &str) -> bool {
+        self.phi_uses.contains(var)
+    }
+
+    fn add_to_live_in(&mut self, v: &str) {
+        self.live_in.push(v.to_string());
+    }
+
+    fn remove_from_live_in(&mut self) {
+        self.live_in.pop();
+    }
+
+    fn top_live_in(&self) -> Option<&String> {
+        self.live_in.last()
+    }
+
+    fn add_to_live_out(&mut self, v: &str) {
+        self.live_out.push(v.to_string());
+    }
+
+    fn remove_from_live_out(&mut self) {
+        self.live_out.pop();
+    }
+
+    fn top_live_out(&self) -> Option<&String> {
+        self.live_out.last()
+    }
+
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -232,29 +277,39 @@ impl CFG {
         CFG { entry, blocks: vec![BasicBlock::new(entry)], definitions: BTreeMap::new(), def_use: BTreeMap::new() }
     }
 
-    pub fn new_from_fun(f: Function) -> Self {
+    pub fn new_from_fun(f: Function) -> Result<Self, String> {
         let entry = 0;
         let mut cfg = CFG::new(entry);
 
         let mut constructor = CfgConstructor::new(&mut cfg);
         constructor.process_body(&f.body, entry, None);
 
-        cfg
+        cfg.compute_livesets_ssa_by_var();
+
+        Ok(cfg)
     }
 
-    pub fn new_from_template(t: Template) -> Self {
+    pub fn new_from_template(t: Template) -> Result<Self, String> {
         let entry = 0;
         let mut cfg = CFG::new(entry);
 
         let mut constructor = CfgConstructor::new(&mut cfg);
         constructor.process_body(&t.body, entry, None);
 
-        cfg
+        cfg.compute_livesets_ssa_by_var();
+
+        Ok(cfg)
     }
 
     pub fn add_phi_function(&mut self, block: usize, phi: PhiFunction) -> LineInstruction{
         let var = phi.output.clone();
         let line = self.blocks[block].add_phi_function(phi);
+        //Add the variables to the phi uses of the predecessors
+        //TODO: Consider avoiding cloning
+        let preds = self.blocks[block].predecessors.clone();
+        for pred in preds {
+            self.blocks[pred].add_phi_use(&var);
+        }
         if self.definitions.contains_key(&var) {
             //TODO: Improve error handling
             panic!("Variable '{}' was defined twice", var);
@@ -347,6 +402,101 @@ impl CFG {
         }
         self.def_use.entry(replacement.to_string()).or_insert_with(BTreeSet::new).insert(Use::InCondition(block));
         self.blocks[block].change_condition(target, replacement);
+    }
+
+
+    ///Liveness analysis
+    ///Taken from Domaine, & Brandner, Florian & Boissinot, Benoit & Darte, Alain & Dinechin, Benoît & Rastello, Fabrice. (2011). Computing Liveness Sets for SSA-Form Programs.
+    //TODO: Add the error when a use does not reach its definition (maybe not necessary?)
+    fn compute_livesets_ssa_by_var(&mut self) -> Result<(), String>{
+        for (var, uses) in &self.def_use {
+            for u in uses {
+                match u {
+                    Use::InCondition(block) |
+                    Use::InInstruction(block, _)
+                    => {
+                        if self.blocks[*block].check_phi_use(var) {
+                            self.blocks[*block].add_to_live_out(var);
+                        }
+
+                        let def_v = self.definitions.get(var).unwrap_or_else(|| {
+                            panic!("Variable {var} was used, but not defined!")
+                        });
+
+                        //We need a list of blocks marked in the current dfs
+                        let mut marked = vec![false; self.blocks.len()];
+                        if !Self::up_and_mark(&mut self.blocks, *block, var, def_v, &mut marked) {
+                            return Err(format!("Variable {var} was used without being dominated by its definition"));
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    ///Returns whether the definition reaches the use
+    fn up_and_mark(blocks: &mut Vec<BasicBlock>, block: usize, var: &str, def_v: &(usize, LineInstruction), marked: &mut Vec<bool>) -> bool {
+        //Defined in the block (not phi) or propagation already done -> Stop
+        if def_v.0 == block && !def_v.1.is_phi {
+            return true;
+        }
+
+        //We have already gone through this block in this dfs → cycle and we haven't reached the
+        //definition
+        if marked[block] {
+            return false;
+        }
+
+        //We have gone though this block in a previous dfs that found the definition
+        if let Some(top_live_in) = blocks[block].top_live_in() {
+            if var == top_live_in {
+                return true;
+            }
+        }
+
+        marked[block] = true;
+
+        blocks[block].add_to_live_in(var);
+
+        if def_v.0 == block /*  && def_v.1.is_phi */ {
+            return true;
+        }
+
+        //TODO: Avoid cloning
+        let preds = blocks[block].predecessors.clone();
+        let mut found_def = false;
+        for pred in preds {
+            if let Some(top_v) = blocks[pred].top_live_out() {
+                if top_v != var {
+                    blocks[pred].add_to_live_out(var);
+                }
+            }
+            else {
+                blocks[pred].add_to_live_out(var);
+            }
+
+            let found = Self::up_and_mark(blocks, pred, var, def_v, marked);
+
+            if !found {
+                //The top of the live_out is var, but we haven't reached the definition → remove it
+                //from the stack
+                blocks[pred].remove_from_live_out();
+            }
+
+            //We just need one path in which we reach the definition
+            found_def |= found;
+        }
+
+
+        if !found_def {
+            //We search through all predecessors but didn't arrive to the definition → not live in
+            blocks[block].remove_from_live_in();
+        }
+        marked[block] = false;
+
+        found_def
     }
 
     #[deprecated(note = "This function is only for debugging purposes!")]
@@ -517,6 +667,9 @@ impl CFG {
             // 1) collect one line per statement (with Debug)
             let mut lines = Vec::new();
             lines.push(format!("Block {}", block.id));
+            
+            lines.push(format!("Live in: {:?}", &block.live_in));
+
             for phi in &block.phi_functions {
                 lines.push(format!("{:?}", phi));
             }
@@ -524,6 +677,8 @@ impl CFG {
             for stmt in &block.statements {
                 lines.push(format!("{:?}", stmt));
             }
+
+            lines.push(format!("Live out: {:?}", &block.live_out));
 
             // 2) join with "\n"
             let raw_label = lines.join("\n");
@@ -632,7 +787,8 @@ impl CFGList {
 
         //CFGs for functions
         for f in ast.functions {
-            cfgs.push(CFG::new_from_fun(f));
+            //TODO: Change unwrap
+            cfgs.push(CFG::new_from_fun(f).unwrap());
         }
 
         //CFGs for templates
@@ -640,7 +796,8 @@ impl CFGList {
             if t.name == ast.main_template {
                 entry = cfgs.len();
             }
-            cfgs.push(CFG::new_from_template(t));
+            //TODO: Change unwrap
+            cfgs.push(CFG::new_from_template(t).unwrap());
         }
 
         Self { entry, cfgs }

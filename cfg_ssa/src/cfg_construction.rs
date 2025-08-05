@@ -575,7 +575,7 @@ mod tests {
                 },
                 ],
         };
-        let cfg = CFG::new_from_template(template);
+        let cfg = CFG::new_from_template(template).unwrap();
 
         let dot_representation = cfg.to_dot(0);
         std::fs::create_dir_all("./test").expect("Unable to create test directory");
