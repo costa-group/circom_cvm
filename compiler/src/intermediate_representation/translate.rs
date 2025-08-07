@@ -1095,6 +1095,7 @@ struct BusAccessInfo{
 struct ProcessedSymbol {
     line: usize,
     length: SizeOption,
+    dims: Vec<usize>,
     symbol_dimensions: Vec<usize>, // the dimensions of last symbol
     symbol_size: usize, // the size of the last symbol
     message_id: usize,
@@ -1287,6 +1288,8 @@ impl ProcessedSymbol {
             let mut is_first = true;
             let mut all_equal = true;
             let mut with_length: usize = 0;
+            let with_dims = possible_status.possible_lengths[0].clone();
+
 
             let mut multiple_sizes = vec![];
             let mut index = 0;
@@ -1330,6 +1333,7 @@ impl ProcessedSymbol {
                 line: context.files.get_line(meta.start, meta.get_file_id()).unwrap(),
                 message_id: state.message_id,
                 length: size,
+                dims: with_dims,
                 symbol_dimensions: symbol_info.dimensions.clone(),
                 symbol_size: symbol_info.size,
                 symbol: symbol_info,
@@ -1343,12 +1347,14 @@ impl ProcessedSymbol {
 
             assert!(possible_status.possible_sizes.len() == 1);
             let with_length: usize = possible_status.possible_sizes[0];
+            let with_dims: Vec<usize> = possible_status.possible_lengths[0].clone();
 
             ProcessedSymbol {
                 xtype: meta.get_type_knowledge().get_reduces_to(),
                 line: context.files.get_line(meta.start, meta.get_file_id()).unwrap(),
                 message_id: state.message_id,
                 length: SizeOption::Single(with_length),
+                dims: with_dims,
                 symbol_dimensions: initial_symbol_dimensions,
                 symbol_size: initial_symbol_size,
                 symbol: symbol_info,
@@ -1949,7 +1955,7 @@ fn is_array_variable(
         } else{
             let def = SymbolDef { meta: meta.clone(), symbol: name.clone(), acc: access.clone() };
             let aux_symbol = ProcessedSymbol::new(def, state, context);
-            return aux_symbol.symbol_dimensions.len() > 0
+            aux_symbol.dims.len() > 0            
         }
     } else {
         false
