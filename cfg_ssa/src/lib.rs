@@ -437,6 +437,7 @@ impl CFG {
     }
 
     ///Returns whether the definition reaches the use
+    //TODO: Check inside a block (the line of the use is after the definition)
     fn up_and_mark(blocks: &mut Vec<BasicBlock>, block: usize, var: &str, def_v: &(usize, LineInstruction), marked: &mut Vec<bool>) -> bool {
         //Defined in the block (not phi) or propagation already done -> Stop
         if def_v.0 == block && !def_v.1.is_phi {
