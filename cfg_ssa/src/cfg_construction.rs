@@ -21,9 +21,6 @@ pub struct CfgConstructor<'a> {
     /// Old name → SSA name
     definitions: Vec<HashMap<String, String>>,
 
-    /// SSA name of a variable -> concrete Value it has
-    values: HashMap<String, Value>,
-
     /// SSA name of the phi → List of possible values it can have depending on the execution
     phis: HashMap<String, Vec<PhiPossibility>>,
 
@@ -49,7 +46,6 @@ impl<'a> CfgConstructor<'a> {
         Self {
             cfg,
             definitions: vec![HashMap::new()],
-            values: HashMap::new(),
             phis: HashMap::new(),
             to_non_ssa: HashMap::new(),
             incomplete_phis: vec![HashSet::new()],
@@ -90,9 +86,8 @@ impl<'a> CfgConstructor<'a> {
 
     /// Write a new SSA binding for source `src` in `block` with `val`
     /// Returns ssa name
-    fn write_variable(&mut self, non_ssa_name: &str, block: usize, val: Value) -> String {
+    fn write_variable(&mut self, non_ssa_name: &str, block: usize) -> String {
         let ssa_name = self.fresh();
-        self.values.insert(ssa_name.clone(), val);
         self.to_non_ssa.insert(ssa_name.clone(), non_ssa_name.to_string());
         self.definitions[block].insert(non_ssa_name.to_string(), ssa_name.clone());
         ssa_name
@@ -155,7 +150,6 @@ impl<'a> CfgConstructor<'a> {
     fn add_phi_operands(&mut self, non_ssa_name: &str, ssa_phi_name: &str, block: usize) {
         let mut operands = Vec::new();
         let predecessors: Vec<_> = self.cfg.predecessors(block).to_vec();
-
 
         for &pred in &predecessors {
             let operand = self.read_variable(non_ssa_name, pred);
@@ -353,15 +347,15 @@ impl<'a> CfgConstructor<'a> {
             ops.push(self.read_expression(op, curr));
         }
 
-        let val = Value { operator: operator.clone(), operands: ops.clone() };
-
-        let var = output.as_ref().map(|v|
-                                  self.write_variable(v, curr, val.clone()));
-
         let pos = self.cfg.get_block_size(curr);
         for op in &ops {
             self.track_use_instruction(op, curr, LineInstruction { is_phi: false, line: pos });
         }
+
+        let val = Value { operator: operator.clone(), operands: ops };
+
+        let var = output.as_ref().map(|v|
+                                  self.write_variable(v, curr));
 
         let stmt = Statement { num_type: num_type.clone(), output: var, value: val };
         self.cfg.add_instruction(curr, stmt);
