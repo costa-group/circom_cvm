@@ -917,6 +917,7 @@ impl WriteCVM for CallBucket{
                     producer.set_current_line(self.line);
                 }
                 if !self.is_called_function_returning_array {
+                    instructions.append(&mut instructions_dest);
                     let call_res = producer.fresh_var();
                     instructions.push(format!("{} = ff.call ${} {}", call_res, self.symbol.clone(), params));
                     match ldest {
