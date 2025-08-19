@@ -616,7 +616,6 @@ impl WriteCVM for Circuit {
             //writer.flush().map_err(|_| {})?;
         }
 
-        
         writer.flush().map_err(|_| {})
     }
 }
