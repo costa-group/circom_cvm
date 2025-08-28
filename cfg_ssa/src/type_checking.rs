@@ -67,9 +67,12 @@ impl TypeChecker {
                 self.check_operation(num_type, operator, output, operands)
             },
             ASTNode::IfThenElse { num_type, condition, if_case, else_case } => {
-                self.type_expression(condition)?;
                 if self.type_expression(condition)? != Type::Variable(num_type.clone()) {
-                    return Err("Condition must be an integer".to_string());
+                    return Err(format!(
+                        "Condition must be of type {:?}, but found {:?}.",
+                        num_type,
+                        self.type_expression(condition)?
+                    ));
                 }
 
                 for inner_node in if_case {
