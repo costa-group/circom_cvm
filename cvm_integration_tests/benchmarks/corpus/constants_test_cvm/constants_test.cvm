@@ -1,0 +1,585 @@
+;; Prime value
+%%prime 21888242871839275222246405745257275088548364400416034343698204186575808495617
+
+
+;; Memory of signals
+%%signals 34
+
+
+;; Heap of components
+%%components_heap 7
+
+
+;; Types (for each field we store name type offset size nDims dims)
+
+
+;; Main template
+%%start A_1
+
+
+;; Component creation mode (implicit/explicit)
+%%components implicit
+
+
+;; Witness (signal list)
+%%witness 0 1
+
+
+%%template K_0 [ ff 1 32] [] [32] [ ]
+x_0 = i64.66
+;; getting dest
+ff.store i64.0 ff.8
+;; end of store bucket
+;;line 39
+;; getting dest
+ff.store i64.1 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.2 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.3 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.4 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.5 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.6 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.7 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.8 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.9 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.10 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.11 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.12 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.13 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.14 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.15 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.16 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.17 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.18 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.19 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.20 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.21 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.22 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.23 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.24 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.25 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.26 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.27 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.28 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.29 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.30 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.31 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.32 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.33 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.34 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.35 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.36 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.37 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.38 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.39 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.40 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.41 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.42 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.43 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.44 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.45 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.46 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.47 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.48 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.49 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.50 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.51 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.52 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.53 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.54 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.55 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.56 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.57 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.58 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.59 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.60 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.61 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.62 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.63 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.64 ff.0
+;; end of store bucket
+;; getting dest
+ff.store i64.1 ff.1116352408
+;; end of store bucket
+;; getting dest
+ff.store i64.2 ff.1899447441
+;; end of store bucket
+;; getting dest
+ff.store i64.3 ff.3049323471
+;; end of store bucket
+;; getting dest
+ff.store i64.4 ff.3921009573
+;; end of store bucket
+;; getting dest
+ff.store i64.5 ff.961987163
+;; end of store bucket
+;; getting dest
+ff.store i64.6 ff.1508970993
+;; end of store bucket
+;; getting dest
+ff.store i64.7 ff.2453635748
+;; end of store bucket
+;; getting dest
+ff.store i64.8 ff.2870763221
+;; end of store bucket
+;; getting dest
+ff.store i64.9 ff.3624381080
+;; end of store bucket
+;; getting dest
+ff.store i64.10 ff.310598401
+;; end of store bucket
+;; getting dest
+ff.store i64.11 ff.607225278
+;; end of store bucket
+;; getting dest
+ff.store i64.12 ff.1426881987
+;; end of store bucket
+;; getting dest
+ff.store i64.13 ff.1925078388
+;; end of store bucket
+;; getting dest
+ff.store i64.14 ff.2162078206
+;; end of store bucket
+;; getting dest
+ff.store i64.15 ff.2614888103
+;; end of store bucket
+;; getting dest
+ff.store i64.16 ff.3248222580
+;; end of store bucket
+;; getting dest
+ff.store i64.17 ff.3835390401
+;; end of store bucket
+;; getting dest
+ff.store i64.18 ff.4022224774
+;; end of store bucket
+;; getting dest
+ff.store i64.19 ff.264347078
+;; end of store bucket
+;; getting dest
+ff.store i64.20 ff.604807628
+;; end of store bucket
+;; getting dest
+ff.store i64.21 ff.770255983
+;; end of store bucket
+;; getting dest
+ff.store i64.22 ff.1249150122
+;; end of store bucket
+;; getting dest
+ff.store i64.23 ff.1555081692
+;; end of store bucket
+;; getting dest
+ff.store i64.24 ff.1996064986
+;; end of store bucket
+;; getting dest
+ff.store i64.25 ff.2554220882
+;; end of store bucket
+;; getting dest
+ff.store i64.26 ff.2821834349
+;; end of store bucket
+;; getting dest
+ff.store i64.27 ff.2952996808
+;; end of store bucket
+;; getting dest
+ff.store i64.28 ff.3210313671
+;; end of store bucket
+;; getting dest
+ff.store i64.29 ff.3336571891
+;; end of store bucket
+;; getting dest
+ff.store i64.30 ff.3584528711
+;; end of store bucket
+;; getting dest
+ff.store i64.31 ff.113926993
+;; end of store bucket
+;; getting dest
+ff.store i64.32 ff.338241895
+;; end of store bucket
+;; getting dest
+ff.store i64.33 ff.666307205
+;; end of store bucket
+;; getting dest
+ff.store i64.34 ff.773529912
+;; end of store bucket
+;; getting dest
+ff.store i64.35 ff.1294757372
+;; end of store bucket
+;; getting dest
+ff.store i64.36 ff.1396182291
+;; end of store bucket
+;; getting dest
+ff.store i64.37 ff.1695183700
+;; end of store bucket
+;; getting dest
+ff.store i64.38 ff.1986661051
+;; end of store bucket
+;; getting dest
+ff.store i64.39 ff.2177026350
+;; end of store bucket
+;; getting dest
+ff.store i64.40 ff.2456956037
+;; end of store bucket
+;; getting dest
+ff.store i64.41 ff.2730485921
+;; end of store bucket
+;; getting dest
+ff.store i64.42 ff.2820302411
+;; end of store bucket
+;; getting dest
+ff.store i64.43 ff.3259730800
+;; end of store bucket
+;; getting dest
+ff.store i64.44 ff.3345764771
+;; end of store bucket
+;; getting dest
+ff.store i64.45 ff.3516065817
+;; end of store bucket
+;; getting dest
+ff.store i64.46 ff.3600352804
+;; end of store bucket
+;; getting dest
+ff.store i64.47 ff.4094571909
+;; end of store bucket
+;; getting dest
+ff.store i64.48 ff.275423344
+;; end of store bucket
+;; getting dest
+ff.store i64.49 ff.430227734
+;; end of store bucket
+;; getting dest
+ff.store i64.50 ff.506948616
+;; end of store bucket
+;; getting dest
+ff.store i64.51 ff.659060556
+;; end of store bucket
+;; getting dest
+ff.store i64.52 ff.883997877
+;; end of store bucket
+;; getting dest
+ff.store i64.53 ff.958139571
+;; end of store bucket
+;; getting dest
+ff.store i64.54 ff.1322822218
+;; end of store bucket
+;; getting dest
+ff.store i64.55 ff.1537002063
+;; end of store bucket
+;; getting dest
+ff.store i64.56 ff.1747873779
+;; end of store bucket
+;; getting dest
+ff.store i64.57 ff.1955562222
+;; end of store bucket
+;; getting dest
+ff.store i64.58 ff.2024104815
+;; end of store bucket
+;; getting dest
+ff.store i64.59 ff.2227730452
+;; end of store bucket
+;; getting dest
+ff.store i64.60 ff.2361852424
+;; end of store bucket
+;; getting dest
+ff.store i64.61 ff.2428436474
+;; end of store bucket
+;; getting dest
+ff.store i64.62 ff.2756734187
+;; end of store bucket
+;; getting dest
+ff.store i64.63 ff.3204031479
+;; end of store bucket
+;; getting dest
+ff.store i64.64 ff.3329325298
+;; end of store bucket
+;;line 50
+;; getting dest
+ff.store i64.65 ff.0
+;; end of store bucket
+;; loop bucket. Line 50
+loop
+;; compute bucket
+;; load bucket
+x_1 = ff.load i64.65
+;; end of load bucket
+;; OP(LESSER)
+x_2 = ff.lt x_1 ff.32
+;; end of compute bucket
+ff.if x_2
+;;line 51
+;; compute bucket
+;; compute bucket
+;; load bucket
+x_3 = ff.load i64.65
+;; end of load bucket
+;; OP(SHIFT_R)
+x_4 = ff.shr ff.3624381080 x_3
+;; end of compute bucket
+;; OP(BITAND)
+x_5 = ff.band x_4 ff.1
+;; end of compute bucket
+;; getting dest
+;; compute bucket
+;; compute bucket
+;; compute bucket
+;; load bucket
+x_6 = ff.load i64.65
+;; end of load bucket
+;; OP(TO_ADDRESS)
+x_7 = i64.wrap_ff x_6
+;; end of compute bucket
+;; OP(MUL_ADDRESS)
+;;line 0
+x_8 = i64.mul i64.1 x_7
+;; end of compute bucket
+;; OP(ADD_ADDRESS)
+x_9 = i64.add x_8 i64.0
+;; end of compute bucket
+;;line 51
+set_signal x_9 x_5
+;; end of store bucket
+;;line 50
+;; compute bucket
+;; load bucket
+x_10 = ff.load i64.65
+;; end of load bucket
+;; OP(ADD)
+x_11 = ff.add x_10 ff.1
+;; end of compute bucket
+;; getting dest
+ff.store i64.65 x_11
+;; end of store bucket
+continue
+end
+end
+;; end of loop bucket
+
+%%template A_1 [] [ ff 0 ] [1] [ 0 ]
+x_12 = i64.3
+;;line 10
+;; getting dest
+ff.store i64.0 ff.0
+;; end of store bucket
+;;line 11
+;; getting dest
+ff.store i64.1 ff.1
+;; end of store bucket
+;;line 12
+;; getting dest
+ff.store i64.2 ff.0
+;; end of store bucket
+;; loop bucket. Line 12
+loop
+;; compute bucket
+;; load bucket
+x_13 = ff.load i64.2
+;; end of load bucket
+;; OP(LESSER)
+x_14 = ff.lt x_13 ff.32
+;; end of compute bucket
+ff.if x_14
+;;line 13
+;; compute bucket
+;; load bucket
+x_15 = ff.load i64.0
+;; end of load bucket
+;; compute bucket
+;; load bucket
+x_16 = ff.load i64.1
+;; end of load bucket
+;; load bucket
+;; compute bucket
+;; compute bucket
+;; compute bucket
+;; load bucket
+x_17 = ff.load i64.2
+;; end of load bucket
+;; OP(TO_ADDRESS)
+x_18 = i64.wrap_ff x_17
+;; end of compute bucket
+;; OP(MUL_ADDRESS)
+;;line 0
+x_19 = i64.mul i64.1 x_18
+;; end of compute bucket
+;; OP(ADD_ADDRESS)
+x_20 = i64.add x_19 i64.0
+;; end of compute bucket
+x_21 = get_cmp_signal i64.0 x_20
+;; end of load bucket
+;; OP(MUL)
+;;line 13
+x_22 = ff.mul x_16 x_21
+;; end of compute bucket
+;; OP(ADD)
+x_23 = ff.add x_15 x_22
+;; end of compute bucket
+;; getting dest
+ff.store i64.0 x_23
+;; end of store bucket
+;;line 14
+;; compute bucket
+;; load bucket
+x_24 = ff.load i64.1
+;; end of load bucket
+;; OP(MUL)
+x_25 = ff.mul x_24 ff.2
+;; end of compute bucket
+;; getting dest
+ff.store i64.1 x_25
+;; end of store bucket
+;;line 12
+;; compute bucket
+;; load bucket
+x_26 = ff.load i64.2
+;; end of load bucket
+;; OP(ADD)
+x_27 = ff.add x_26 ff.1
+;; end of compute bucket
+;; getting dest
+ff.store i64.2 x_27
+;; end of store bucket
+continue
+end
+end
+;; end of loop bucket
+;; assert bucket
+;; compute bucket
+;; load bucket
+;;line 17
+x_28 = ff.load i64.0
+;; end of load bucket
+;; load bucket
+x_29 = get_signal i64.0
+;; end of load bucket
+;; OP(EQ(Single(1)))
+x_30 = ff.eq x_28 x_29
+;; end of compute bucket
+x_31 = ff.eqz x_30
+ff.if x_31
+error i64.0
+end
+;; end of assert bucket
+

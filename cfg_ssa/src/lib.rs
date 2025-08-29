@@ -824,4 +824,39 @@ impl CFGList {
     pub fn to_dot(&self) -> Vec<String> {
         self.cfgs.iter().enumerate().map(|(id, cfg)| cfg.to_dot(id)).collect()
     }
+
+    //Returns: num_cfgs, avg_blocks_per_cfg, avg_variables_per_cfg, avg_stmts_per_block
+    pub fn get_metrics(&self) -> (usize, f64, f64, f64) {
+        let mut num_blocks: usize = 0;
+        let mut num_variables: usize = 0;
+        let mut total_stmts: usize = 0;
+
+        for cfg in &self.cfgs {
+            num_blocks += cfg.blocks.len();
+            num_variables += cfg.definitions.len();
+            for block in &cfg.blocks {
+                total_stmts += block.phi_functions.len();
+                total_stmts += block.statements.len();
+            }
+        }
+
+        fn safe_div(numerator: usize, denominator: usize) -> f64 {
+            if denominator == 0 {
+                0.0
+            } else {
+                numerator as f64 / denominator as f64
+            }
+        }
+
+        let avg_blocks_per_cfg = safe_div(num_blocks, self.cfgs.len());
+        let avg_variables_per_cfg = safe_div(num_variables, self.cfgs.len());
+        let avg_stmts_per_block = safe_div(total_stmts, num_blocks);
+
+        (
+            self.cfgs.len(),
+            avg_blocks_per_cfg,
+            avg_variables_per_cfg,
+            avg_stmts_per_block,
+        )
+    }
 }

@@ -3,7 +3,7 @@
 SEARCH_DIR="$1"
 BINARY_NAME="cvm_integration_tests"
 BIN_PATH="target/debug/$BINARY_NAME"
-LOG_DIR="logs"
+LOG_DIR="cvm_integration_tests/logs"
 
 if [ -z "$SEARCH_DIR" ]; then
   echo "Usage: $0 <directory>"

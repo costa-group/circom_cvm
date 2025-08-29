@@ -1,0 +1,730 @@
+;; Prime value
+%%prime 21888242871839275222246405745257275088548364400416034343698204186575808495617
+
+
+;; Memory of signals
+%%signals 29
+
+
+;; Heap of components
+%%components_heap 19
+
+
+;; Types (for each field we store name type offset size nDims dims)
+
+
+;; Main template
+%%start Main_4
+
+
+;; Component creation mode (implicit/explicit)
+%%components implicit
+
+
+;; Witness (signal list)
+%%witness 0 1 2 12 13 21 22 23 25
+
+
+%%template MultiMux2_0 [ ff 1 1] [ ff 2 1 4 ff 1 2] [12] [ ]
+x_0 = i64.2
+;; getting dest
+ff.store i64.0 ff.1
+;; end of store bucket
+;;line 32
+;; compute bucket
+;; load bucket
+x_1 = get_signal i64.6
+;; end of load bucket
+;; load bucket
+x_2 = get_signal i64.5
+;; end of load bucket
+;; OP(MUL)
+x_3 = ff.mul x_1 x_2
+;; end of compute bucket
+;; getting dest
+set_signal i64.11 x_3
+;; end of store bucket
+;;line 34
+;; getting dest
+ff.store i64.1 ff.0
+;; end of store bucket
+;; loop bucket. Line 34
+loop
+;; compute bucket
+;; load bucket
+x_4 = ff.load i64.1
+;; end of load bucket
+;; OP(LESSER)
+x_5 = ff.lt x_4 ff.1
+;; end of compute bucket
+ff.if x_5
+;;line 36
+;; compute bucket
+;; compute bucket
+;; compute bucket
+;; compute bucket
+;; load bucket
+x_6 = get_signal i64.4
+;; end of load bucket
+;; load bucket
+x_7 = get_signal i64.3
+;; end of load bucket
+;; OP(SUB)
+x_8 = ff.sub x_6 x_7
+;; end of compute bucket
+;; load bucket
+x_9 = get_signal i64.2
+;; end of load bucket
+;; OP(SUB)
+x_10 = ff.sub x_8 x_9
+;; end of compute bucket
+;; load bucket
+x_11 = get_signal i64.1
+;; end of load bucket
+;; OP(ADD)
+x_12 = ff.add x_10 x_11
+;; end of compute bucket
+;; load bucket
+x_13 = get_signal i64.11
+;; end of load bucket
+;; OP(MUL)
+x_14 = ff.mul x_12 x_13
+;; end of compute bucket
+;; getting dest
+set_signal i64.7 x_14
+;; end of store bucket
+;;line 37
+;; compute bucket
+;; compute bucket
+;; load bucket
+x_15 = get_signal i64.3
+;; end of load bucket
+;; load bucket
+x_16 = get_signal i64.1
+;; end of load bucket
+;; OP(SUB)
+x_17 = ff.sub x_15 x_16
+;; end of compute bucket
+;; load bucket
+x_18 = get_signal i64.6
+;; end of load bucket
+;; OP(MUL)
+x_19 = ff.mul x_17 x_18
+;; end of compute bucket
+;; getting dest
+set_signal i64.8 x_19
+;; end of store bucket
+;;line 38
+;; compute bucket
+;; compute bucket
+;; load bucket
+x_20 = get_signal i64.2
+;; end of load bucket
+;; load bucket
+x_21 = get_signal i64.1
+;; end of load bucket
+;; OP(SUB)
+x_22 = ff.sub x_20 x_21
+;; end of compute bucket
+;; load bucket
+x_23 = get_signal i64.5
+;; end of load bucket
+;; OP(MUL)
+x_24 = ff.mul x_22 x_23
+;; end of compute bucket
+;; getting dest
+set_signal i64.9 x_24
+;; end of store bucket
+;;line 39
+;; load bucket
+x_25 = get_signal i64.1
+;; end of load bucket
+;; getting dest
+set_signal i64.10 x_25
+;; end of store bucket
+;;line 41
+;; compute bucket
+;; compute bucket
+;; compute bucket
+;; load bucket
+x_26 = get_signal i64.7
+;; end of load bucket
+;; load bucket
+x_27 = get_signal i64.8
+;; end of load bucket
+;; OP(ADD)
+x_28 = ff.add x_26 x_27
+;; end of compute bucket
+;; load bucket
+x_29 = get_signal i64.9
+;; end of load bucket
+;; OP(ADD)
+x_30 = ff.add x_28 x_29
+;; end of compute bucket
+;; load bucket
+x_31 = get_signal i64.10
+;; end of load bucket
+;; OP(ADD)
+x_32 = ff.add x_30 x_31
+;; end of compute bucket
+;; getting dest
+set_signal i64.0 x_32
+;; end of store bucket
+;;line 34
+;; getting dest
+ff.store i64.1 ff.1
+;; end of store bucket
+continue
+end
+end
+;; end of loop bucket
+
+%%template Mux2_1 [ ff 0 ] [ ff 1 4 ff 1 2] [7] [ 0 ]
+x_33 = i64.1
+;;line 47
+;; getting dest
+ff.store i64.0 ff.0
+;; end of store bucket
+;;line 54
+;; getting dest
+ff.store i64.0 ff.0
+;; end of store bucket
+;; loop bucket. Line 54
+loop
+;; compute bucket
+;; load bucket
+x_34 = ff.load i64.0
+;; end of load bucket
+;; OP(LESSER)
+x_35 = ff.lt x_34 ff.4
+;; end of compute bucket
+ff.if x_35
+;;line 55
+;; load bucket
+;; compute bucket
+;; compute bucket
+;; compute bucket
+;; load bucket
+x_36 = ff.load i64.0
+;; end of load bucket
+;; OP(TO_ADDRESS)
+x_37 = i64.wrap_ff x_36
+;; end of compute bucket
+;; OP(MUL_ADDRESS)
+;;line 0
+x_38 = i64.mul i64.1 x_37
+;; end of compute bucket
+;; OP(ADD_ADDRESS)
+x_39 = i64.add x_38 i64.1
+;; end of compute bucket
+x_40 = get_signal x_39
+;; end of load bucket
+;; getting dest
+;; compute bucket
+;; compute bucket
+;; compute bucket
+;; compute bucket
+;; load bucket
+;;line 55
+x_41 = ff.load i64.0
+;; end of load bucket
+;; OP(TO_ADDRESS)
+x_42 = i64.wrap_ff x_41
+;; end of compute bucket
+;; OP(MUL_ADDRESS)
+;;line 0
+x_43 = i64.mul i64.1 x_42
+;; end of compute bucket
+;; OP(ADD_ADDRESS)
+x_44 = i64.add i64.0 x_43
+;; end of compute bucket
+;; OP(ADD_ADDRESS)
+x_45 = i64.add x_44 i64.1
+;; end of compute bucket
+;;line 55
+set_cmp_input_cnt_check i64.0 x_45 x_40
+;; end of store bucket
+;;line 54
+;; compute bucket
+;; load bucket
+x_46 = ff.load i64.0
+;; end of load bucket
+;; OP(ADD)
+x_47 = ff.add x_46 ff.1
+;; end of compute bucket
+;; getting dest
+ff.store i64.0 x_47
+;; end of store bucket
+continue
+end
+end
+;; end of loop bucket
+;;line 58
+;; getting dest
+ff.store i64.0 ff.0
+;; end of store bucket
+;; loop bucket. Line 58
+loop
+;; compute bucket
+;; load bucket
+x_48 = ff.load i64.0
+;; end of load bucket
+;; OP(LESSER)
+x_49 = ff.lt x_48 ff.2
+;; end of compute bucket
+ff.if x_49
+;;line 59
+;; load bucket
+;; compute bucket
+;; compute bucket
+;; compute bucket
+;; load bucket
+x_50 = ff.load i64.0
+;; end of load bucket
+;; OP(TO_ADDRESS)
+x_51 = i64.wrap_ff x_50
+;; end of compute bucket
+;; OP(MUL_ADDRESS)
+;;line 0
+x_52 = i64.mul i64.1 x_51
+;; end of compute bucket
+;; OP(ADD_ADDRESS)
+x_53 = i64.add x_52 i64.5
+;; end of compute bucket
+x_54 = get_signal x_53
+;; end of load bucket
+;; getting dest
+;; compute bucket
+;; compute bucket
+;; compute bucket
+;; load bucket
+;;line 59
+x_55 = ff.load i64.0
+;; end of load bucket
+;; OP(TO_ADDRESS)
+x_56 = i64.wrap_ff x_55
+;; end of compute bucket
+;; OP(MUL_ADDRESS)
+;;line 0
+x_57 = i64.mul i64.1 x_56
+;; end of compute bucket
+;; OP(ADD_ADDRESS)
+x_58 = i64.add x_57 i64.5
+;; end of compute bucket
+;;line 59
+set_cmp_input_cnt_check i64.0 x_58 x_54
+;; end of store bucket
+;;line 58
+;; compute bucket
+;; load bucket
+x_59 = ff.load i64.0
+;; end of load bucket
+;; OP(ADD)
+x_60 = ff.add x_59 ff.1
+;; end of compute bucket
+;; getting dest
+ff.store i64.0 x_60
+;; end of store bucket
+continue
+end
+end
+;; end of loop bucket
+;;line 62
+;; load bucket
+x_61 = get_cmp_signal i64.0 i64.0
+;; end of load bucket
+;; getting dest
+set_signal i64.0 x_61
+;; end of store bucket
+
+%%template Num2Bits_2 [ ff 1 2] [ ff 0 ] [3] [ ]
+x_62 = i64.4
+;;line 0
+;; getting dest
+ff.store i64.0 ff.2
+;; end of store bucket
+;;line 28
+;; getting dest
+ff.store i64.1 ff.0
+;; end of store bucket
+;;line 30
+;; getting dest
+ff.store i64.2 ff.1
+;; end of store bucket
+;;line 31
+;; getting dest
+ff.store i64.3 ff.0
+;; end of store bucket
+;; loop bucket. Line 31
+loop
+;; compute bucket
+;; load bucket
+x_63 = ff.load i64.3
+;; end of load bucket
+;; OP(LESSER)
+x_64 = ff.lt x_63 ff.2
+;; end of compute bucket
+ff.if x_64
+;;line 32
+;; compute bucket
+;; compute bucket
+;; load bucket
+x_65 = get_signal i64.2
+;; end of load bucket
+;; load bucket
+x_66 = ff.load i64.3
+;; end of load bucket
+;; OP(SHIFT_R)
+x_67 = ff.shr x_65 x_66
+;; end of compute bucket
+;; OP(BITAND)
+x_68 = ff.band x_67 ff.1
+;; end of compute bucket
+;; getting dest
+;; compute bucket
+;; compute bucket
+;; compute bucket
+;; load bucket
+x_69 = ff.load i64.3
+;; end of load bucket
+;; OP(TO_ADDRESS)
+x_70 = i64.wrap_ff x_69
+;; end of compute bucket
+;; OP(MUL_ADDRESS)
+;;line 0
+x_71 = i64.mul i64.1 x_70
+;; end of compute bucket
+;; OP(ADD_ADDRESS)
+x_72 = i64.add x_71 i64.0
+;; end of compute bucket
+;;line 32
+set_signal x_72 x_68
+;; end of store bucket
+;; assert bucket
+;; compute bucket
+;; compute bucket
+;; load bucket
+;;line 33
+;; compute bucket
+;; compute bucket
+;; compute bucket
+;; load bucket
+x_73 = ff.load i64.3
+;; end of load bucket
+;; OP(TO_ADDRESS)
+x_74 = i64.wrap_ff x_73
+;; end of compute bucket
+;; OP(MUL_ADDRESS)
+;;line 0
+x_75 = i64.mul i64.1 x_74
+;; end of compute bucket
+;; OP(ADD_ADDRESS)
+x_76 = i64.add x_75 i64.0
+;; end of compute bucket
+x_77 = get_signal x_76
+;; end of load bucket
+;; compute bucket
+;; load bucket
+;;line 33
+;; compute bucket
+;; compute bucket
+;; compute bucket
+;; load bucket
+x_78 = ff.load i64.3
+;; end of load bucket
+;; OP(TO_ADDRESS)
+x_79 = i64.wrap_ff x_78
+;; end of compute bucket
+;; OP(MUL_ADDRESS)
+;;line 0
+x_80 = i64.mul i64.1 x_79
+;; end of compute bucket
+;; OP(ADD_ADDRESS)
+x_81 = i64.add x_80 i64.0
+;; end of compute bucket
+x_82 = get_signal x_81
+;; end of load bucket
+;; OP(SUB)
+;;line 33
+x_83 = ff.sub x_82 ff.1
+;; end of compute bucket
+;; OP(MUL)
+x_84 = ff.mul x_77 x_83
+;; end of compute bucket
+;; OP(EQ(Single(1)))
+x_85 = ff.eq x_84 ff.0
+;; end of compute bucket
+x_86 = ff.eqz x_85
+ff.if x_86
+error i64.0
+end
+;; end of assert bucket
+;;line 34
+;; compute bucket
+;; load bucket
+x_87 = ff.load i64.1
+;; end of load bucket
+;; compute bucket
+;; load bucket
+;; compute bucket
+;; compute bucket
+;; compute bucket
+;; load bucket
+x_88 = ff.load i64.3
+;; end of load bucket
+;; OP(TO_ADDRESS)
+x_89 = i64.wrap_ff x_88
+;; end of compute bucket
+;; OP(MUL_ADDRESS)
+;;line 0
+x_90 = i64.mul i64.1 x_89
+;; end of compute bucket
+;; OP(ADD_ADDRESS)
+x_91 = i64.add x_90 i64.0
+;; end of compute bucket
+x_92 = get_signal x_91
+;; end of load bucket
+;; load bucket
+;;line 34
+x_93 = ff.load i64.2
+;; end of load bucket
+;; OP(MUL)
+x_94 = ff.mul x_92 x_93
+;; end of compute bucket
+;; OP(ADD)
+x_95 = ff.add x_87 x_94
+;; end of compute bucket
+;; getting dest
+ff.store i64.1 x_95
+;; end of store bucket
+;;line 35
+;; compute bucket
+;; load bucket
+x_96 = ff.load i64.2
+;; end of load bucket
+;; load bucket
+x_97 = ff.load i64.2
+;; end of load bucket
+;; OP(ADD)
+x_98 = ff.add x_96 x_97
+;; end of compute bucket
+;; getting dest
+ff.store i64.2 x_98
+;; end of store bucket
+;;line 31
+;; compute bucket
+;; load bucket
+x_99 = ff.load i64.3
+;; end of load bucket
+;; OP(ADD)
+x_100 = ff.add x_99 ff.1
+;; end of compute bucket
+;; getting dest
+ff.store i64.3 x_100
+;; end of store bucket
+continue
+end
+end
+;; end of loop bucket
+;; assert bucket
+;; compute bucket
+;; load bucket
+;;line 38
+x_101 = ff.load i64.1
+;; end of load bucket
+;; load bucket
+x_102 = get_signal i64.2
+;; end of load bucket
+;; OP(EQ(Single(1)))
+x_103 = ff.eq x_101 x_102
+;; end of compute bucket
+x_104 = ff.eqz x_103
+ff.if x_104
+error i64.0
+end
+;; end of assert bucket
+
+%%template Constants_3 [ ff 1 4] [] [4] [ ]
+x_105 = i64.1
+;;line 8
+;; getting dest
+ff.store i64.0 ff.0
+;; end of store bucket
+;;line 11
+;; getting dest
+set_signal i64.0 ff.37
+;; end of store bucket
+;;line 12
+;; getting dest
+set_signal i64.1 ff.47
+;; end of store bucket
+;;line 13
+;; getting dest
+set_signal i64.2 ff.53
+;; end of store bucket
+;;line 14
+;; getting dest
+set_signal i64.3 ff.71
+;; end of store bucket
+
+%%template Main_4 [ ff 0 ] [ ff 0 ] [2] [ 3 1 2 ]
+x_106 = i64.1
+;;line 18
+;; getting dest
+ff.store i64.0 ff.0
+;; end of store bucket
+;;line 26
+;; load bucket
+x_107 = get_signal i64.1
+;; end of load bucket
+;; getting dest
+set_cmp_input_run i64.2 i64.2 x_107
+;; end of store bucket
+;;line 27
+;; getting dest
+ff.store i64.0 ff.0
+;; end of store bucket
+;; loop bucket. Line 27
+loop
+;; compute bucket
+;; load bucket
+x_108 = ff.load i64.0
+;; end of load bucket
+;; OP(LESSER)
+x_109 = ff.lt x_108 ff.2
+;; end of compute bucket
+ff.if x_109
+;;line 28
+;; load bucket
+;; compute bucket
+;; compute bucket
+;; compute bucket
+;; load bucket
+x_110 = ff.load i64.0
+;; end of load bucket
+;; OP(TO_ADDRESS)
+x_111 = i64.wrap_ff x_110
+;; end of compute bucket
+;; OP(MUL_ADDRESS)
+;;line 0
+x_112 = i64.mul i64.1 x_111
+;; end of compute bucket
+;; OP(ADD_ADDRESS)
+x_113 = i64.add x_112 i64.0
+;; end of compute bucket
+x_114 = get_cmp_signal i64.2 x_113
+;; end of load bucket
+;; getting dest
+;; compute bucket
+;; compute bucket
+;; compute bucket
+;; load bucket
+;;line 28
+x_115 = ff.load i64.0
+;; end of load bucket
+;; OP(TO_ADDRESS)
+x_116 = i64.wrap_ff x_115
+;; end of compute bucket
+;; OP(MUL_ADDRESS)
+;;line 0
+x_117 = i64.mul i64.1 x_116
+;; end of compute bucket
+;; OP(ADD_ADDRESS)
+x_118 = i64.add x_117 i64.5
+;; end of compute bucket
+;;line 28
+set_cmp_input_cnt_check i64.1 x_118 x_114
+;; end of store bucket
+;;line 27
+;; compute bucket
+;; load bucket
+x_119 = ff.load i64.0
+;; end of load bucket
+;; OP(ADD)
+x_120 = ff.add x_119 ff.1
+;; end of compute bucket
+;; getting dest
+ff.store i64.0 x_120
+;; end of store bucket
+continue
+end
+end
+;; end of loop bucket
+;;line 30
+;; getting dest
+ff.store i64.0 ff.0
+;; end of store bucket
+;; loop bucket. Line 30
+loop
+;; compute bucket
+;; load bucket
+x_121 = ff.load i64.0
+;; end of load bucket
+;; OP(LESSER)
+x_122 = ff.lt x_121 ff.4
+;; end of compute bucket
+ff.if x_122
+;;line 31
+;; load bucket
+;; compute bucket
+;; compute bucket
+;; compute bucket
+;; load bucket
+x_123 = ff.load i64.0
+;; end of load bucket
+;; OP(TO_ADDRESS)
+x_124 = i64.wrap_ff x_123
+;; end of compute bucket
+;; OP(MUL_ADDRESS)
+;;line 0
+x_125 = i64.mul i64.1 x_124
+;; end of compute bucket
+;; OP(ADD_ADDRESS)
+x_126 = i64.add x_125 i64.0
+;; end of compute bucket
+x_127 = get_cmp_signal i64.0 x_126
+;; end of load bucket
+;; getting dest
+;; compute bucket
+;; compute bucket
+;; compute bucket
+;; load bucket
+;;line 31
+x_128 = ff.load i64.0
+;; end of load bucket
+;; OP(TO_ADDRESS)
+x_129 = i64.wrap_ff x_128
+;; end of compute bucket
+;; OP(MUL_ADDRESS)
+;;line 0
+x_130 = i64.mul i64.1 x_129
+;; end of compute bucket
+;; OP(ADD_ADDRESS)
+x_131 = i64.add x_130 i64.1
+;; end of compute bucket
+;;line 31
+set_cmp_input_cnt_check i64.1 x_131 x_127
+;; end of store bucket
+;;line 30
+;; compute bucket
+;; load bucket
+x_132 = ff.load i64.0
+;; end of load bucket
+;; OP(ADD)
+x_133 = ff.add x_132 ff.1
+;; end of compute bucket
+;; getting dest
+ff.store i64.0 x_133
+;; end of store bucket
+continue
+end
+end
+;; end of loop bucket
+;;line 34
+;; load bucket
+x_134 = get_cmp_signal i64.1 i64.0
+;; end of load bucket
+;; getting dest
+set_signal i64.0 x_134
+;; end of store bucket
+

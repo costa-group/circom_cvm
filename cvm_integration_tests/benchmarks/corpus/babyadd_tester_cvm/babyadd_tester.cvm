@@ -1,0 +1,270 @@
+;; Prime value
+%%prime 21888242871839275222246405745257275088548364400416034343698204186575808495617
+
+
+;; Memory of signals
+%%signals 11
+
+
+;; Heap of components
+%%components_heap 3
+
+
+;; Types (for each field we store name type offset size nDims dims)
+
+
+;; Main template
+%%start BabyAdd_0
+
+
+;; Component creation mode (implicit/explicit)
+%%components implicit
+
+
+;; Witness (signal list)
+%%witness 0 1 2 3 4 5 6 7 8 9 10
+
+
+%%template BabyAdd_0 [ ff 0  ff 0 ] [ ff 0  ff 0  ff 0  ff 0 ] [10] [ ]
+x_0 = i64.2
+;;line 37
+;; getting dest
+ff.store i64.0 ff.168700
+;; end of store bucket
+;;line 38
+;; getting dest
+ff.store i64.1 ff.168696
+;; end of store bucket
+;;line 40
+;; compute bucket
+;; load bucket
+x_1 = get_signal i64.2
+;; end of load bucket
+;; load bucket
+x_2 = get_signal i64.5
+;; end of load bucket
+;; OP(MUL)
+x_3 = ff.mul x_1 x_2
+;; end of compute bucket
+;; getting dest
+set_signal i64.6 x_3
+;; end of store bucket
+;;line 41
+;; compute bucket
+;; load bucket
+x_4 = get_signal i64.3
+;; end of load bucket
+;; load bucket
+x_5 = get_signal i64.4
+;; end of load bucket
+;; OP(MUL)
+x_6 = ff.mul x_4 x_5
+;; end of compute bucket
+;; getting dest
+set_signal i64.7 x_6
+;; end of store bucket
+;;line 42
+;; compute bucket
+;; compute bucket
+;; compute bucket
+;; load bucket
+x_7 = get_signal i64.2
+;; end of load bucket
+;; OP(MUL)
+x_8 = ff.mul ff.21888242871839275222246405745257275088548364400416034343698204186575808326917 x_7
+;; end of compute bucket
+;; load bucket
+x_9 = get_signal i64.3
+;; end of load bucket
+;; OP(ADD)
+x_10 = ff.add x_8 x_9
+;; end of compute bucket
+;; compute bucket
+;; load bucket
+x_11 = get_signal i64.4
+;; end of load bucket
+;; load bucket
+x_12 = get_signal i64.5
+;; end of load bucket
+;; OP(ADD)
+x_13 = ff.add x_11 x_12
+;; end of compute bucket
+;; OP(MUL)
+x_14 = ff.mul x_10 x_13
+;; end of compute bucket
+;; getting dest
+set_signal i64.8 x_14
+;; end of store bucket
+;;line 43
+;; compute bucket
+;; load bucket
+x_15 = get_signal i64.6
+;; end of load bucket
+;; load bucket
+x_16 = get_signal i64.7
+;; end of load bucket
+;; OP(MUL)
+x_17 = ff.mul x_15 x_16
+;; end of compute bucket
+;; getting dest
+set_signal i64.9 x_17
+;; end of store bucket
+;;line 45
+;; compute bucket
+;; compute bucket
+;; load bucket
+x_18 = get_signal i64.6
+;; end of load bucket
+;; load bucket
+x_19 = get_signal i64.7
+;; end of load bucket
+;; OP(ADD)
+x_20 = ff.add x_18 x_19
+;; end of compute bucket
+;; compute bucket
+;; compute bucket
+;; load bucket
+x_21 = get_signal i64.9
+;; end of load bucket
+;; OP(MUL)
+x_22 = ff.mul ff.168696 x_21
+;; end of compute bucket
+;; OP(ADD)
+x_23 = ff.add ff.1 x_22
+;; end of compute bucket
+;; OP(DIV)
+x_24 = ff.div x_20 x_23
+;; end of compute bucket
+;; getting dest
+set_signal i64.0 x_24
+;; end of store bucket
+;; assert bucket
+;; compute bucket
+;; compute bucket
+;; compute bucket
+;; compute bucket
+;; load bucket
+;;line 46
+x_25 = get_signal i64.9
+;; end of load bucket
+;; OP(MUL)
+x_26 = ff.mul ff.168696 x_25
+;; end of compute bucket
+;; OP(ADD)
+x_27 = ff.add ff.1 x_26
+;; end of compute bucket
+;; load bucket
+x_28 = get_signal i64.0
+;; end of load bucket
+;; OP(MUL)
+x_29 = ff.mul x_27 x_28
+;; end of compute bucket
+;; compute bucket
+;; load bucket
+x_30 = get_signal i64.6
+;; end of load bucket
+;; load bucket
+x_31 = get_signal i64.7
+;; end of load bucket
+;; OP(ADD)
+x_32 = ff.add x_30 x_31
+;; end of compute bucket
+;; OP(EQ(Single(1)))
+x_33 = ff.eq x_29 x_32
+;; end of compute bucket
+x_34 = ff.eqz x_33
+ff.if x_34
+error i64.0
+end
+;; end of assert bucket
+;;line 48
+;; compute bucket
+;; compute bucket
+;; compute bucket
+;; load bucket
+x_35 = get_signal i64.8
+;; end of load bucket
+;; compute bucket
+;; load bucket
+x_36 = get_signal i64.6
+;; end of load bucket
+;; OP(MUL)
+x_37 = ff.mul ff.168700 x_36
+;; end of compute bucket
+;; OP(ADD)
+x_38 = ff.add x_35 x_37
+;; end of compute bucket
+;; load bucket
+x_39 = get_signal i64.7
+;; end of load bucket
+;; OP(SUB)
+x_40 = ff.sub x_38 x_39
+;; end of compute bucket
+;; compute bucket
+;; compute bucket
+;; load bucket
+x_41 = get_signal i64.9
+;; end of load bucket
+;; OP(MUL)
+x_42 = ff.mul ff.168696 x_41
+;; end of compute bucket
+;; OP(SUB)
+x_43 = ff.sub ff.1 x_42
+;; end of compute bucket
+;; OP(DIV)
+x_44 = ff.div x_40 x_43
+;; end of compute bucket
+;; getting dest
+set_signal i64.1 x_44
+;; end of store bucket
+;; assert bucket
+;; compute bucket
+;; compute bucket
+;; compute bucket
+;; compute bucket
+;; load bucket
+;;line 49
+x_45 = get_signal i64.9
+;; end of load bucket
+;; OP(MUL)
+x_46 = ff.mul ff.168696 x_45
+;; end of compute bucket
+;; OP(SUB)
+x_47 = ff.sub ff.1 x_46
+;; end of compute bucket
+;; load bucket
+x_48 = get_signal i64.1
+;; end of load bucket
+;; OP(MUL)
+x_49 = ff.mul x_47 x_48
+;; end of compute bucket
+;; compute bucket
+;; compute bucket
+;; load bucket
+x_50 = get_signal i64.8
+;; end of load bucket
+;; compute bucket
+;; load bucket
+x_51 = get_signal i64.6
+;; end of load bucket
+;; OP(MUL)
+x_52 = ff.mul ff.168700 x_51
+;; end of compute bucket
+;; OP(ADD)
+x_53 = ff.add x_50 x_52
+;; end of compute bucket
+;; load bucket
+x_54 = get_signal i64.7
+;; end of load bucket
+;; OP(SUB)
+x_55 = ff.sub x_53 x_54
+;; end of compute bucket
+;; OP(EQ(Single(1)))
+x_56 = ff.eq x_49 x_55
+;; end of compute bucket
+x_57 = ff.eqz x_56
+ff.if x_57
+error i64.0
+end
+;; end of assert bucket
+

@@ -1,0 +1,99 @@
+;; Prime value
+%%prime 21888242871839275222246405745257275088548364400416034343698204186575808495617
+
+
+;; Memory of signals
+%%signals 4
+
+
+;; Heap of components
+%%components_heap 3
+
+
+;; Types (for each field we store name type offset size nDims dims)
+
+
+;; Main template
+%%start IsZero_0
+
+
+;; Component creation mode (implicit/explicit)
+%%components implicit
+
+
+;; Witness (signal list)
+%%witness 0 1 2 3
+
+
+%%template IsZero_0 [ ff 0 ] [ ff 0 ] [3] [ ]
+x_0 = i64.0
+;; branch bucket
+;; compute bucket
+;; load bucket
+;;line 30
+x_1 = get_signal i64.1
+;; end of load bucket
+;; OP(NOT_EQ)
+x_2 = ff.neq x_1 ff.0
+;; end of compute bucket
+ff.if x_2
+;; compute bucket
+;; load bucket
+x_3 = get_signal i64.1
+;; end of load bucket
+;; OP(DIV)
+x_4 = ff.div ff.1 x_3
+;; end of compute bucket
+;; getting dest
+set_signal i64.2 x_4
+;; end of store bucket
+else
+;; getting dest
+set_signal i64.2 ff.0
+;; end of store bucket
+end
+;; end of branch bucket
+;;line 32
+;; compute bucket
+;; compute bucket
+;; compute bucket
+;; load bucket
+x_5 = get_signal i64.1
+;; end of load bucket
+;; OP(PREFIX_SUB)
+x_6 = ff.sub ff.0 x_5
+;; end of compute bucket
+;; load bucket
+x_7 = get_signal i64.2
+;; end of load bucket
+;; OP(MUL)
+x_8 = ff.mul x_6 x_7
+;; end of compute bucket
+;; OP(ADD)
+x_9 = ff.add x_8 ff.1
+;; end of compute bucket
+;; getting dest
+set_signal i64.0 x_9
+;; end of store bucket
+;; assert bucket
+;; compute bucket
+;; compute bucket
+;; load bucket
+;;line 33
+x_10 = get_signal i64.1
+;; end of load bucket
+;; load bucket
+x_11 = get_signal i64.0
+;; end of load bucket
+;; OP(MUL)
+x_12 = ff.mul x_10 x_11
+;; end of compute bucket
+;; OP(EQ(Single(1)))
+x_13 = ff.eq x_12 ff.0
+;; end of compute bucket
+x_14 = ff.eqz x_13
+ff.if x_14
+error i64.0
+end
+;; end of assert bucket
+

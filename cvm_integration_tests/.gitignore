@@ -2,3 +2,5 @@ compiled/*
 outputs/*
 fails/*
 successes/*
+*.json
+*.dot
