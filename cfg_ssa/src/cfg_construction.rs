@@ -569,15 +569,17 @@ mod tests {
                 },
                 ],
         };
-        let cfg = CFG::new_from_template(template).unwrap();
+        let cfg = CFG::new_from_template(template);
+
+        if let Err(e) = cfg {
+            panic!("CFG construction failed: {:?}", e);
+        }
+        let cfg = cfg.unwrap();
 
         let dot_representation = cfg.to_dot(0);
         std::fs::create_dir_all("./test").expect("Unable to create test directory");
         std::fs::write("./test/cfg_output.dot", dot_representation).expect("Unable to write DOT file");
         let json_representation = cfg.to_json();
         std::fs::write("./test/cfg_output.json", json_representation).expect("Unable to write JSON file");
-
-        let check_ssa = cfg.check_ssa();
-        assert!(check_ssa.is_ok(), "CFG construction failed: {:?}", check_ssa.err());
     }
 }

@@ -85,9 +85,10 @@ fn main() {
     // Construct the control flow graph (CFG)
     let t_cfg_start = Instant::now();
     let cfg = CFGList::new(parsed_program);
-    // if let Err(err) = cfg.check_ssa() {
-    //     eprintln!("Error at SSA construction: {}", err);
-    // }
+    let cfg = cfg.unwrap_or_else(|err| {
+        eprintln!("Error at SSA construction: {}", err);
+        std::process::exit(1);
+    });
     let cfg_time = t_cfg_start.elapsed();
 
     // Write the CFG to a JSON file
@@ -116,7 +117,6 @@ fn main() {
     if metrics_mode {
         // Structural metrics
         let num_lines = file_content.lines().count();
-        //TODO: cfg metrics
         let (num_cfgs, avg_blocks_per_cfg, avg_variables_per_cfg, avg_stmts_per_block) = cfg.get_metrics();
 
         let metrics = Metrics {

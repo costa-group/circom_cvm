@@ -284,7 +284,7 @@ impl CFG {
         let mut constructor = CfgConstructor::new(&mut cfg);
         constructor.process_body(&f.body, entry, None);
 
-        cfg.compute_livesets_ssa_by_var();
+        cfg.compute_livesets_ssa_by_var()?;
 
         Ok(cfg)
     }
@@ -296,12 +296,12 @@ impl CFG {
         let mut constructor = CfgConstructor::new(&mut cfg);
         constructor.process_body(&t.body, entry, None);
 
-        cfg.compute_livesets_ssa_by_var();
+        cfg.compute_livesets_ssa_by_var()?;
 
         Ok(cfg)
     }
 
-    pub fn add_phi_function(&mut self, block: usize, phi: PhiFunction) -> LineInstruction{
+    pub fn add_phi_function(&mut self, block: usize, phi: PhiFunction) -> LineInstruction {
         let var = phi.output.clone();
         let line = self.blocks[block].add_phi_function(phi);
         //Add the variables to the phi uses of the predecessors
@@ -311,6 +311,7 @@ impl CFG {
             self.blocks[pred].add_phi_use(&var);
         }
         if self.definitions.contains_key(&var) {
+            // Check SSA property
             //TODO: Improve error handling
             panic!("Variable '{}' was defined twice", var);
         } else {
@@ -324,6 +325,7 @@ impl CFG {
         let line = self.blocks[block].add_instruction(stmt);
         if let Some(output) = var {
             if self.definitions.contains_key(&output) {
+                // Check SSA property
                 //TODO: Improve error handling
                 panic!("Variable '{}' was defined twice", output);
             } else {
@@ -404,11 +406,9 @@ impl CFG {
         self.blocks[block].change_condition(target, replacement);
     }
 
-
     ///Liveness analysis
     ///Taken from Domaine, & Brandner, Florian & Boissinot, Benoit & Darte, Alain & Dinechin, Benoît & Rastello, Fabrice. (2011). Computing Liveness Sets for SSA-Form Programs.
-    //TODO: Add the error when a use does not reach its definition (maybe not necessary?)
-    fn compute_livesets_ssa_by_var(&mut self) -> Result<(), String>{
+    fn compute_livesets_ssa_by_var(&mut self) -> Result<(), String> {
         for (var, uses) in &self.def_use {
             for u in uses {
                 match u {
@@ -500,161 +500,159 @@ impl CFG {
         found_def
     }
 
-    #[deprecated(note = "This function is only for debugging purposes!")]
-    #[doc(hidden)]
-    //TODO: Change error type
-    //TODO: Fix
-    fn check_ssa(&self) -> Result<(), String> {
-        //First pass, check double declarations and add them to a map
-        //declarations:
-        //- Key: Variable declared
-        //- Value: Block in which it is declared
-        let mut declarations = HashMap::new();
+    // Old function to check if the SSA form is valid
+    // This is now checked during the construction
+    // #[deprecated(note = "This function is only for debugging purposes!")]
+    // #[doc(hidden)]
+    // //TODO: Change error type
+    // //TODO: Fix
+    // fn check_ssa(&self) -> Result<(), String> {
+    //     //First pass, check double declarations and add them to a map
+    //     //declarations:
+    //     //- Key: Variable declared
+    //     //- Value: Block in which it is declared
+    //     let mut declarations = HashMap::new();
 
-        for (index, block) in self.blocks.iter().enumerate() {
-            for phi in &block.phi_functions {
-                if declarations.contains_key(&phi.output) {
-                    //Error: variable is declared more than once
-                    return Err(format!("Variable '{}' is declared more than once.", phi.output));
-                } else {
-                    declarations.insert(phi.output.clone(), index);
-                }
-            }
-            for stmt in &block.statements {
-                if let Some(var) = &stmt.output {
-                    if declarations.contains_key(var) {
-                        //Error: variable is declared more than once
-                        return Err(format!("Variable '{}' is declared more than once.", var));
-                    } else {
-                        declarations.insert(var.clone(), index);
-                    }
-                }
-            }
-        }
+    //     for (index, block) in self.blocks.iter().enumerate() {
+    //         for phi in &block.phi_functions {
+    //             if declarations.contains_key(&phi.output) {
+    //                 //Error: variable is declared more than once
+    //                 return Err(format!("Variable '{}' is declared more than once.", phi.output));
+    //             } else {
+    //                 declarations.insert(phi.output.clone(), index);
+    //             }
+    //         }
+    //         for stmt in &block.statements {
+    //             if let Some(var) = &stmt.output {
+    //                 if declarations.contains_key(var) {
+    //                     //Error: variable is declared more than once
+    //                     return Err(format!("Variable '{}' is declared more than once.", var));
+    //                 } else {
+    //                     declarations.insert(var.clone(), index);
+    //                 }
+    //             }
+    //         }
+    //     }
 
-        //Second pass, check uses of variables
-        //Every variable must be declared before it is used
-        let mut reachable = vec![vec![false; self.blocks.len()]; self.blocks.len()];
-        //Blocks in which we already have every reachable block
-        let mut closed_blocks = vec![false; self.blocks.len()];
-        //The entry block only has itself as reachable therefore
-        closed_blocks[0] = true;
+    //     //Second pass, check uses of variables
+    //     //Every variable must be declared before it is used
+    //     let mut reachable = vec![vec![false; self.blocks.len()]; self.blocks.len()];
+    //     //Blocks in which we already have every reachable block
+    //     let mut closed_blocks = vec![false; self.blocks.len()];
+    //     //The entry block only has itself as reachable therefore
+    //     closed_blocks[0] = true;
 
-        for (index, block) in self.blocks.iter().enumerate() {
-            //A block is reachable by itself
-            reachable[index][index] = true;
-            for prec in &block.predecessors {
-                //A block can reach its predecessors
-                reachable[index][*prec] = true;
-            }
-        }
+    //     for (index, block) in self.blocks.iter().enumerate() {
+    //         //A block is reachable by itself
+    //         reachable[index][index] = true;
+    //         for prec in &block.predecessors {
+    //             //A block can reach its predecessors
+    //             reachable[index][*prec] = true;
+    //         }
+    //     }
 
-        //use_line represents whether it is used in a phi function or a statement and the line in
-        //the corresponding vector of the simple block with id "use_block"
-        let mut ensure_reachability = |var: &str, use_block: usize, use_line: LineInstruction| -> Result<(), String> {
-            let declaration_block = *declarations
-                .get(var)
-                .ok_or_else(|| format!("Variable '{}' was not declared in the program.", var))?;
+    //     //use_line represents whether it is used in a phi function or a statement and the line in
+    //     //the corresponding vector of the simple block with id "use_block"
+    //     let mut ensure_reachability = |var: &str, use_block: usize, use_line: LineInstruction| -> Result<(), String> {
+    //         let declaration_block = *declarations
+    //             .get(var)
+    //             .ok_or_else(|| format!("Variable '{}' was not declared in the program.", var))?;
 
-            if use_block == declaration_block {
-                //TODO: Change unwrap
-                let decl_line = self.blocks[declaration_block].declarations.get(var).unwrap();
-                // Error cases:
-                // - Declared as a phi function and used in one, but before declaration
-                // - Declared in stmt and used in one, but before declaration
-                // - Declared in stmt, but used in a phi
-                if (decl_line.is_phi == use_line.is_phi && use_line.line < decl_line.line)
-                   || (!decl_line.is_phi && use_line.is_phi) {
-                    return Err(format!(
-                            "Variable '{}' was declared in block {} (line {}), but used in line {}.",
-                            var, declaration_block, decl_line.line, use_line.line
-                    ))
-                }
-            }
+    //         if use_block == declaration_block {
+    //             //TODO: Change unwrap
+    //             let decl_line = self.blocks[declaration_block].declarations.get(var).unwrap();
+    //             // Error cases:
+    //             // - Declared as a phi function and used in one, but before declaration
+    //             // - Declared in stmt and used in one, but before declaration
+    //             // - Declared in stmt, but used in a phi
+    //             if (decl_line.is_phi == use_line.is_phi && use_line.line < decl_line.line)
+    //                || (!decl_line.is_phi && use_line.is_phi) {
+    //                 return Err(format!(
+    //                         "Variable '{}' was declared in block {} (line {}), but used in line {}.",
+    //                         var, declaration_block, decl_line.line, use_line.line
+    //                 ))
+    //             }
+    //         }
 
-            if reachable[use_block][declaration_block] {
-                return Ok(());
-            }
+    //         if reachable[use_block][declaration_block] {
+    //             return Ok(());
+    //         }
 
-            if closed_blocks[use_block] {
-                return Err(format!(
-                        "Variable '{}' was declared in block '{}', but used in block '{}' which is not reachable.",
-                        var, declaration_block, use_block
-                ));
-            }
+    //         if closed_blocks[use_block] {
+    //             return Err(format!(
+    //                     "Variable '{}' was declared in block '{}', but used in block '{}' which is not reachable.",
+    //                     var, declaration_block, use_block
+    //             ));
+    //         }
 
-            //Case in which the block is not yet closed, we go backwards into the
-            //predecessors with dfs marking the visited blocks
-            let mut visited = vec![false; self.blocks.len()];
-            let mut queue = VecDeque::new();
+    //         //Case in which the block is not yet closed, we go backwards into the
+    //         //predecessors with dfs marking the visited blocks
+    //         let mut visited = vec![false; self.blocks.len()];
+    //         let mut queue = VecDeque::new();
 
-            visited[use_block] = true;
-            queue.push_back(use_block);
+    //         visited[use_block] = true;
+    //         queue.push_back(use_block);
 
-            while let Some(node) = queue.pop_front() {
-                //TODO: Improve this so that not only the index block is updated (also
-                //all those that we visit)
-                reachable[use_block][node] = true;
-                if node == declaration_block {
-                    break;
-                }
+    //         while let Some(node) = queue.pop_front() {
+    //             //TODO: Improve this so that not only the index block is updated (also
+    //             //all those that we visit)
+    //             reachable[use_block][node] = true;
+    //             if node == declaration_block {
+    //                 break;
+    //             }
 
-                for &neighbor in &self.blocks[node].predecessors {
-                    if !visited[neighbor] {
-                        visited[neighbor] = true;
-                        queue.push_back(neighbor);
-                    }
-                }
-            }
+    //             for &neighbor in &self.blocks[node].predecessors {
+    //                 if !visited[neighbor] {
+    //                     visited[neighbor] = true;
+    //                     queue.push_back(neighbor);
+    //                 }
+    //             }
+    //         }
 
-            if queue.is_empty() {
-                closed_blocks[use_block] = true;
-            }
+    //         if queue.is_empty() {
+    //             closed_blocks[use_block] = true;
+    //         }
 
-            //Error if the index block is closed, but the position block is not
-            //reachable from it
-            if !reachable[use_block][declaration_block] && closed_blocks[use_block] {
-                return Err(format!(
-                        "Variable '{}' was declared in block '{}', but used in block '{}' and it is not reachable.",
-                        var, declaration_block, use_block
-                ));
-            }
+    //         //Error if the index block is closed, but the position block is not
+    //         //reachable from it
+    //         if !reachable[use_block][declaration_block] && closed_blocks[use_block] {
+    //             return Err(format!(
+    //                     "Variable '{}' was declared in block '{}', but used in block '{}' and it is not reachable.",
+    //                     var, declaration_block, use_block
+    //             ));
+    //         }
 
-            Ok(())
-        };
+    //         Ok(())
+    //     };
 
-        for (block_index, block) in self.blocks.iter().enumerate() {
-            //Check the uses of each phi function
-            for (line, phi) in block.phi_functions.iter().enumerate() {
-                for pos in &phi.possibilities {
-                    let use_line = LineInstruction { is_phi: true, line };
-                    ensure_reachability(&pos.variable, block_index, use_line)?;
-                }
-            }
+    //     for (block_index, block) in self.blocks.iter().enumerate() {
+    //         //Check the uses of each phi function
+    //         for (line, phi) in block.phi_functions.iter().enumerate() {
+    //             for pos in &phi.possibilities {
+    //                 let use_line = LineInstruction { is_phi: true, line };
+    //                 ensure_reachability(&pos.variable, block_index, use_line)?;
+    //             }
+    //         }
 
-            //Check the uses of each statement
-            for (line, stmt) in block.statements.iter().enumerate() {
-                let val = &stmt.value;
-                for operand in &val.operands {
-                    for var in get_variable_names(operand) {
-                        let use_line = LineInstruction { is_phi: false, line };
-                        ensure_reachability(&var, block_index, use_line)?;
-                    }
-                }
-            }
-        }
+    //         //Check the uses of each statement
+    //         for (line, stmt) in block.statements.iter().enumerate() {
+    //             let val = &stmt.value;
+    //             for operand in &val.operands {
+    //                 for var in get_variable_names(operand) {
+    //                     let use_line = LineInstruction { is_phi: false, line };
+    //                     ensure_reachability(&var, block_index, use_line)?;
+    //                 }
+    //             }
+    //         }
+    //     }
 
-        Ok(())
-    }
+    //     Ok(())
+    // }
 
-    #[deprecated(note = "This function is only for debugging purposes!")]
-    #[doc(hidden)]
     pub fn to_json(&self) -> String {
         serde_json::to_string_pretty(self).unwrap()
     }
 
-    #[deprecated(note = "This function is only for debugging purposes!")]
-    #[doc(hidden)]
     pub fn to_dot(&self, id: usize) -> String {
         // helper: only escape quotes, leave \n alone
         fn esc(s: &str) -> String {
@@ -782,14 +780,14 @@ pub struct CFGList {
 }
 
 impl CFGList {
-    pub fn new(ast: AST) -> Self {
+    pub fn new(ast: AST) -> Result<Self, String> {
         let mut cfgs = Vec::new();
         let mut entry = 0;
 
         //CFGs for functions
         for f in ast.functions {
             //TODO: Change unwrap
-            cfgs.push(CFG::new_from_fun(f).unwrap());
+            cfgs.push(CFG::new_from_fun(f)?);
         }
 
         //CFGs for templates
@@ -798,34 +796,31 @@ impl CFGList {
                 entry = cfgs.len();
             }
             //TODO: Change unwrap
-            cfgs.push(CFG::new_from_template(t).unwrap());
+            cfgs.push(CFG::new_from_template(t)?);
         }
 
-        Self { entry, cfgs }
+        Ok(Self { entry, cfgs })
     }
 
-    #[deprecated(note = "This function is only for debugging purposes!")]
-    #[doc(hidden)]
-    pub fn check_ssa(&self) -> Result<(), String> {
-        for (i, cfg) in self.cfgs.iter().enumerate() {
-            cfg.check_ssa().map_err(|e| format!("cfg[{}] failed SSA check: {}", i, e))?;
-        }
-        Ok(())
-    }
+    // This is now checked during the construction
+    // #[deprecated(note = "This function is only for debugging purposes!")]
+    // #[doc(hidden)]
+    // pub fn check_ssa(&self) -> Result<(), String> {
+    //     for (i, cfg) in self.cfgs.iter().enumerate() {
+    //         cfg.check_ssa().map_err(|e| format!("cfg[{}] failed SSA check: {}", i, e))?;
+    //     }
+    //     Ok(())
+    // }
 
-    #[deprecated(note = "This function is only for debugging purposes!")]
-    #[doc(hidden)]
     pub fn to_json(&self) -> String {
         serde_json::to_string_pretty(self).unwrap()
     }
 
-    #[deprecated(note = "This function is only for debugging purposes!")]
-    #[doc(hidden)]
     pub fn to_dot(&self) -> Vec<String> {
         self.cfgs.iter().enumerate().map(|(id, cfg)| cfg.to_dot(id)).collect()
     }
 
-    //Returns: num_cfgs, avg_blocks_per_cfg, avg_variables_per_cfg, avg_stmts_per_block
+    ///Returns: num_cfgs, avg_blocks_per_cfg, avg_variables_per_cfg, avg_stmts_per_block
     pub fn get_metrics(&self) -> (usize, f64, f64, f64) {
         let mut num_blocks: usize = 0;
         let mut num_variables: usize = 0;
