@@ -571,10 +571,10 @@ mod tests {
         };
         let cfg = CFG::new_from_template(template);
 
-        if let Err(e) = cfg {
-            panic!("CFG construction failed: {:?}", e);
-        }
-        let cfg = cfg.unwrap();
+        let cfg = cfg.unwrap_or_else(|err| {
+            eprintln!("Error at CFG construction: {}", err);
+            std::process::exit(1);
+        });
 
         let dot_representation = cfg.to_dot(0);
         std::fs::create_dir_all("./test").expect("Unable to create test directory");
