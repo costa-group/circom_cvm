@@ -5,7 +5,7 @@ pub mod type_checking;
 mod cfg_construction;
 mod tests;
 
-use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 
 use ast::{Function, Template, AST};
 use cfg_construction::CfgConstructor;
@@ -410,6 +410,9 @@ impl CFG {
     ///Taken from Domaine, & Brandner, Florian & Boissinot, Benoit & Darte, Alain & Dinechin, Benoît & Rastello, Fabrice. (2011). Computing Liveness Sets for SSA-Form Programs.
     fn compute_livesets_ssa_by_var(&mut self) -> Result<(), String> {
         for (var, uses) in &self.def_use {
+            let (def_block, _) = self.definitions.get(var).unwrap();
+            let on_path = Self::on_path_from_def(&self.blocks, *def_block);
+
             for u in uses {
                 match u {
                     Use::InCondition(block) |
@@ -423,9 +426,10 @@ impl CFG {
                             panic!("Variable {var} was used, but not defined!")
                         });
 
+
                         //We need a list of blocks marked in the current dfs
                         let mut marked = vec![false; self.blocks.len()];
-                        if !Self::up_and_mark(&mut self.blocks, *block, var, def_v, &mut marked) {
+                        if !Self::up_and_mark(&mut self.blocks, *block, var, def_v, &mut marked, &on_path) {
                             return Err(format!("Variable {var} was used without being dominated by its definition"));
                         }
                     }
@@ -436,9 +440,40 @@ impl CFG {
         Ok(())
     }
 
+    ///Returns a list with all the blocks that the origin_block can reach through a bfs
+    fn on_path_from_def(blocks: &Vec<BasicBlock>, origin_block: usize) -> HashSet<usize> {
+        let mut reachable = HashSet::new();
+        let mut queue = VecDeque::new();
+
+        queue.push_back(origin_block);
+        reachable.insert(origin_block);
+
+        while let Some(current) = queue.pop_front() {
+            if let Some(succ) = &blocks[current].successors {
+                match succ {
+                    Successor::Unconditional { to } => {
+                        if reachable.insert(*to) {
+                            queue.push_back(*to);
+                        }
+                    }
+                    Successor::Conditional { to_then, to_else, .. } => {
+                        if reachable.insert(*to_then) {
+                            queue.push_back(*to_then);
+                        }
+                        if reachable.insert(*to_else) {
+                            queue.push_back(*to_else);
+                        }
+                    }
+                }
+            }
+        }
+
+        reachable
+    }
+
     ///Returns whether the definition reaches the use
     //TODO: Check inside a block (the line of the use is after the definition)
-    fn up_and_mark(blocks: &mut Vec<BasicBlock>, block: usize, var: &str, def_v: &(usize, LineInstruction), marked: &mut Vec<bool>) -> bool {
+    fn up_and_mark(blocks: &mut Vec<BasicBlock>, block: usize, var: &str, def_v: &(usize, LineInstruction), marked: &mut Vec<bool>, on_path: &HashSet<usize>) -> bool {
         //Defined in the block (not phi) or propagation already done -> Stop
         if def_v.0 == block && !def_v.1.is_phi {
             return true;
@@ -447,7 +482,8 @@ impl CFG {
         //We have already gone through this block in this dfs → cycle and we haven't reached the
         //definition
         if marked[block] {
-            return false;
+            // If the current block can reach the definition
+            return on_path.contains(&block);
         }
 
         //We have gone though this block in a previous dfs that found the definition
@@ -469,6 +505,10 @@ impl CFG {
         let preds = blocks[block].predecessors.clone();
         let mut found_def = false;
         for pred in preds {
+            if !on_path.contains(&pred) {
+                continue;
+            }
+
             if let Some(top_v) = blocks[pred].top_live_out() {
                 if top_v != var {
                     blocks[pred].add_to_live_out(var);
@@ -478,15 +518,11 @@ impl CFG {
                 blocks[pred].add_to_live_out(var);
             }
 
-            let found = Self::up_and_mark(blocks, pred, var, def_v, marked);
-
-            if !found {
-                //The top of the live_out is var, but we haven't reached the definition → remove it
-                //from the stack
-                blocks[pred].remove_from_live_out();
-            }
+            //TODO: This should always be true
+            let found = Self::up_and_mark(blocks, pred, var, def_v, marked, on_path);
 
             //We just need one path in which we reach the definition
+            //TODO: This should always be true
             found_def |= found;
         }
 
@@ -786,7 +822,6 @@ impl CFGList {
 
         //CFGs for functions
         for f in ast.functions {
-            //TODO: Change unwrap
             cfgs.push(CFG::new_from_fun(f)?);
         }
 
@@ -795,7 +830,6 @@ impl CFGList {
             if t.name == ast.main_template {
                 entry = cfgs.len();
             }
-            //TODO: Change unwrap
             cfgs.push(CFG::new_from_template(t)?);
         }
 
