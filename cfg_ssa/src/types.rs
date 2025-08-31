@@ -192,8 +192,7 @@ pub fn get_variable_names(expression: &Expression) -> Vec<String> {
             Atomic::Variable(name) => vec![name.clone()],
             //TODO: I don't add them to the vector because they are not ssa variables in the same
             //sense as the rest of the variables. Maybe should be changed.
-            Atomic::Function(name) => vec![],
-            Atomic::Constant(_) => vec![],
+            Atomic::Function(_) | Atomic::Constant(_) => vec![],
         },
         Expression::Parameter(parameter) => match parameter {
             Parameter::Signal { index, size } => {

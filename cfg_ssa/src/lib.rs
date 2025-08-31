@@ -1,6 +1,5 @@
 pub mod ast;
 pub mod types;
-//TODO: This should not be public, but i want to test first
 pub mod type_checking;
 mod cfg_construction;
 mod tests;
@@ -138,7 +137,6 @@ pub struct BasicBlock {
     successors: Option<Successor>,
     ///Whether a variable is declared as a phi function and its position in the list of phi
     ///functions or statements accordingly
-    //TODO: Maybe search directly in the vectors if they are usually small?
     declarations: BTreeMap<String, LineInstruction>,
     //Necessary data for liveness analysis
     ///Set with the variables that are used in phi functions in the successors of the block
@@ -232,20 +230,12 @@ impl BasicBlock {
         self.live_in.push(v.to_string());
     }
 
-    fn remove_from_live_in(&mut self) {
-        self.live_in.pop();
-    }
-
     fn top_live_in(&self) -> Option<&String> {
         self.live_in.last()
     }
 
     fn add_to_live_out(&mut self, v: &str) {
         self.live_out.push(v.to_string());
-    }
-
-    fn remove_from_live_out(&mut self) {
-        self.live_out.pop();
     }
 
     fn top_live_out(&self) -> Option<&String> {
@@ -282,7 +272,7 @@ impl CFG {
         let mut cfg = CFG::new(entry);
 
         let mut constructor = CfgConstructor::new(&mut cfg);
-        constructor.process_body(&f.body, entry, None);
+        constructor.process_body(&f.body, entry, None)?;
 
         cfg.compute_livesets_ssa_by_var()?;
 
@@ -294,14 +284,14 @@ impl CFG {
         let mut cfg = CFG::new(entry);
 
         let mut constructor = CfgConstructor::new(&mut cfg);
-        constructor.process_body(&t.body, entry, None);
+        constructor.process_body(&t.body, entry, None)?;
 
         cfg.compute_livesets_ssa_by_var()?;
 
         Ok(cfg)
     }
 
-    pub fn add_phi_function(&mut self, block: usize, phi: PhiFunction) -> LineInstruction {
+    pub fn add_phi_function(&mut self, block: usize, phi: PhiFunction) -> Result<LineInstruction, String> {
         let var = phi.output.clone();
         let line = self.blocks[block].add_phi_function(phi);
         //Add the variables to the phi uses of the predecessors
@@ -312,26 +302,25 @@ impl CFG {
         }
         if self.definitions.contains_key(&var) {
             // Check SSA property
-            //TODO: Improve error handling
-            panic!("Variable '{}' was defined twice", var);
+            return Err(format!("Variable '{}' was defined twice", var));
         } else {
             self.definitions.insert(var, (block, line.clone()));
         }
-        line
+        Ok(line)
     }
 
-    pub fn add_instruction(&mut self, block: usize, stmt: Statement) {
+    pub fn add_instruction(&mut self, block: usize, stmt: Statement) -> Result<(), String> {
         let var = stmt.output.clone();
         let line = self.blocks[block].add_instruction(stmt);
         if let Some(output) = var {
             if self.definitions.contains_key(&output) {
                 // Check SSA property
-                //TODO: Improve error handling
-                panic!("Variable '{}' was defined twice", output);
+                return Err(format!("Variable '{}' was defined twice", output));
             } else {
                 self.definitions.insert(output, (block, line));
             }
         }
+        Ok(())
     }
 
     pub fn create_new_block(&mut self) -> usize {
@@ -355,7 +344,7 @@ impl CFG {
     }
 
     pub fn add_uncond_link(&mut self, pred: usize, suc: usize) {
-        //TODO: check if this is correct: do not overwrite existing successors
+        //do not overwrite existing successors
         if !self.check_existing_successor(pred) {
             self.blocks[pred].add_succesor(Successor::Unconditional { to: suc });
             self.blocks[suc].add_predecessor(pred);
@@ -363,7 +352,7 @@ impl CFG {
     }
 
     pub fn add_cond_link(&mut self, pred: usize, condition: Expression, to_then: usize, to_else: usize) {
-        //TODO: check if this is correct: do not overwrite existing successors
+        //do not overwrite existing successors
         if !self.check_existing_successor(pred) {
             self.blocks[pred].add_succesor(Successor::Conditional { condition, to_then, to_else });
             self.blocks[to_then].add_predecessor(pred);
@@ -576,7 +565,7 @@ impl CFG {
 
 
         let mut du_lines = Vec::new();
-        du_lines.push("Def‑Use Chains".to_string());
+        du_lines.push("Def-Use Chains".to_string());
         for (var, uses) in &self.def_use {
             // render each use as "BID:L(φ?)" or "BID:cond"
             let locs: Vec<String> = uses.iter().map(|u| {

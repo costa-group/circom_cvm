@@ -76,12 +76,13 @@ impl<'a> CfgConstructor<'a> {
     }
 
     /// Seal a block: finish φ-nodes
-    fn seal_block(&mut self, block: usize) {
+    fn seal_block(&mut self, block: usize) -> Result<(), String> {
         let pending_phis = std::mem::take(&mut self.incomplete_phis[block]);
         for (non_ssa_name, ssa_phi_name) in pending_phis {
-            self.add_phi_operands(&non_ssa_name, &ssa_phi_name, block);
+            self.add_phi_operands(&non_ssa_name, &ssa_phi_name, block)?;
         }
         self.sealed_blocks[block] = true;
+        Ok(())
     }
 
     /// Write a new SSA binding for source `src` in `block` with `val`
@@ -104,28 +105,28 @@ impl<'a> CfgConstructor<'a> {
 
     /// Read a variable, inserting φ if needed
     /// Returns ssa name
-    fn read_variable(&mut self, non_ssa_name: &str, block: usize) -> String {
+    fn read_variable(&mut self, non_ssa_name: &str, block: usize) -> Result<String, String> {
         if let Some(ssa_name) = self.definitions[block].get(non_ssa_name) {
-            return ssa_name.clone();
+            return Ok(ssa_name.clone());
         }
         self.read_recursive(non_ssa_name, block)
     }
 
     /// Recursively tries to read a variable, inserting φ if needed
     /// Returns ssa name
-    fn read_recursive(&mut self, non_ssa_name: &str, block: usize) -> String {
+    fn read_recursive(&mut self, non_ssa_name: &str, block: usize) -> Result<String, String> {
         if !self.sealed_blocks[block] {
             // Incomplete block: create φ placeholder
             let ssa_phi_name = self.write_phi_function(non_ssa_name, block);
             self.incomplete_phis[block].insert((non_ssa_name.to_string(), ssa_phi_name.clone()));
-            return ssa_phi_name;
+            return Ok(ssa_phi_name);
         }
 
         let predecessors = self.cfg.predecessors(block);
 
         // Single predecessor -> no φ needed
         if predecessors.len() == 1 {
-            let v = self.read_variable(non_ssa_name, predecessors[0]);
+            let v = self.read_variable(non_ssa_name, predecessors[0])?;
 
             // Don't write_variable because it creates a new SSA name
 
@@ -134,28 +135,31 @@ impl<'a> CfgConstructor<'a> {
             let usage = UseTemp::InMemoization(block);
             self.uses.entry(v.clone()).or_default().insert(usage);
 
-            return v;
+            return Ok(v);
         }
 
         // Multiple predecessors -> φ
         // Break potential cycles with operandless phi
         let ssa_phi_name = self.write_phi_function(non_ssa_name, block);
-        self.add_phi_operands(non_ssa_name, &ssa_phi_name, block);
+        self.add_phi_operands(non_ssa_name, &ssa_phi_name, block)?;
 
         // In case phi is trivial, we read again
         self.read_variable(non_ssa_name, block)
     }
 
     /// Add φ operands from all predecessors for `name` in `block`
-    fn add_phi_operands(&mut self, non_ssa_name: &str, ssa_phi_name: &str, block: usize) {
+    fn add_phi_operands(&mut self, non_ssa_name: &str, ssa_phi_name: &str, block: usize) -> Result<(), String> {
         let mut operands = Vec::new();
         let predecessors: Vec<_> = self.cfg.predecessors(block).to_vec();
 
         for &pred in &predecessors {
-            let operand = self.read_variable(non_ssa_name, pred);
+            let operand = self.read_variable(non_ssa_name, pred)?;
             operands.push((operand.clone(), pred));
         }
-        let phi_operation = self.phis.get_mut(ssa_phi_name).expect("Phi node missing");
+        let phi_operation = match self.phis.get_mut(ssa_phi_name) {
+            Some(op) => op,
+            None => return Err(format!("Phi node '{}' missing", ssa_phi_name)),
+        };
         phi_operation.extend(
             operands
                 .into_iter()
@@ -165,12 +169,14 @@ impl<'a> CfgConstructor<'a> {
         let phi_operation = phi_operation.clone();
         if !self.try_remove_trivial(ssa_phi_name, non_ssa_name, block) {
             let phi = crate::PhiFunction { output: ssa_phi_name.to_string(), possibilities: phi_operation.clone() };
-            let line = self.cfg.add_phi_function(block, phi);
+            let line = self.cfg.add_phi_function(block, phi)?;
 
             for op in phi_operation {
                 self.track_use_instruction(&Expression::Atomic(Atomic::Variable(op.variable.to_string())), block, line.clone());
             }
         }
+
+        Ok(())
     }
 
     /// Simplify trivial φ-nodes with identical operands
@@ -226,56 +232,57 @@ impl<'a> CfgConstructor<'a> {
         true
     }
 
-    fn read_expression(&mut self, op: &Expression, block: usize) -> Expression {
+    fn read_expression(&mut self, op: &Expression, block: usize) -> Result<Expression, String> {
         match op {
             Expression::Atomic(Atomic::Variable(var)) => {
-                Expression::Atomic(Atomic::Variable(self.read_variable(var, block)))
+                Ok(Expression::Atomic(Atomic::Variable(self.read_variable(var, block)?)))
             }
-            Expression::Atomic(atomic) => Expression::Atomic(atomic.clone()),
+            Expression::Atomic(atomic) => Ok(Expression::Atomic(atomic.clone())),
             Expression::Parameter(param) => {
                 let mut new_param = param.clone();
-                let mut update_atomic = |a: &mut Atomic| {
+                let mut update_atomic = |a: &mut Atomic| -> Result<(), String> {
                     if let Atomic::Variable(var) = a {
-                        *var = self.read_variable(var, block);
+                        *var = self.read_variable(var, block)?;
                     }
+                    Ok(())
                 };
 
                 match &mut new_param {
                     Parameter::Signal { index, size }
                     | Parameter::I64Memory { index, size }
                     | Parameter::FfMemory { index, size } => {
-                        update_atomic(index);
-                        update_atomic(size);
+                        update_atomic(index)?;
+                        update_atomic(size)?;
                     }
                     Parameter::SubcmpSignal { component, index, size } => {
-                        update_atomic(component);
-                        update_atomic(index);
-                        update_atomic(size);
+                        update_atomic(component)?;
+                        update_atomic(index)?;
+                        update_atomic(size)?;
                     }
                 }
-                Expression::Parameter(new_param)
+                Ok(Expression::Parameter(new_param))
             }
         }
     }
 
     /// Process AST nodes into CFG, returning the last block
     /// loop_blocks: (entry, exit)
-    pub fn process_body(&mut self, body: &[ASTNode], mut curr: usize, loop_blocks: Option<(usize, usize)>) -> usize {
+    pub fn process_body(&mut self, body: &[ASTNode], mut curr: usize, loop_blocks: Option<(usize, usize)>) -> Result<usize, String> {
         for stmt in body {
             curr = match stmt {
                 ASTNode::Operation { num_type, operator, output, operands } => {
                     if let Some(Operator::Error) = operator {
-                        let new_curr = self.handle_operation(curr, num_type, operator, output, operands);
+                        let new_curr = self.handle_operation(curr, num_type, operator, output, operands)?;
                         self.exception_blocks.insert(new_curr);
-                        return new_curr;
+                        return Ok(new_curr);
                     }
-                    self.handle_operation(curr, num_type, operator, output, operands)
+                    self.handle_operation(curr, num_type, operator, output, operands)?
                 }
-                ASTNode::Loop { body: loop_body } => self.handle_loop(loop_body, curr),
+                ASTNode::Loop { body: loop_body } => self.handle_loop(loop_body, curr)?,
                 ASTNode::IfThenElse { num_type: _, condition, if_case, else_case } => {
-                    let cond = self.read_expression(condition, curr);
-                    self.track_use_condition(&cond, curr);
-                    self.handle_if(&cond, if_case, else_case, curr, loop_blocks)
+                    let cond = self.read_expression(condition, curr)?;
+                    self.track_use_condition(&cond, curr)?;
+                    self.handle_if(&cond, if_case, else_case, curr, loop_blocks)?
                 }
                 ASTNode::Break => {
                     let out = loop_blocks.expect("break outside loop").1;
@@ -290,7 +297,7 @@ impl<'a> CfgConstructor<'a> {
             };
         }
 
-        curr
+        Ok(curr)
     }
 
 
@@ -324,15 +331,16 @@ impl<'a> CfgConstructor<'a> {
         }
     }
 
-    fn track_use_condition(&mut self, op: &Expression, block: usize) {
+    fn track_use_condition(&mut self, op: &Expression, block: usize) -> Result<(), String> {
         let usage = UseTemp::InBlock(Use::InCondition(block));
         if let Expression::Atomic(Atomic::Variable(var)) = op {
             self.uses.entry(var.clone()).or_default().insert(usage);
             self.cfg.track_use_condition(block, var.clone());
         }
         else if let Expression::Parameter(_) = op {
-            panic!("The condition of a branch cannot be a parameter for a function");
+            return Err("The condition of a branch cannot be a parameter for a function".to_string());
         }
+        Ok(())
     }
 
     fn handle_operation(
@@ -341,10 +349,10 @@ impl<'a> CfgConstructor<'a> {
         operator: &Option<crate::types::Operator>,
         output: &Option<String>,
         operands: &Vec<Expression>,
-    ) -> usize {
+    ) -> Result<usize, String> {
         let mut ops = Vec::new();
         for op in operands {
-            ops.push(self.read_expression(op, curr));
+            ops.push(self.read_expression(op, curr)?);
         }
 
         let pos = self.cfg.get_block_size(curr);
@@ -358,9 +366,9 @@ impl<'a> CfgConstructor<'a> {
                                   self.write_variable(v, curr));
 
         let stmt = Statement { num_type: num_type.clone(), output: var, value: val };
-        self.cfg.add_instruction(curr, stmt);
+        self.cfg.add_instruction(curr, stmt)?;
 
-        curr
+        Ok(curr)
     }
 
     /// Helper: create a new block and link from `curr`
@@ -370,7 +378,7 @@ impl<'a> CfgConstructor<'a> {
         b
     }
 
-    fn handle_loop(&mut self, loop_body: &[ASTNode], curr: usize) -> usize {
+    fn handle_loop(&mut self, loop_body: &[ASTNode], curr: usize) -> Result<usize, String> {
         // Add new block for the loop body (if the current is not empty)
         let entry = self.create_and_link(curr);
 
@@ -378,17 +386,17 @@ impl<'a> CfgConstructor<'a> {
         let after = self.create_block();
 
         // The block that will be the last one in the loop
-        let last = self.process_body(loop_body, entry, Some((entry, after)));
+        let last = self.process_body(loop_body, entry, Some((entry, after)))?;
         if !self.cfg.predecessors(last).is_empty() && !self.exception_blocks.contains(&last) {
             self.cfg.add_uncond_link(last, after);
         }
 
         // Seal the blocks
-        self.seal_block(entry);
-        self.seal_block(after);
+        self.seal_block(entry)?;
+        self.seal_block(after)?;
 
         // Continue after the loop
-        after
+        Ok(after)
     }
 
     fn handle_if(
@@ -398,7 +406,7 @@ impl<'a> CfgConstructor<'a> {
         else_case: &Option<Vec<ASTNode>>,
         curr: usize,
         loop_blocks: Option<(usize, usize)>,
-    ) -> usize {
+    ) -> Result<usize, String> {
         // If body
         let then_b = self.create_block();
 
@@ -414,34 +422,35 @@ impl<'a> CfgConstructor<'a> {
         self.cfg.add_cond_link(curr, condition.clone(), then_b, else_b);
 
         // Seal the blocks that start then and else
-        self.seal_block(then_b);
+        self.seal_block(then_b)?;
         // Ensure the join is not accidentally sealed
         if else_case.is_some() {
-            self.seal_block(else_b);
+            self.seal_block(else_b)?;
         }
 
         // Process then case
-        let end_then = self.process_body(if_case, then_b, loop_blocks);
+        let end_then = self.process_body(if_case, then_b, loop_blocks)?;
         if !self.exception_blocks.contains(&end_then) {
             self.cfg.add_uncond_link(end_then, join);
         }
 
         if let Some(else_stmts) = else_case {
-            let end_else = self.process_body(else_stmts, else_b, loop_blocks);
+            let end_else = self.process_body(else_stmts, else_b, loop_blocks)?;
             if !self.exception_blocks.contains(&end_else) {
                 self.cfg.add_uncond_link(end_else, join);
             }
         }
 
         // Seal join
-        self.seal_block(join);
+        self.seal_block(join)?;
 
-        join
+        Ok(join)
     }
 
-    pub fn remove_unreachable_blocks(&mut self) {
-        todo!();
-    }
+    //TODO
+    // pub fn remove_unreachable_blocks(&mut self) {
+    //     todo!();
+    // }
 }
 
 #[cfg(test)]

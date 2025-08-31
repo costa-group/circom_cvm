@@ -329,10 +329,7 @@ pub fn parse_program(input: &str) -> IResult<&str, AST> {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs, path::Path};
-
     use cfg_ssa::types::{Atomic, ConstantType, Expression, NumericType, Operator};
-    use std::io::Write;
 
     use super::*;
 
