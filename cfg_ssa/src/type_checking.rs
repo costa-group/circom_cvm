@@ -1,20 +1,20 @@
 use crate::ast::*;
 use crate::types::*;
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 #[derive(Debug, Clone)]
 pub struct TypeChecker {
     // Crate public to allow testing
-    pub(crate) variables_enviroment: HashMap<String, Type>,
-    pub(crate) functions_enviroment: HashMap<String, Type>,
+    pub(crate) variables_enviroment: BTreeMap<String, Type>,
+    pub(crate) functions_enviroment: BTreeMap<String, Type>,
 }
 
 impl TypeChecker {
     pub fn new() -> Self {
         Self {
-            variables_enviroment: HashMap::new(),
-            functions_enviroment: HashMap::new()
+            variables_enviroment: BTreeMap::new(),
+            functions_enviroment: BTreeMap::new()
         }
     }
 

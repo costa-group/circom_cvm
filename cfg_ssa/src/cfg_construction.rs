@@ -1,11 +1,11 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{ast::ASTNode, types::{Atomic, Expression, Operator, Parameter}, LineInstruction, PhiPossibility, Statement, Use, Value, CFG};
 
 //TODO: These uses are duplicated in lib.rs, the problem is InMemoization which is neccesary when removing trivial phis
 //but it is not when we have the final CFG.
 /// Enum to represent the possible uses:
-#[derive (Eq, Hash, PartialEq, Clone)]
+#[derive (Eq, Hash, PartialEq, Clone, Ord, PartialOrd)]
 enum UseTemp {
     /// - In memoization (the block has written in its definitions this variable)
     InMemoization(usize),
@@ -19,22 +19,22 @@ pub struct CfgConstructor<'a> {
 
     /// Save for each block the definition of the variables it contains (the new name)
     /// Old name → SSA name
-    definitions: Vec<HashMap<String, String>>,
+    definitions: Vec<BTreeMap<String, String>>,
 
     /// SSA name of the phi → List of possible values it can have depending on the execution
-    phis: HashMap<String, Vec<PhiPossibility>>,
+    phis: BTreeMap<String, Vec<PhiPossibility>>,
 
     /// Current SSA values: ssa name -> original name
-    to_non_ssa: HashMap<String, String>,
+    to_non_ssa: BTreeMap<String, String>,
 
     /// Tracks unfinished φ-nodes per block (tracked variable and its φ-node)
-    incomplete_phis: Vec<HashSet<(String, String)>>,
+    incomplete_phis: Vec<BTreeSet<(String, String)>>,
 
     /// For each variable, we save a set of blocks where it is used and how
-    uses: HashMap<String, HashSet<UseTemp>>,
+    uses: BTreeMap<String, BTreeSet<UseTemp>>,
 
     /// We keep track of the blocks that lead to exceptions (i.e., errors)
-    exception_blocks: HashSet<usize>,
+    exception_blocks: BTreeSet<usize>,
 
     sealed_blocks: Vec<bool>,
     next_ssa_num: usize,
@@ -45,12 +45,12 @@ impl<'a> CfgConstructor<'a> {
     pub fn new(cfg: &'a mut CFG) -> Self {
         Self {
             cfg,
-            definitions: vec![HashMap::new()],
-            phis: HashMap::new(),
-            to_non_ssa: HashMap::new(),
-            incomplete_phis: vec![HashSet::new()],
-            uses: HashMap::new(),
-            exception_blocks: HashSet::new(),
+            definitions: vec![BTreeMap::new()],
+            phis: BTreeMap::new(),
+            to_non_ssa: BTreeMap::new(),
+            incomplete_phis: vec![BTreeSet::new()],
+            uses: BTreeMap::new(),
+            exception_blocks: BTreeSet::new(),
             sealed_blocks: vec![true],
             next_ssa_num: 0,
         }
@@ -60,8 +60,8 @@ impl<'a> CfgConstructor<'a> {
     /// variable definition
     /// Returns position of block
     fn create_block(&mut self) -> usize {
-        self.definitions.push(HashMap::new());
-        self.incomplete_phis.push(HashSet::new());
+        self.definitions.push(BTreeMap::new());
+        self.incomplete_phis.push(BTreeSet::new());
         self.sealed_blocks.push(false);
         self.cfg.create_new_block()
     }
@@ -502,7 +502,7 @@ mod tests {
                     operands: vec![Expression::Atomic(Atomic::Constant(ConstantType::I64(1)))],
                 },
                 ASTNode::IfThenElse {
-                    num_type: NumericType::FiniteField,
+                    num_type: NumericType::Integer,
                     condition: Expression::Atomic(Atomic::Variable("condition".to_string())),
                     if_case: vec![
                         ASTNode::Operation {
@@ -529,7 +529,7 @@ mod tests {
                             ],
                         },
                         ASTNode::IfThenElse {
-                            num_type: NumericType::FiniteField,
+                            num_type: NumericType::Integer,
                             condition: Expression::Atomic(Atomic::Variable("loop_condition".to_string())),
                             if_case: vec![
                                 ASTNode::Operation {
@@ -580,6 +580,7 @@ mod tests {
         std::fs::create_dir_all("./test").expect("Unable to create test directory");
         std::fs::write("./test/cfg_output.dot", dot_representation).expect("Unable to write DOT file");
         let json_representation = cfg.to_json();
+        assert_eq!(json_representation, r#"{"entry":0,"blocks":[{"id":0,"phi_functions":[],"statements":[{"num_type":"FiniteField","output":"v000","value":{"operator":null,"operands":[{"Atomic":{"Constant":{"FF":[1,[1]]}}}]}},{"num_type":"FiniteField","output":"v001","value":{"operator":null,"operands":[{"Atomic":{"Constant":{"FF":[1,[10]]}}}]}},{"num_type":"FiniteField","output":"v002","value":{"operator":null,"operands":[{"Atomic":{"Constant":{"FF":[1,[9]]}}}]}},{"num_type":"FiniteField","output":"v003","value":{"operator":"Add","operands":[{"Atomic":{"Variable":"v001"}},{"Atomic":{"Variable":"v002"}}]}},{"num_type":"FiniteField","output":"v004","value":{"operator":null,"operands":[{"Atomic":{"Constant":{"I64":1}}}]}},{"num_type":"FiniteField","output":"v005","value":{"operator":null,"operands":[{"Atomic":{"Constant":{"I64":1}}}]}}],"predecessors":[],"successors":{"Conditional":{"condition":{"Atomic":{"Variable":"v004"}},"to_then":1,"to_else":2}},"declarations":{"v000":{"is_phi":false,"line":0},"v001":{"is_phi":false,"line":1},"v002":{"is_phi":false,"line":2},"v003":{"is_phi":false,"line":3},"v004":{"is_phi":false,"line":4},"v005":{"is_phi":false,"line":5}},"phi_uses":["v014"],"live_in":[],"live_out":["v000","v001","v002","v005"]},{"id":1,"phi_functions":[],"statements":[{"num_type":"FiniteField","output":"v006","value":{"operator":"Sub","operands":[{"Atomic":{"Variable":"v000"}},{"Atomic":{"Variable":"v001"}}]}}],"predecessors":[0],"successors":{"Unconditional":{"to":2}},"declarations":{"v006":{"is_phi":false,"line":0}},"phi_uses":["v014"],"live_in":["v000","v001","v002","v005"],"live_out":["v000","v001","v002","v005","v006"]},{"id":2,"phi_functions":[{"output":"v014","possibilities":[{"variable":"v000","block":0},{"variable":"v006","block":1}]}],"statements":[],"predecessors":[0,1],"successors":{"Unconditional":{"to":3}},"declarations":{"v014":{"is_phi":true,"line":0}},"phi_uses":["v007"],"live_in":["v000","v001","v002","v005","v006","v014"],"live_out":["v001","v002","v005","v014"]},{"id":3,"phi_functions":[{"output":"v007","possibilities":[{"variable":"v014","block":2},{"variable":"v012","block":7}]}],"statements":[{"num_type":"FiniteField","output":"v009","value":{"operator":"Mul","operands":[{"Atomic":{"Variable":"v007"}},{"Atomic":{"Variable":"v002"}}]}}],"predecessors":[2,7],"successors":{"Conditional":{"condition":{"Atomic":{"Variable":"v005"}},"to_then":5,"to_else":7}},"declarations":{"v007":{"is_phi":true,"line":0},"v009":{"is_phi":false,"line":0}},"phi_uses":[],"live_in":["v001","v002","v005","v007","v012","v014"],"live_out":["v001","v002","v005","v007","v014"]},{"id":4,"phi_functions":[],"statements":[{"num_type":"FiniteField","output":"v018","value":{"operator":"Add","operands":[{"Atomic":{"Variable":"v001"}},{"Atomic":{"Variable":"v002"}}]}}],"predecessors":[5],"successors":null,"declarations":{"v018":{"is_phi":false,"line":0}},"phi_uses":[],"live_in":["v001","v002"],"live_out":[]},{"id":5,"phi_functions":[],"statements":[{"num_type":"FiniteField","output":"v011","value":{"operator":"Div","operands":[{"Atomic":{"Variable":"v007"}},{"Atomic":{"Variable":"v002"}}]}}],"predecessors":[3],"successors":{"Unconditional":{"to":4}},"declarations":{"v011":{"is_phi":false,"line":0}},"phi_uses":[],"live_in":["v001","v002","v007"],"live_out":["v001","v002"]},{"id":6,"phi_functions":[],"statements":[],"predecessors":[],"successors":null,"declarations":{},"phi_uses":[],"live_in":[],"live_out":[]},{"id":7,"phi_functions":[],"statements":[{"num_type":"FiniteField","output":"v012","value":{"operator":"Sub","operands":[{"Atomic":{"Variable":"v007"}},{"Atomic":{"Variable":"v002"}}]}}],"predecessors":[3],"successors":{"Unconditional":{"to":3}},"declarations":{"v012":{"is_phi":false,"line":0}},"phi_uses":["v007"],"live_in":["v001","v002","v005","v007","v014"],"live_out":["v001","v002","v005","v007","v012","v014"]}],"definitions":{"v000":[0,{"is_phi":false,"line":0}],"v001":[0,{"is_phi":false,"line":1}],"v002":[0,{"is_phi":false,"line":2}],"v003":[0,{"is_phi":false,"line":3}],"v004":[0,{"is_phi":false,"line":4}],"v005":[0,{"is_phi":false,"line":5}],"v006":[1,{"is_phi":false,"line":0}],"v007":[3,{"is_phi":true,"line":0}],"v009":[3,{"is_phi":false,"line":0}],"v011":[5,{"is_phi":false,"line":0}],"v012":[7,{"is_phi":false,"line":0}],"v014":[2,{"is_phi":true,"line":0}],"v018":[4,{"is_phi":false,"line":0}]},"def_use":{"v000":[{"InInstruction":[1,{"is_phi":false,"line":0}]},{"InInstruction":[2,{"is_phi":true,"line":0}]}],"v001":[{"InInstruction":[0,{"is_phi":false,"line":3}]},{"InInstruction":[1,{"is_phi":false,"line":0}]},{"InInstruction":[4,{"is_phi":false,"line":0}]}],"v002":[{"InInstruction":[0,{"is_phi":false,"line":3}]},{"InInstruction":[3,{"is_phi":false,"line":0}]},{"InInstruction":[4,{"is_phi":false,"line":0}]},{"InInstruction":[5,{"is_phi":false,"line":0}]},{"InInstruction":[7,{"is_phi":false,"line":0}]}],"v004":[{"InCondition":0}],"v005":[{"InCondition":3}],"v006":[{"InInstruction":[2,{"is_phi":true,"line":0}]}],"v007":[{"InInstruction":[3,{"is_phi":false,"line":0}]},{"InInstruction":[5,{"is_phi":false,"line":0}]},{"InInstruction":[7,{"is_phi":false,"line":0}]}],"v012":[{"InInstruction":[3,{"is_phi":true,"line":0}]}],"v014":[{"InInstruction":[3,{"is_phi":true,"line":0}]}]}}"#);
         std::fs::write("./test/cfg_output.json", json_representation).expect("Unable to write JSON file");
     }
 }
