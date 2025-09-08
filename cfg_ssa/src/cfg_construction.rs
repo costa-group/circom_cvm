@@ -36,6 +36,9 @@ pub struct CfgConstructor<'a> {
     /// We keep track of the blocks that lead to exceptions (i.e., errors)
     exception_blocks: BTreeSet<usize>,
 
+    /// Non-ssa names, to count the number of original variables
+    non_ssa_names: BTreeSet<String>,
+
     sealed_blocks: Vec<bool>,
     next_ssa_num: usize,
 }
@@ -51,6 +54,7 @@ impl<'a> CfgConstructor<'a> {
             incomplete_phis: vec![BTreeSet::new()],
             uses: BTreeMap::new(),
             exception_blocks: BTreeSet::new(),
+            non_ssa_names: BTreeSet::new(),
             sealed_blocks: vec![true],
             next_ssa_num: 0,
         }
@@ -88,6 +92,9 @@ impl<'a> CfgConstructor<'a> {
     /// Write a new SSA binding for source `src` in `block` with `val`
     /// Returns ssa name
     fn write_variable(&mut self, non_ssa_name: &str, block: usize) -> String {
+        if !self.non_ssa_names.contains(non_ssa_name) {
+            self.non_ssa_names.insert(non_ssa_name.to_string());
+        }
         let ssa_name = self.fresh();
         self.to_non_ssa.insert(ssa_name.clone(), non_ssa_name.to_string());
         self.definitions[block].insert(non_ssa_name.to_string(), ssa_name.clone());
@@ -96,6 +103,9 @@ impl<'a> CfgConstructor<'a> {
 
     /// Write a new empty phi function for source `src` in `block`
     fn write_phi_function(&mut self, non_ssa_name: &str, block: usize) -> String {
+        if !self.non_ssa_names.contains(non_ssa_name) {
+            self.non_ssa_names.insert(non_ssa_name.to_string());
+        }
         let ssa_name = self.fresh();
         self.phis.insert(ssa_name.clone(), Vec::new());
         self.to_non_ssa.insert(ssa_name.clone(), non_ssa_name.to_string());
@@ -445,6 +455,10 @@ impl<'a> CfgConstructor<'a> {
         self.seal_block(join)?;
 
         Ok(join)
+    }
+
+    pub(crate) fn get_non_ssa(&self) -> usize {
+        self.non_ssa_names.len()
     }
 
     //TODO

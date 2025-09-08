@@ -14,7 +14,8 @@ struct Metrics {
     num_lines: usize,
     num_cfgs: usize,
     avg_blocks_per_cfg: f64,
-    avg_variables_per_cfg: f64,
+    avg_non_ssa_variables_per_cfg: f64,
+    avg_ssa_variables_per_cfg: f64,
     avg_stmts_per_block: f64,
     time_read: f64,
     time_parse: f64,
@@ -117,14 +118,15 @@ fn main() {
     if metrics_mode {
         // Structural metrics
         let num_lines = file_content.lines().count();
-        let (num_cfgs, avg_blocks_per_cfg, avg_variables_per_cfg, avg_stmts_per_block) = cfg.get_metrics();
+        let (num_cfgs, avg_blocks_per_cfg, avg_non_ssa_variables_per_cfg, avg_ssa_variables_per_cfg,  avg_stmts_per_block) = cfg.get_metrics();
 
         let metrics = Metrics {
             file: file_path.to_string(),
             num_lines,
             num_cfgs,
             avg_blocks_per_cfg,
-            avg_variables_per_cfg,
+            avg_non_ssa_variables_per_cfg,
+            avg_ssa_variables_per_cfg,
             avg_stmts_per_block,
             time_read: read_time.as_secs_f64(),
             time_parse: parse_time.as_secs_f64(),

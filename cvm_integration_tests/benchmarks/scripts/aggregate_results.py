@@ -37,7 +37,8 @@ df = df.rename(columns={
     'num_lines': 'Lines',
     'num_cfgs': 'Nº CFGs',
     'avg_blocks_per_cfg': 'Avg. Blocks/CFG',
-    'avg_variables_per_cfg': 'Avg. Variables/CFG',
+    'avg_non_ssa_variables_per_cfg': 'Avg. Variables/CFG before',
+    'avg_ssa_variables_per_cfg': 'Avg. Variables/CFG after',
     'avg_stmts_per_block': 'Avg. Stmts/Block',
     'time_read_pct': 'Read (%)',
     'time_parse_pct': 'Parse (%)',
@@ -50,7 +51,7 @@ df = df.rename(columns={
 
 # Columns to round to 2 decimals
 two_decimal_cols = [
-    'Lines', 'Nº CFGs', 'Avg. Blocks/CFG', 'Avg. Variables/CFG', 'Avg. Stmts/Block',
+    'Lines', 'Nº CFGs', 'Avg. Blocks/CFG', 'Avg. Variables/CFG before', 'Avg. Variables/CFG after', 'Avg. Stmts/Block',
     'Read (%)', 'Parse (%)', 'Typecheck (%)', 'CFG (%)', 'JSON Write (%)', 'DOT Write (%)',
     'Total time / CIRCOM to CVM (%)'
 ]
@@ -63,7 +64,8 @@ df['CIRCOM to CVM (s)'] = df['CIRCOM to CVM (s)'].apply(lambda x: f"{x:.6f}")
 
 # Select columns for LaTeX export
 columns_to_export = [
-    'Source file name', 'Lines', 'Nº CFGs', 'Avg. Blocks/CFG', 'Avg. Variables/CFG',
+    'Source file name', 'Lines', 'Nº CFGs', 'Avg. Blocks/CFG',
+    'Avg. Variables/CFG before', 'Avg. Variables/CFG after',
     'Avg. Stmts/Block', 'Read (%)', 'Parse (%)', 'Typecheck (%)', 'CFG (%)',
     'JSON Write (%)', 'DOT Write (%)', 'Total Time (s)', 'CIRCOM to CVM (s)',
     'Total time / CIRCOM to CVM (%)'

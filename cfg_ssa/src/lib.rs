@@ -256,6 +256,7 @@ enum Use {
 pub struct CFG {
     entry: usize,
     blocks: Vec<BasicBlock>,
+    non_ssa_variables: usize,
     /// Key: Variable, Value: Block and line in that block where it is defined
     definitions: BTreeMap<String, (usize, LineInstruction)>,
     /// Key: Variable, Value: Set with all its uses
@@ -264,7 +265,7 @@ pub struct CFG {
 
 impl CFG {
     pub fn new(entry: usize) -> Self {
-        CFG { entry, blocks: vec![BasicBlock::new(entry)], definitions: BTreeMap::new(), def_use: BTreeMap::new() }
+        CFG { entry, blocks: vec![BasicBlock::new(entry)], non_ssa_variables: 0, definitions: BTreeMap::new(), def_use: BTreeMap::new() }
     }
 
     pub fn new_from_fun(f: Function) -> Result<Self, String> {
@@ -273,6 +274,8 @@ impl CFG {
 
         let mut constructor = CfgConstructor::new(&mut cfg);
         constructor.process_body(&f.body, entry, None)?;
+
+        cfg.non_ssa_variables = constructor.get_non_ssa();
 
         cfg.compute_livesets_ssa_by_var()?;
 
@@ -285,6 +288,8 @@ impl CFG {
 
         let mut constructor = CfgConstructor::new(&mut cfg);
         constructor.process_body(&t.body, entry, None)?;
+
+        cfg.non_ssa_variables = constructor.get_non_ssa();
 
         cfg.compute_livesets_ssa_by_var()?;
 
@@ -663,15 +668,17 @@ impl CFGList {
         self.cfgs.iter().enumerate().map(|(id, cfg)| cfg.to_dot(id)).collect()
     }
 
-    ///Returns: num_cfgs, avg_blocks_per_cfg, avg_variables_per_cfg, avg_stmts_per_block
-    pub fn get_metrics(&self) -> (usize, f64, f64, f64) {
+    ///Returns: num_cfgs, avg_blocks_per_cfg, avg_non_ssa_variables_per_cfg, avg_ssa_variables_per_cfg, avg_stmts_per_block
+    pub fn get_metrics(&self) -> (usize, f64, f64, f64, f64) {
         let mut num_blocks: usize = 0;
-        let mut num_variables: usize = 0;
+        let mut num_non_ssa_variables: usize = 0;
+        let mut num_ssa_variables: usize = 0;
         let mut total_stmts: usize = 0;
 
         for cfg in &self.cfgs {
             num_blocks += cfg.blocks.len();
-            num_variables += cfg.definitions.len();
+            num_ssa_variables += cfg.definitions.len();
+            num_non_ssa_variables += cfg.non_ssa_variables;
             for block in &cfg.blocks {
                 total_stmts += block.phi_functions.len();
                 total_stmts += block.statements.len();
@@ -687,13 +694,15 @@ impl CFGList {
         }
 
         let avg_blocks_per_cfg = safe_div(num_blocks, self.cfgs.len());
-        let avg_variables_per_cfg = safe_div(num_variables, self.cfgs.len());
+        let avg_non_ssa_variables_per_cfg = safe_div(num_non_ssa_variables, self.cfgs.len());
+        let avg_ssa_variables_per_cfg = safe_div(num_ssa_variables, self.cfgs.len());
         let avg_stmts_per_block = safe_div(total_stmts, num_blocks);
 
         (
             self.cfgs.len(),
             avg_blocks_per_cfg,
-            avg_variables_per_cfg,
+            avg_non_ssa_variables_per_cfg,
+            avg_ssa_variables_per_cfg,
             avg_stmts_per_block,
         )
     }
