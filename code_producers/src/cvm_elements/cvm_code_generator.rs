@@ -1891,3 +1891,23 @@ pub fn generate_witness(producer: &CVMProducer) -> Vec<CVMInstruction>{
 
     instr
 }
+
+
+pub fn generate_input_signals(producer: &CVMProducer) -> Vec<CVMInstruction>{
+    let mut instr = Vec::new();
+    let mut aux = Vec::new();
+    let mut n_inputs = 0;
+    instr.push(";; Input signals".to_string());
+    for s in producer.get_main_input_list(){
+        if !s.name.contains(".") {
+            n_inputs += 1;
+            let input_info = declare_variable(s.bus_id, &s.dimensions);
+            aux.push(format!("\"{}\" {}", s.name, input_info));
+        }
+    }  
+    instr.push(format!("%%input {}", n_inputs));
+    instr.append(&mut aux);
+    instr.push("\n".to_string());
+
+    instr
+}

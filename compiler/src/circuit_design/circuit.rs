@@ -606,6 +606,11 @@ impl WriteCVM for Circuit {
         code = merge_code(code_aux);
         writer.write_all(code.as_bytes()).map_err(|_| {})?;
 
+        code_aux = generate_input_signals(&producer);
+        code = merge_code(code_aux);
+        writer.write_all(code.as_bytes()).map_err(|_| {})?;
+
+
         for f in &self.functions {
             f.write_cvm(writer, producer)?;
             //writer.flush().map_err(|_| {})?;
