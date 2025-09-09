@@ -1882,11 +1882,17 @@ pub fn generate_components(producer: &CVMProducer) -> Vec<CVMInstruction>{
 pub fn generate_witness(producer: &CVMProducer) -> Vec<CVMInstruction>{
     let mut instr = Vec::new();
     instr.push(";; Witness (signal list)".to_string());
-    let mut witness = "".to_string();
-    for s in producer.get_witness_to_signal_list(){
-        witness = format!("{} {}", witness, s)
+    let signals_list = producer.get_witness_to_signal_list().iter()
+        .map(|n| n.to_string())
+        .collect::<Vec<String>>()
+        .join(" ");
+    let mut witness = String::with_capacity("%%witness ".len() + signals_list.len());
+    witness.push_str("%%witness");
+    if !signals_list.is_empty() {
+        witness.push_str(" ");
+        witness.push_str(&signals_list);
     }
-    instr.push(format!("%%witness{}", witness));
+    instr.push(witness);
     instr.push("\n".to_string());
 
     instr

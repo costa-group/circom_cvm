@@ -400,6 +400,14 @@ It copies as many elements as given in size-of-return from the provided address-
 
 ### Other operations
 
+The template ids are assigned following the Template definition order, starting from $0$.
+
+The template output or input signal ids are given one by one from $0$ starting first with the outputs and then the inputs following the template definition given in the CVM code. There is an id per input/output signal (no matter if it is a single signal or an array of signals), namely if a template has 2 output and 3 inputs, the first output has id $0$ and the second one id $1$, the first input has id $2$, the second one $3$ and the third one $4$.
+
+The bus ids are assigned following the Bus definition order, starting from $0$.
+
+The bus field signal ids are given one by one starting from $0$ to the fields of the bus following the bus definition given in the CVM code. There is an id per field signal (no matter if it is a single signal or an array of signals), namely if a bus has 4 fields, the first one has id $0$, the second one $1$ and so one.
+
 ```text
 get_template_id <i64 value>
 ```
@@ -409,8 +417,11 @@ it can only be used in the code of a template.
 ```text
 get_template_signal_position <i64 value> <i64 value>
 ```
-Given a template id and a signal id returns the offset (i64) of the signal in such template.
+Given a template id and an output or input signal id returns the offset (i64) of the signal in such template.
 It can only be used in the code of a template.
+
+
+For instance
 
 ```text
 get_template_signal_size <i64 value> <i64 value>
@@ -419,39 +430,39 @@ Given a template id and a signal id returns the size (i64) of the signal in such
 It can only be used in the code of a template.
 
 ```text
-get_template_signal_dimension <i64 value> <i64 value>
+get_template_signal_dimension <i64 value> <i64 value> <i64 value>
 ```
-Given a template id and a signal id returns the number of dimensions of (i64) of the signal in such template.
+Given a template id and an output or input signal id and a dimension returns the size (i64) of this dimension of the signal in such template .
 It can only be used in the code of a template.
 
 ```text
 get_template_signal_type <i64 value> <i64 value>
 ```
-Given a template id and a signal id returns the type id (i64) of the signal in such template.
+Given a template id and an output or input signal id returns the type id (i64) of the signal in such template.
 It can only be used in the code of a template.
 
 ```text
 get_bus_signal_position <i64 value> <i64 value>
 ```
-Given a bus id and a signal id returns the offset (i64) of the signal in such template.
+Given a bus id and a bus field signal id returns the offset (i64) of the signal in such template.
 It can only be used in the code of a template.
 
 ```text
 get_bus_signal_size <i64 value> <i64 value>
 ```
-Given a bus id and a signal id returns the size (i64) of the signal in such template.
+Given a bus id and a bus field signal id returns the size (i64) of the signal in such template.
 It can only be used in the code of a template.
 
 ```text
-get_bus_signal_dimension <i64 value> <i64 value>
+get_bus_signal_dimension <i64 value> <i64 value> <i64 value>
 ```
-Given a bus id and a signal id returns the number of dimensions of (i64) of the signal in such template.
+Given a bus id, a bus field signal id and a dimension returns the size (i64) of this dimension of the signal in such template.
 It can only be used in the code of a template.
 
 ```text
 get_bus_signal_type <i64 value> <i64 value>
 ```
-Given a bus id and a signal id returns the type id (i64) of the signal in such template.
+Given a bus id and a bus field signal id returns the type id (i64) of the signal in such template.
 It can only be used in the code of a template.
 
 outs ??
