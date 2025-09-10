@@ -257,12 +257,13 @@ fn build_function_instances(
 }
 
 // CVM producer builder
-fn initialize_cvm_producer(vcp: &VCP, database: &TemplateDB, version: &str) -> CVMProducer {
+fn initialize_cvm_producer(vcp: &VCP, database: &TemplateDB, cvm_multi_assign_flag: bool, version: &str) -> CVMProducer {
     use program_structure::utils::constants::UsefulConstants;
     let initial_node = vcp.get_main_id();
     let prime = UsefulConstants::new(&vcp.prime).get_p().clone();
     let mut producer = CVMProducer::default();
     let stats = vcp.get_stats();
+    producer.cvm_multi_assign_flag = cvm_multi_assign_flag;
     producer.main_header = vcp.get_main_instance().unwrap().template_header.clone();
     producer.main_signal_offset = 1;
     producer.prime = prime.to_str_radix(10);
@@ -714,7 +715,7 @@ pub fn build_circuit(vcp: VCP, flag: CompilationFlags, version: &str) -> Circuit
     }
     let template_database = TemplateDB::build(&vcp.templates);
     let mut circuit = Circuit::default();
-    circuit.cvm_producer = initialize_cvm_producer(&vcp, &template_database, version);
+    circuit.cvm_producer = initialize_cvm_producer(&vcp, &template_database, flag.cvm_multi_assign_flag, version);
     circuit.wasm_producer = initialize_wasm_producer(&vcp, &template_database, flag.wat_flag, version);
     circuit.c_producer = initialize_c_producer(&vcp, &template_database, flag.no_asm_flag, version);
 

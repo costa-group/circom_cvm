@@ -44,6 +44,7 @@ pub fn compile(config: CompilerConfig) -> Result<(), ()> {
                 wat_flag: config.wat_flag,
                 constraint_assert_disabled_flag: config.constraint_assert_disabled_flag,
                 no_asm_flag: config.no_asm_flag,
+                cvm_multi_assign_flag: config.cvm_multi_assign_flag,
             },
             VERSION
         )?;

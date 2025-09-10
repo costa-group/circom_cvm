@@ -8,7 +8,8 @@ pub struct Config {
     pub produce_input_log: bool,
     pub wat_flag: bool,
     pub no_asm_flag: bool,
-    pub constraint_assert_disabled_flag: bool
+    pub constraint_assert_disabled_flag: bool,
+    pub cvm_multi_assign_flag: bool,
 }
 
 pub fn run_compiler(vcp: VCP, config: Config, version: &str) -> Result<Circuit, ()> {
@@ -16,7 +17,8 @@ pub fn run_compiler(vcp: VCP, config: Config, version: &str) -> Result<Circuit, 
         main_inputs_log: config.produce_input_log,
         wat_flag: config.wat_flag,
         no_asm_flag: config.no_asm_flag,
-        constraint_assert_disabled_flag: config.constraint_assert_disabled_flag
+        constraint_assert_disabled_flag: config.constraint_assert_disabled_flag,
+        cvm_multi_assign_flag: config.cvm_multi_assign_flag,
     };
     let circuit = Circuit::build(vcp, flags, version);
     if config.debug_output {
