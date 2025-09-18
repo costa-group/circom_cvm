@@ -287,13 +287,21 @@ addr is i64: address in variable memory
 size: number of elements to be set
 
 ```text
+mset_signal_from_cmp idx cidx sidx value
+```
+idx is i64: destination signal
+cidx is i64: source component
+sidx is i64: source signal
+size: number of elements to be set
+
+```text
 set_cmp_input cidx sidx value
 set_cmp_input_cnt cidx sidx value
 set_cmp_input_run cidx sidx value
 set_cmp_input_cnt_check cidx sidx value
 ```
-cidx is i64
-sidx is i64
+cidx is i64: destination component
+sidx is i64: destination signal in component
 value is ff
 
 ```text

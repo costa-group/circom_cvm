@@ -913,12 +913,180 @@ impl WriteCVM for StoreBucket{
                 }
             }
         } else {
-            //if producer.needs_comments() {
-            //    instructions.push(";; getting src".to_string());
-	    //}
             if let Instruction::Load(load) = &*self.src {
                 let (mut instructions_src, lsrc) = load.src.produce_cvm(&load.address_type, &load.context, producer); 
                 instructions.append(&mut instructions_src);
+                if producer.cvm_multi_assign_flag {
+                    let (mut instructions_dest, ldest) = self.dest.produce_cvm(&self.dest_address_type,&self.context, producer);
+                    instructions.append(&mut instructions_dest);
+                    //
+                    let vsize = producer.fresh_var();
+	            if !is_multiple_dest && !is_multiple_src {
+                        instructions.push(format!("{} = i64.{}", vsize,n)); 
+                    } else {
+                        if is_multiple_dest {
+                            let mut cmp_dest = "".to_string();
+                            if let ComputedAddress::SubcmpSignal(rcmp,_rsig) = &ldest {
+                                cmp_dest = rcmp.clone();
+                            } else {
+                                assert!(false);
+                            }
+                            let mut instructions_if_dest = create_if_selection(&values_dest, &cmp_dest, &vsize, producer);
+                            instructions.append(&mut instructions_if_dest);
+                        } else {
+                            instructions.push(format!("{} = i64.{}", vsize, size_dest)); 
+                        }
+                        let vsize2 = producer.fresh_var();
+                        if is_multiple_src {
+                            let mut cmp_src = "".to_string();
+                            if let ComputedAddress::SubcmpSignal(rcmp,_rsig) = &lsrc {
+                                cmp_src = rcmp.clone();
+                            } else {
+                                assert!(false);
+                            }
+                            let mut instructions_if_src = create_if_selection(&values_src, &cmp_src, &vsize2, producer);
+                            instructions.append(&mut instructions_if_src);
+                        } else {
+                            instructions.push(format!("{} = i64.{}", vsize2, size_src)); 
+                        }
+                        let check = producer.fresh_var();
+                        instructions.push(format!("{} = {} {} {}", check, lt64(), vsize2, vsize));
+                        instructions.push(format!("{} {}", add_if64(), check));
+                        instructions.push(format!("{} = {}", vsize, vsize2));
+                        instructions.push(add_end());
+                    }
+                    //vsize has the size of the multi copy
+                    match lsrc {
+                        ComputedAddress::Variable(rvar) => {
+                            let src_location;
+                            if self.context.in_function_returning_array && RETURN_PARAM_SIZE > 0 {
+                                let rvar2 = producer.fresh_var();
+                                instructions.push(format!("{} = {} {} i64.{}", rvar2, add64(), rvar, RETURN_PARAM_SIZE));
+                                src_location = rvar2;
+                            } else {
+                                src_location = rvar;
+                            }
+                            match ldest {
+                                ComputedAddress::Variable(drvar) => {
+                                    let dest_location;
+                                    if self.context.in_function_returning_array && RETURN_PARAM_SIZE > 0 {
+                                        let drvar2 = producer.fresh_var();
+                                        instructions.push(format!("{} = {} {} i64.{}", drvar2, add64(), drvar, RETURN_PARAM_SIZE));
+                                        dest_location = drvar2;
+                                    } else {
+                                        dest_location = drvar;
+                                    }
+                                    instructions.push(format!("{} {} {} {}", mstoreff(), dest_location, src_location,vsize));
+                                }
+                                ComputedAddress::Signal(drsig) => {
+                                    instructions.push(mset_signal_from_memory(&drsig, &src_location,&vsize));
+                                }
+                                ComputedAddress::SubcmpSignal(drcmp,drsig) => {
+                                    if let AddressType::SubcmpSignal {input_information, .. } = &self.dest_address_type {
+                                        if let InputInformation::Input{status, needs_decrement} = input_information {
+		                            if let StatusInput::NoLast = status {
+			                        // no need to run subcomponent
+                                                if *needs_decrement{
+                                                    instructions.push(mset_cmp_input_from_memory_dec_no_last(&drcmp,&drsig,&src_location,&vsize));
+                                                } else {
+                                                    instructions.push(mset_cmp_input_from_memory_no_dec_no_last(&drcmp,&drsig,&src_location,&vsize));
+                                                }
+                                            } else if let StatusInput::Last = status {
+                                                instructions.push(mset_cmp_input_from_memory_and_run(&drcmp,&drsig,&src_location,&vsize));
+                                            } else {
+                                                instructions.push(mset_cmp_input_from_memory_dec_and_check_run(&drcmp,&drsig,&src_location,&vsize));
+                                            }
+                                        } else {
+                                            assert!(false);
+                                        }
+                                    } else {
+                                        assert!(false);
+                                    }
+                                }
+                            }
+                        }
+                        ComputedAddress::Signal(rsig) => {
+                            match ldest {
+                                ComputedAddress::Variable(drvar) => {
+                                    let dest_location;
+                                    if self.context.in_function_returning_array && RETURN_PARAM_SIZE > 0 {
+                                        let drvar2 = producer.fresh_var();
+                                        instructions.push(format!("{} = {} {} i64.{}", drvar2, add64(), drvar, RETURN_PARAM_SIZE));
+                                        dest_location = drvar2;
+                                    } else {
+                                        dest_location = drvar;
+                                    }
+                                    instructions.push(format!("{} {} {} {}", mstoresignalff(), dest_location, rsig, vsize));
+                                }
+                                ComputedAddress::Signal(drsig) => {
+                                    instructions.push(mset_signal(&drsig, &rsig, &vsize));
+                                }
+                                ComputedAddress::SubcmpSignal(drcmp,drsig) => {
+                                    if let AddressType::SubcmpSignal {input_information, .. } = &self.dest_address_type {
+                                        if let InputInformation::Input{status, needs_decrement} = input_information {
+		                            if let StatusInput::NoLast = status {
+			                        // no need to run subcomponent
+                                                if *needs_decrement{
+                                                    instructions.push(mset_cmp_input_dec_no_last(&drcmp,&drsig,&rsig,&vsize));
+                                                } else {
+                                                    instructions.push(mset_cmp_input_no_dec_no_last(&drcmp,&drsig,&rsig,&vsize));
+                                                }
+                                            } else if let StatusInput::Last = status {
+                                                instructions.push(mset_cmp_input_and_run(&drcmp,&drsig,&rsig,&vsize));
+                                            } else {
+                                                instructions.push(mset_cmp_input_dec_and_check_run(&drcmp,&drsig,&rsig,&vsize));
+                                            }
+                                        } else {
+                                            assert!(false);
+                                        }
+                                    } else {
+                                        assert!(false);
+                                    }
+                                }
+                            }
+                        }
+                        ComputedAddress::SubcmpSignal(rcmp,rsig) => {
+                            match ldest {
+                                ComputedAddress::Variable(drvar) => {
+                                    let dest_location;
+                                    if self.context.in_function_returning_array && RETURN_PARAM_SIZE > 0 {
+                                        let drvar2 = producer.fresh_var();
+                                        instructions.push(format!("{} = {} {} i64.{}", drvar2, add64(), drvar, RETURN_PARAM_SIZE));
+                                        dest_location = drvar2;
+                                    } else {
+                                        dest_location = drvar;
+                                    }
+                                    instructions.push(format!("{} {} {} {} {}", mstorecmpsignalff(), dest_location, rcmp, rsig, vsize));
+                                }
+                                ComputedAddress::Signal(drsig) => {
+                                    instructions.push(mset_signal_from_cmp(&drsig, &rcmp, &rsig, &vsize));
+                                }
+                                ComputedAddress::SubcmpSignal(drcmp,drsig) => {
+                                    if let AddressType::SubcmpSignal {input_information, .. } = &self.dest_address_type {
+                                        if let InputInformation::Input{status, needs_decrement} = input_information {
+		                            if let StatusInput::NoLast = status {
+			                        // no need to run subcomponent
+                                                if *needs_decrement{
+                                                    instructions.push(mset_cmp_input_from_cmp_dec_no_last(&drcmp,&drsig,&rcmp,&rsig,&vsize));
+                                                } else {
+                                                    instructions.push(mset_cmp_input_from_cmp_no_dec_no_last(&drcmp,&drsig,&rcmp,&rsig,&vsize));
+                                                }
+                                            } else if let StatusInput::Last = status {
+                                                instructions.push(mset_cmp_input_from_cmp_and_run(&drcmp,&drsig,&rcmp,&rsig,&vsize));
+                                            } else {
+                                                instructions.push(mset_cmp_input_from_cmp_dec_and_check_run(&drcmp,&drsig,&rcmp,&rsig,&vsize));
+                                            }
+                                        } else {
+                                            assert!(false);
+                                        }
+                                    } else {
+                                        assert!(false);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {                    
                 let location_var = producer.fresh_var();
                 let destination_var = producer.fresh_var();
                 let counter = producer.fresh_var(); 
@@ -951,6 +1119,7 @@ impl WriteCVM for StoreBucket{
                     instructions.push(format!(";;line {}", self.line));
                     producer.set_current_line(self.line);
                 }
+                    
                 let (mut instructions_dest, ldest) = self.dest.produce_cvm(&self.dest_address_type,&self.context, producer);
                 instructions.append(&mut instructions_dest);
                 let dest_location;
@@ -1068,9 +1237,10 @@ impl WriteCVM for StoreBucket{
                     instructions.push(add_end());
                 }
             }
+            }
             else {
-                assert!(false);
-            }    
+                assert!(false);    
+            }
         }
         if producer.needs_comments() {
             instructions.push(";; end of store bucket".to_string());

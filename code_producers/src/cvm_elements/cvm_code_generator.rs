@@ -94,6 +94,22 @@ pub fn storeff() -> CVMInstruction {
     "ff.store".to_string()
 }
 
+pub fn mstore64() -> CVMInstruction {
+    "i64.mstore".to_string()
+}
+
+pub fn mstoreff() -> CVMInstruction {
+    "ff.mstore".to_string()
+}
+
+pub fn mstoresignalff() -> CVMInstruction {
+    "ff.mstore_from_signal".to_string()
+}
+
+pub fn mstorecmpsignalff() -> CVMInstruction {
+    "ff.mstore_from_cmp_signal".to_string()
+}
+
 pub fn get_signal(inx: &str) -> CVMInstruction {
     format!("get_signal {}", inx)
 }
@@ -105,6 +121,19 @@ pub fn get_cmp_signal(cinx: &str, sinx: &str) -> CVMInstruction {
 pub fn set_signal(inx: &str, value: &str) -> CVMInstruction {
     format!("set_signal {} {}", inx, value)
 }
+
+pub fn mset_signal(inx1: &str, inx2: &str, size: &str) -> CVMInstruction {
+    format!("mset_signal {} {} {}", inx1, inx2, size)
+}
+
+pub fn mset_signal_from_memory(inx: &str, minx: &str, size: &str) -> CVMInstruction {
+    format!("mset_signal_from_memory {} {} {}", inx, minx, size)
+}
+
+pub fn mset_signal_from_cmp(inx: &str, cinx: &str, sinx: &str, size: &str) -> CVMInstruction {
+    format!("mset_signal_from_cmp {} {} {} {}", inx, cinx, sinx, size)
+}
+
 pub fn set_cmp_input_no_dec_no_last(cinx: &str, sinx: &str, value: &str) -> CVMInstruction {
     format!("set_cmp_input {} {} {}", cinx, sinx, value)
 }
@@ -117,6 +146,47 @@ pub fn set_cmp_input_and_run(cinx: &str, sinx: &str, value: &str) -> CVMInstruct
 pub fn set_cmp_input_dec_and_check_run(cinx: &str, sinx: &str, value: &str) -> CVMInstruction {
     format!("set_cmp_input_cnt_check {} {} {}", cinx, sinx, value)
 }
+
+
+pub fn mset_cmp_input_from_memory_no_dec_no_last(cinx: &str, sinx: &str, midx: &str, size: &str) -> CVMInstruction {
+    format!("mset_cmp_input_from_memory {} {} {} {}", cinx, sinx, midx, size)
+}
+pub fn mset_cmp_input_from_memory_dec_no_last(cinx: &str, sinx: &str, midx: &str, size: &str) -> CVMInstruction {
+    format!("mset_cmp_input_from_memory_cnt {} {} {} {}", cinx, sinx, midx, size)
+}
+pub fn mset_cmp_input_from_memory_and_run(cinx: &str, sinx: &str, midx: &str, size: &str) -> CVMInstruction {
+    format!("mset_cmp_input_from_memory_run {} {} {} {}", cinx, sinx, midx, size)
+}
+pub fn mset_cmp_input_from_memory_dec_and_check_run(cinx: &str, sinx: &str, midx: &str, size: &str) -> CVMInstruction {
+    format!("mset_cmp_input_from_memory_cnt_check {} {} {} {}", cinx, sinx, midx, size)
+}
+
+pub fn mset_cmp_input_no_dec_no_last(cinx: &str, sinx: &str, idx2: &str, size: &str) -> CVMInstruction {
+    format!("mset_cmp_input {} {} {} {}", cinx, sinx, idx2, size)
+}
+pub fn mset_cmp_input_dec_no_last(cinx: &str, sinx: &str, idx2: &str, size: &str) -> CVMInstruction {
+    format!("mset_cmp_input_cnt {} {} {} {}", cinx, sinx, idx2, size)
+}
+pub fn mset_cmp_input_and_run(cinx: &str, sinx: &str, idx2: &str, size: &str) -> CVMInstruction {
+    format!("mset_cmp_input_run {} {} {} {}", cinx, sinx, idx2, size)
+}
+pub fn mset_cmp_input_dec_and_check_run(cinx: &str, sinx: &str, idx2: &str, size: &str) -> CVMInstruction {
+    format!("mset_cmp_input_cnt_check {} {} {} {}", cinx, sinx, idx2, size)
+}
+
+pub fn mset_cmp_input_from_cmp_no_dec_no_last(cinx: &str, sinx: &str, cinx2: &str, sinx2: &str, size: &str) -> CVMInstruction {
+    format!("mset_cmp_input_from_cmp {} {} {} {} {}", cinx, sinx, cinx2, sinx2, size)
+}
+pub fn mset_cmp_input_from_cmp_dec_no_last(cinx: &str, sinx: &str, cinx2: &str, sinx2: &str, size: &str) -> CVMInstruction {
+    format!("mset_cmp_input_from_cmp_cnt {} {} {} {} {}", cinx, sinx, cinx2, sinx2, size)
+}
+pub fn mset_cmp_input_from_cmp_and_run(cinx: &str, sinx: &str, cinx2: &str, sinx2: &str, size: &str) -> CVMInstruction {
+    format!("mset_cmp_input_from_cmp_run {} {} {} {} {}", cinx, sinx, cinx2, sinx2, size)
+}
+pub fn mset_cmp_input_from_cmp_dec_and_check_run(cinx: &str, sinx: &str, cinx2: &str, sinx2: &str, size: &str) -> CVMInstruction {
+    format!("mset_cmp_input_from_cmp_cnt_check {} {} {} {} {}", cinx, sinx, cinx2, sinx2, size)
+}
+
 /*
 //The 𝗆𝖾𝗆𝗈𝗋𝗒.𝗌𝗂𝗓𝖾 instruction returns the current size of a memory.
 pub fn memory_size() -> CVMInstruction {
