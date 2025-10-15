@@ -195,14 +195,19 @@ impl WriteCVM for TemplateCodeInfo {
         for comp_indexes in &self.components_instances{
             for index in comp_indexes{
                 let index_info = match index{
-                    None => "-1".to_string(),
-                    Some(v) => v.to_string()
+                    None => {
+                        "null".to_string()
+                    },
+                    
+                    Some(v) => {
+                        producer.get_template_instance_list()[*v].clone()
+                    }
                 };
                 subcomponents = format!("{} {}", subcomponents, index_info);
             }
         }
         
-        instructions.push(format!("%%template {} [{}] [{}] [{}] [{} ]",
+        instructions.push(format!("%%template {} [{}] [{}] {} [{} ]",
             self.header, 
             outputs,
             inputs,

@@ -1892,11 +1892,11 @@ pub fn generate_types(producer: &CVMProducer) -> Vec<CVMInstruction>{
     instr.push(";; Types (for each field we store name type offset size nDims dims)".to_string());
     let mut node_id = 0;
     for bus in producer.get_busid_field_info(){
-        instr.push(format!("%%type $bus_{}", node_id));
+        instr.push(format!("%%type bus_{}", node_id));
         for field in bus{
             // We store the following info: name type offset size number_dims dims
             let type_field = if field.bus_id.is_some(){
-                format!("$bus_{}", field.bus_id.unwrap())
+                format!("bus_{}", field.bus_id.unwrap())
             } else{
                 "ff".to_string()
             };
@@ -1905,11 +1905,11 @@ pub fn generate_types(producer: &CVMProducer) -> Vec<CVMInstruction>{
                 dims = format!("{} {}", dims, dim);
             }
 
-            instr.push(format!("       ${} ${} {} {} {} {}",
-                field.name,
+            instr.push(format!("       {} {} {}",
+                //field.name,
                 type_field,
-                field.offset,
-                field.size,
+                //field.offset,
+                //field.size,
                 field.dimensions.len(),
                 dims
             ));
@@ -1952,12 +1952,12 @@ pub fn generate_components(producer: &CVMProducer) -> Vec<CVMInstruction>{
 pub fn generate_witness(producer: &CVMProducer) -> Vec<CVMInstruction>{
     let mut instr = Vec::new();
     instr.push(";; Witness (signal list)".to_string());
-    let signals_list = producer.get_witness_to_signal_list().iter()
+    let signals = producer.get_witness_to_signal_list();
+    let signals_list = signals.iter()
         .map(|n| n.to_string())
         .collect::<Vec<String>>()
         .join(" ");
-    let mut witness = String::with_capacity("%%witness ".len() + signals_list.len());
-    witness.push_str("%%witness");
+    let mut witness = format!("%%witness {}", signals.len());
     if !signals_list.is_empty() {
         witness.push_str(" ");
         witness.push_str(&signals_list);
