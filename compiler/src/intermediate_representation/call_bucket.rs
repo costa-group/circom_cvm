@@ -857,6 +857,7 @@ impl WriteCVM for CallBucket{
         let mut params = "".to_string();
         let mut i = 0;
         for p in &self.arguments {
+            instructions.push(format!(";; copying argument {}", i));
             //instructions.push(format!(";; evaluating argument {}", i));
             let size = match &self.argument_types[i].size{
                 SizeOption::Single(value) => *value,
@@ -899,17 +900,19 @@ impl WriteCVM for CallBucket{
             }
             ReturnType::Final(data) => {
                 let (mut instructions_dest, ldest) = data.dest.produce_cvm(&data.dest_address_type, &data.context,producer);
-                let size = match &data.context.size {
-                    SizeOption::Single(value) => format!("i64.{}",value),
+                let (mut instructions_size, size) = match &data.context.size {
+                    SizeOption::Single(value) => (vec![],format!("i64.{}",value)),
                     SizeOption::Multiple(values) => {
                         let rsize = producer.fresh_var();
                         if let  ComputedAddress::SubcmpSignal(rcmp,_rsig) = &ldest {
-                            let mut instructions_if_size = create_if_selection(&values, &rcmp, &rsize, producer);
-                            instructions.append(&mut instructions_if_size);
+                            //instructions.push(format!(";; before if selection {}", &rcmp));
+                            let instructions_if_size = create_if_selection(&values, &rcmp, &rsize, producer);
+                            //instructions.append(&mut instructions_if_size);
+                            (instructions_if_size,rsize)
                         } else {
                             assert!(false);
+                            (vec![],rsize)
                         }
-                        rsize
                     }
                 };
                 if producer.get_current_line() != self.line {
@@ -955,11 +958,18 @@ impl WriteCVM for CallBucket{
                     if let  ComputedAddress::Variable(rvar) = &ldest {
                         result_position = rvar.clone();
                         instructions.append(&mut instructions_dest);
+                        assert!(instructions_size.len() == 0);
                         instructions.push(format!("ff.mcall ${} {} {} {}", self.symbol.clone(), result_position, size.clone(), params));
                     } else {
                         result_position = producer.get_current_var_to_return_from_call();
-                        instructions.push(format!("ff.mcall ${} {} {} {}", self.symbol.clone(), result_position, size.clone(), params));
-                        instructions.append(&mut instructions_dest);
+                        if instructions_size.len() == 0 {
+                            instructions.push(format!("ff.mcall ${} {} {} {}", self.symbol.clone(), result_position, size.clone(), params));
+                            instructions.append(&mut instructions_dest);
+                        } else {
+                            instructions.append(&mut instructions_dest);
+                            instructions.append(&mut instructions_size);
+                            instructions.push(format!("ff.mcall ${} {} {} {}", self.symbol.clone(), result_position, size.clone(), params));
+                        }
                     }
                     if producer.cvm_multi_assign_flag {
                         match &ldest {
