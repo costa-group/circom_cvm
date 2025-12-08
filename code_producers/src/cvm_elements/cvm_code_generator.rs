@@ -1905,8 +1905,8 @@ pub fn generate_types(producer: &CVMProducer) -> Vec<CVMInstruction>{
                 dims = format!("{} {}", dims, dim);
             }
 
-            instr.push(format!("       {} {} {}",
-                //field.name,
+            instr.push(format!("       {} {} {} {}",
+                field.name,
                 type_field,
                 //field.offset,
                 //field.size,
