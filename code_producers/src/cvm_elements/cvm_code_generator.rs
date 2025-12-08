@@ -345,7 +345,7 @@ pub fn create_if_selection(
     instructions.push(format!("{} = get_template_id {}", tid, rcmpid));
     for i in 0..values.len() {
         let comp = producer.fresh_var();
-	instructions.push(format!("{} = {} {} {}", comp, eq64(), tid, values[i].0));
+	instructions.push(format!("{} = {} {} i64.{}", comp, eq64(), tid, values[i].0));
 	instructions.push(format!("{} {}", add_if64(), comp));
 	instructions.push(format!("{} = i64.{}", rresult, values[i].1)); //Add corresponding size in list
 	instructions.push(add_else());

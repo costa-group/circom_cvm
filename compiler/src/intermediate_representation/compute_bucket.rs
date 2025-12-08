@@ -475,17 +475,30 @@ impl WriteCVM for ComputeBucket{
         if producer.needs_comments() {
             instructions.push(";; compute bucket".to_string());
 	}
+        let mut is_array_eq = false;
+        if let OperatorType::Eq(n) = &self.op {
+            is_array_eq = match n {
+                SizeOption::Single(v) => *v > 1,
+                SizeOption::Multiple(_v) => true
+            };
+        }
         let mut vresults = vec![];
-        for e in &self.stack {
-            let (mut instructions_exp, res) = e.produce_cvm(producer);
-            instructions.append(&mut instructions_exp);
-            vresults.push(res);
+        let res = producer.fresh_var();
+        let params;
+        if ! is_array_eq {
+            for e in &self.stack {
+                let (mut instructions_exp, res) = e.produce_cvm(producer);
+                instructions.append(&mut instructions_exp);
+                vresults.push(res);
+            }
+            params = vresults.join(" ");
+        }
+        else {
+            params = "".to_string();
         }
         if producer.needs_comments() {
             instructions.push(format!(";; OP({})", self.op.to_string()));
 	}
-        let res = producer.fresh_var();
-        let params = vresults.join(" ");
         if producer.get_current_line() != self.line {
             instructions.push(format!(";;line {}", self.line));
             producer.set_current_line(self.line);
@@ -540,20 +553,64 @@ impl WriteCVM for ComputeBucket{
                 instructions.push(format!("{} = {} {}", res, gtff(), params));
             }
             OperatorType::Eq(n) => {
-                let mut is_multiple = false;
-                let (length,values) = match n{
-                    SizeOption::Single(v) => (*v,vec![]),
-                    SizeOption::Multiple(v) => {
-                        is_multiple = true;
-                        (v.len(),v.clone())
+                if !is_array_eq {
+                    assert!(params != "".to_string());
+		    instructions.push(format!("{} = {} {}", res, eqff(), params));
+                } else {
+                    use super::location_rule::*;
+                    if producer.needs_comments() {
+                        instructions.push(";; is array equality".to_string());
                     }
-                };
-		assert!(length != 0);
-		if !is_multiple && length == 1 {
-                    instructions.push(format!("{} = {} {}", res, eqff(), params));
-                } else {                    
+                    let mut is_multiple = false;
+                    let (length,values) = match n{
+                        SizeOption::Single(v) => (*v,vec![]),
+                        SizeOption::Multiple(v) => {
+                            is_multiple = true;
+                            (v.len(),v.clone())
+                        }
+                    };
+		    assert!(length != 0);
+                    let mut location_vars = vec![];
+                    location_vars.push(producer.fresh_var());
+                    location_vars.push(producer.fresh_var());
+                    let mut value_vars = vec![];
+                    value_vars.push(producer.fresh_var());
+                    value_vars.push(producer.fresh_var());
                     let counter = producer.fresh_var();
-                    let res = producer.fresh_var();
+                    let mut vresults = vec![];
+                    let mut instruction_get_results = vec![];
+                    let mut i = 0;
+                    for e in &self.stack {
+                        if let Instruction::Load(load) = &**e {
+                            let (mut instructions_exp, lsrc) = load.src.produce_cvm(&load.address_type, &load.context,producer);
+                            instructions.append(&mut instructions_exp);
+                            match lsrc {
+                                ComputedAddress::Variable(rvar) => {
+                                    if load.context.in_function_returning_array && RETURN_PARAM_SIZE > 0 {
+                                        let rvar2 = producer.fresh_var();
+                                        instructions.push(format!("{} = {} {} i64.{}", rvar2, add64(), rvar, RETURN_PARAM_SIZE));
+                                        vresults.push(rvar2);
+                                    } else {
+                                        vresults.push(rvar);
+                                    }
+                                    instruction_get_results.push(format!("{} = {} {}", value_vars[i], loadff(), location_vars[i]));
+                                }
+                                ComputedAddress::Signal(rsig) => {
+                                    vresults.push(rsig);
+                                    instruction_get_results.push(format!("{} = {}",value_vars[i], &get_signal(&location_vars[i])));
+                                }
+                                ComputedAddress::SubcmpSignal(rcmp,rsig) => {
+                                    vresults.push(rsig);
+                                    instruction_get_results.push(format!("{} = {}",value_vars[i], &get_cmp_signal(&rcmp,&location_vars[i])));
+                                }
+                            }
+                        } else {
+                            assert!(false);
+                        }
+                        i += 1;
+                    }
+                    instructions.push(format!("{} = {}", &location_vars[0], &vresults[0]));
+                    instructions.push(format!("{} = {}", &location_vars[1], &vresults[1]));
                     if is_multiple { 
                         if let Instruction::Load(load) = &*self.stack[1] {
                             if let AddressType::SubcmpSignal {cmp_address, .. } = &load.address_type {
@@ -566,7 +623,7 @@ impl WriteCVM for ComputeBucket{
                                 }
                             } else {
                                 assert!(false);
-                            }                            
+                            } 
                         } else {
                             assert!(false);
                         }
@@ -579,12 +636,13 @@ impl WriteCVM for ComputeBucket{
                     }
                     instructions.push(add_loop());
                     instructions.push(format!("{} {} ", add_if64(), &counter));
-                    instructions.push(format!("{} = {} {}", res, eqff(), params));
+                    instructions.push(instruction_get_results[0].clone());
+                    instructions.push(instruction_get_results[1].clone());                    
+                    instructions.push(format!("{} = {} {} {}", res, eqff(), value_vars[0], value_vars[1]));
                     instructions.push(format!("{} {} ", add_ifff(), &res));
-                                      
                     instructions.push(format!("{} = {} {} i64.1", &counter, sub64(), &counter));
-                    instructions.push(format!("{} = {} {} i64.1", &vresults[0], add64(), &vresults[0]));
-                    instructions.push(format!("{} = {} {} i64.1", &vresults[1], add64(), &vresults[1]));
+                    instructions.push(format!("{} = {} {} i64.1", &location_vars[0], add64(), &location_vars[0]));
+                    instructions.push(format!("{} = {} {} i64.1", &location_vars[1], add64(), &location_vars[1]));
                     instructions.push(add_continue());
                     instructions.push(add_end());
                     instructions.push(add_end());                    
