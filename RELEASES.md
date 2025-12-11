@@ -1,4 +1,27 @@
 # Release notes
+
+## October 24, 2025 circom 2.2.3
+#### Extensions
+- Allow extern C++ functions to be used for custom templates in the produced C++ witness generation code. More information [here](https://github.com/iden3/circom/blob/master/mkdocs/docs/circom-language/templates-and-components.md#extern-c-code-in-custom-templates).
+- A new compilation flag is added: —sanity_check. Depending on the selected level (default is 2) introduces more or less sanity checks in the produced wasm or C++ witness generation code. More information [here](https://github.com/iden3/circom/blob/master/mkdocs/docs/getting-started/compilation-options.md).
+- Flag constraint_assert_disabled is now removed (use option —sanity_check 0)
+- Anonymous components and buses are now allowed inside inline arrays. More information [here](https://github.com/iden3/circom/blob/master/mkdocs/docs/circom-language/data-types.md).
+
+#### Improvements
+- Improving documentation.
+- Goldilocks numbers are represented in C++ code using uint64_t.
+
+#### Fixed bugs
+- Errors and warning were swapped in custom-gates analysis for if-then-else statements.
+- Handling assignments of arrays when dimensions are incomplete to avoid errors.
+- Fixing JSON input reading type check in main.cpp (witness generation).
+- Fixing minor panic in multiple assignments analysis
+- Fixing minor panic in tag propagation for assignment statements and arrays.
+- Fixing minor panic in anonymous processing.
+- Fixing minor issue related to the size of the stack of auxiliary expressions.
+- Fixing minor panic in function calls with buses as parameters. 
+
+
 ## March 11, 2025 circom 2.2.2
 #### Extensions
 - Adding a new prime number: bls12377.
@@ -141,7 +164,7 @@
 ## February 10, 2023 circom 2.1.4
 
  #### Extensions
- - Improving the efficiency of the parser regarding the anonnymous components and tuples. 
+ - Improving the efficiency of the parser regarding the anonymous components and tuples. 
  - Improving the substitution process: better compilation times for --O1 and --O2.
  - Improving the handling of the underscore substitution.
  - Extending the substitution to allow the inheritance of signal tags.
@@ -279,7 +302,7 @@
 
 #### Extensions
 -	A check that all inputs are set is added in the wasm/JS and C++ generated code.
--	Improvement of the “merge_code” implementation in code generators. 
+-	Improvement of the "merge_code" implementation in code generators. 
 
 ## Nov 9, 2021 circom 2.0.1
 

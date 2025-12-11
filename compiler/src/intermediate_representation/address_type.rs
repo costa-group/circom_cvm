@@ -20,12 +20,14 @@ impl ToString for InputInformation {
         match self {
             NoInput => "NO_INPUT".to_string(),
             Input { status , needs_decrement} => {
-                let str_status = match status {
-                    StatusInput::Last => "LAST".to_string(),
-                    StatusInput::NoLast => "NO_LAST".to_string(),
-                    StatusInput::Unknown => "UNKNOWN".to_string(),
-                };
-                format!("Status {} Decrement {}", str_status, needs_decrement)
+                format!("status {} needs decrement {}",  
+                    match status {
+                        StatusInput::Last => "LAST",
+                        StatusInput::NoLast => "NO_LAST",
+                        StatusInput::Unknown => "UNKNOWN",
+                    },
+                    needs_decrement
+                )
             }
         }
     }

@@ -203,6 +203,7 @@ pub struct TemplateInstance {
     pub triggers: Vec<Trigger>,
     pub clusters: Vec<TriggerCluster>,
     pub code: Code,
+    pub is_extern_c: bool,
 }
 
 pub struct TemplateConfig {
@@ -218,6 +219,7 @@ pub struct TemplateConfig {
     pub components: Vec<Component>,
     pub arguments: Vec<Argument>,
     pub signals_to_tags: HashMap<Vec<String>, BigInt>,
+    pub is_extern_c: bool,
 }
 impl TemplateInstance {
     pub fn new(config: TemplateConfig) -> TemplateInstance {
@@ -240,20 +242,20 @@ impl TemplateInstance {
             triggers: config.triggers,
             clusters: config.clusters,
             signals_to_tags: config.signals_to_tags,
+            is_extern_c: config.is_extern_c
         }
     }
 
     pub fn add_signal(&mut self, wire: Wire) {
-        use SignalType::*;
         let new_signals = wire.size();
         match wire.xtype() {
-            Input => {
+            SignalType::Input => {
                 self.number_of_inputs += new_signals;
             }
-            Output => {
+            SignalType::Output => {
                 self.number_of_outputs += new_signals;
             }
-            Intermediate => {
+            SignalType::Intermediate => {
                 self.number_of_intermediates += new_signals;
             }
         }
@@ -295,7 +297,7 @@ pub struct VCPConfig {
     pub program: ProgramArchive,
     pub prime: String,
     pub buses: Vec<BusInstance>,
-
+    pub has_extern_c: bool,
 }
 
 #[derive(Clone)]
@@ -310,6 +312,7 @@ pub struct VCP {
     pub templates_in_mixed: Vec<usize>,
     pub prime: String,
     pub buses: Vec<BusInstance>,
+    pub has_extern_c: bool
 
 }
 impl VCP {
@@ -324,7 +327,8 @@ impl VCP {
             functions: vec![],
             quick_knowledge: HashMap::new(),
             prime: config.prime,
-            buses: config.buses
+            buses: config.buses,
+            has_extern_c: config.has_extern_c
         };
         super::merger::run_preprocessing(&mut vcp, config.program);
         vcp

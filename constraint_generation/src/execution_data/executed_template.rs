@@ -84,6 +84,7 @@ pub struct ExecutedTemplate {
     pub underscored_signals: Vec<String>,
     connexions: Vec<Connexion>,
     pub bus_connexions: HashMap<String, BusConnexion>,
+    pub is_extern_c: bool
 }
 
 impl ExecutedTemplate {
@@ -95,7 +96,8 @@ impl ExecutedTemplate {
         tag_instances: HashMap<String, TagWire>,
         code: Statement,
         is_parallel: bool,
-        is_custom_gate: bool
+        is_custom_gate: bool,
+        is_extern_c: bool
     ) -> ExecutedTemplate {
         let public_inputs: HashSet<_> = public.iter().cloned().collect();
 
@@ -121,6 +123,7 @@ impl ExecutedTemplate {
             connexions: Vec::new(),
             bus_connexions: HashMap::new(),
             underscored_signals: Vec::new(),
+            is_extern_c
         }
     }
 
@@ -395,7 +398,6 @@ impl ExecutedTemplate {
 
         fn build_components(components: ComponentCollector) -> Vec<Component> {
             let mut cmp = vec![];
-
             for c in components {
                 cmp.push(Component { 
                     name: c.name, 
@@ -437,6 +439,7 @@ impl ExecutedTemplate {
             name: self.template_name,
             number_of_components : self.number_of_components,
             signals_to_tags: self.signal_to_tags,
+            is_extern_c: self.is_extern_c
         };
 
         let mut instance = TemplateInstance::new(config);

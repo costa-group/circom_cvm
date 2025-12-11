@@ -62,7 +62,7 @@ fn start() -> Result<(), ()> {
         wasm_file: user_input.wasm_file().to_string(),
         produce_input_log: user_input.main_inputs_flag(),
         no_asm_flag: user_input.no_asm_flag(),
-        constraint_assert_disabled_flag: user_input.constraint_assert_disabled_flag(),
+        sanity_check_style: user_input.sanity_check_style(),
         cvm_flag: user_input.cvm_flag(),
         cvm_multi_assign_flag: user_input.cvm_multi_assign_flag(),
         cvm_folder: user_input.cvm_folder().to_string(),
