@@ -61,10 +61,6 @@ Now, you should be able to see all the options of the executable by using the `h
 ```console
 circom --help
 
-circom compiler 2.1.7
-IDEN3
-Compiler for the circom programming language
-
 USAGE:
     circom [FLAGS] [OPTIONS] [--] [input]
 
@@ -74,24 +70,32 @@ FLAGS:
         --wasm                                 Compiles the circuit to wasm
         --json                                 Outputs the constraints in json format
         --wat                                  Compiles the circuit to wat
-    -c, --c                                    Compiles the circuit to c
+    -c, --c                                    Compiles the circuit to C++
         --O0                                   No simplification is applied
-        --O1                                   Only applies signal to signal and signal to constant simplification
+        --O1                                   Only applies signal to signal and signal to constant simplification. This
+                                               is the default option
         --O2                                   Full constraint simplification
         --verbose                              Shows logs during compilation
         --inspect                              Does an additional check over the constraints produced
         --use_old_simplification_heuristics    Applies the old version of the heuristics when performing linear
                                                simplification
-        --simplification_substitution          Outputs the substitution applied in the simplification phase in json format
+        --simplification_substitution          Outputs the substitution applied in the simplification phase in json
+                                               format
+        --no_asm                               Does not use asm files in witness generation code in C++
+        --no_init                              Removes initializations to 0 of variables ("var") in the witness
+                                               generation code
     -h, --help                                 Prints help information
     -V, --version                              Prints version information
 
 OPTIONS:
     -o, --output <output>                    Path to the directory where the output will be written [default: .]
     -p, --prime <prime>                      To choose the prime number to use to generate the circuit. Receives the
-                                             name of the curve (bn128, bls12381, goldilocks, grumpkin, secq256r1, pallas, vesta) [default: bn128]
+                                             name of the curve (bn128, bls12377, bls12381, goldilocks, grumpkin, pallas,
+                                             secq256r1, vesta) [default: bn128]
     -l <link_libraries>...                   Adds directory to library search path
         --O2round <simplification_rounds>    Maximum number of rounds of the simplification process
+        --sanity_check <sanity_check>        Selects the level of sanity checks to be included in the witness generation
+                                             code generated. It receives the value 0, 1, or 2. [default: 2]
 
 ARGS:
     <input>    Path to a circuit with a main component [default: ./circuit.circom]
