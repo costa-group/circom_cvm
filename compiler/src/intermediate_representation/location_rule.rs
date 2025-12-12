@@ -25,7 +25,7 @@ impl ToString for AccessType {
     fn to_string(&self) -> String {
         match &self{
             AccessType::Indexed(index) =>{
-		
+        
                 format!("Indexed({},{})", index.symbol_dim, index.indexes.iter().map(|i| i.to_string()).collect::<String>())
             }
             AccessType::Qualified(value) =>{
@@ -87,25 +87,26 @@ impl  LocationRule {
                 let mut instructions = vec![];
                 match address_type {
                     AddressType::SubcmpSignal { cmp_address, .. } => {
-			if producer.needs_comments() {
+                        if producer.needs_comments() {
                             instructions.push(";; is subcomponent mapped".to_string());
-			}
+                        }
                         let (mut instructions_cmp, vcmp) = cmp_address.produce_cvm(producer);
                         instructions.append(&mut instructions_cmp);
                         let tid = producer.fresh_var();
                         instructions.push(format!("{} = get_template_id {}", tid, vcmp));
                         let sp = producer.fresh_var();
                         instructions.push(format!("{} = get_template_signal_position {} i64.{}", sp, tid, signal_code));
-			if indexes.len() == 0 {
+                        if indexes.len() == 0 {
                             (instructions, ComputedAddress::SubcmpSignal(vcmp,sp))
-			} else {
+                        } else {
+                            // instructions.push(format!(";; idexes.len = {}",indexes.len()));
                             let mut accsize = sp;
                             let mut tbid = tid.clone();
-                            let mut get_dimention_function = " get_template_signal_dimension".to_string();
-                            let mut get_size_function = " get_template_signal_size".to_string();
-                            let mut get_type_function = " get_template_signal_type".to_string();
+                            let mut get_dimention_function = "get_template_signal_dimension".to_string();
+                            let mut get_size_function = "get_template_signal_size".to_string();
+                            let mut get_type_function = "get_template_signal_type".to_string();
                             let mut idxpos = 0;
-			    while idxpos < indexes.len() {
+                            while idxpos < indexes.len() {
                                 if let AccessType::Indexed(index_info) = &indexes[idxpos] {
                                     let index_list = &index_info.indexes;
                                     let dimensions = index_info.symbol_dim;
@@ -115,7 +116,7 @@ impl  LocationRule {
                                     let psize = producer.fresh_var();
                                     let mut prevsize = psize;
                                     instructions.push(format!("{} = {}", prevsize, vidx0));
-				    for i in 1..index_list.len() {
+                                    for i in 1..index_list.len() {
                                         let dimi = producer.fresh_var();
                                         instructions.push(format!("{} = {} {} i64.{} i64.{}", dimi, get_dimention_function, tbid, signal_code, i));
                                         let (mut instructions_idxi, vidxi) = index_list[i].produce_cvm(producer);
@@ -127,50 +128,52 @@ impl  LocationRule {
                                         prevsize = cursize;
                                     }
                                     assert!(index_list.len() <= dimensions);
-				    let diff = dimensions - index_list.len();
-				    if diff > 0 {
-				        //println!("There is difference: {}",diff);
-				        // must be last access
-				        assert!(idxpos+1 == indexes.len());
-				        for i in 0..diff-1 {
+                                    let diff = dimensions - index_list.len();
+                                    if diff > 0 {
+                                        //println!("There is difference: {}",diff);
+                                        // must be last access
+                                        assert!(idxpos+1 == indexes.len());
+                                        for i in 0..diff-1 {
                                             let dimi = producer.fresh_var();
                                             instructions.push(format!("{} = {} {} i64.{} i64.{}", dimi, get_dimention_function, tid, signal_code, indexes.len() + i));                                        
                                             let cursize = producer.fresh_var();
                                             instructions.push(format!("{} = {} {} {}", cursize, mul64(), prevsize, dimi));
                                             prevsize = cursize;
-				        }
-				    } // after this we have the product of the remaining dimensions
+                                        }
+                                    } // after this we have the product of the remaining dimensions
                                     let vsize = producer.fresh_var();
                                     instructions.push(format!("{} = {} {} i64.{}", vsize,  get_size_function, tid, signal_code));
                                     let finalsize = producer.fresh_var();
                                     instructions.push(format!("{} = {} {} {}", finalsize, mul64(), prevsize, vsize));
                                     let access = producer.fresh_var();
-                                    instructions.push(format!("{} = {} {} {}", access, add64(), accsize, prevsize));
+                                    instructions.push(format!("{} = {} {} {}", access, add64(), accsize, finalsize));
+                                    // instructions.push(format!(";;{}", get_type_function));
                                     accsize = access;
                                 } else if let AccessType::Qualified(field_no) = &indexes[idxpos] {
                                     let bid = producer.fresh_var();
                                     instructions.push(format!("{} = {} {} i64.{}", bid, get_type_function, tbid, signal_code));
                                     tbid = bid.clone();
                                     let sfield = producer.fresh_var();
-                                    instructions.push(format!("{} = get_bus_signal_position {} i64.{}", sfield, bid, field_no));
+                                    instructions.push(format!("{} =  get_bus_field_position {} i64.{}", sfield, bid, field_no));
                                     let access = producer.fresh_var();
                                     instructions.push(format!("{} = {} {} {}", access, add64(), accsize, sfield));
                                     accsize = access;
-				} else {
-				    assert!(false);
-				}
+                                    get_type_function = " get_bus_field_type".to_string();
+                                } else {
+                                    assert!(false);
+                                }   
                                 if idxpos == 0 {
-                                    get_dimention_function = " get_bus_signal_dimension".to_string();
-                                    get_size_function = " get_bus_signal_size".to_string();
-                                    get_type_function = " get_bus_signal_type".to_string();
+                                    get_dimention_function = " get_bus_field_dimension".to_string();
+                                    get_size_function = " get_bus_field_size".to_string();
+                                    //get_type_function = "  get_bus_field_type".to_string();
                                 }
                                 idxpos += 1;
-			    }
-			    if producer.needs_comments() {
+                            }
+                            if producer.needs_comments() {
                                 instructions.push(";; end of load bucket".to_string());
-			    }
+                            }
                             (instructions, ComputedAddress::SubcmpSignal(vcmp,accsize))
-			}
+                        }
                         //after this we have  the offset on top of the stack and the subcomponent start_of_signals just below
                     }
                     _ => {
