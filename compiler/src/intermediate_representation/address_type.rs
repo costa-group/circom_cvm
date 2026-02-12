@@ -5,6 +5,7 @@ pub enum StatusInput {
     Last,
     NoLast,
     Unknown,
+    SizeZero,
 }
 
 
@@ -25,6 +26,8 @@ impl ToString for InputInformation {
                         StatusInput::Last => "LAST",
                         StatusInput::NoLast => "NO_LAST",
                         StatusInput::Unknown => "UNKNOWN",
+                        StatusInput::SizeZero => "SIZE_ZERO",
+
                     },
                     needs_decrement
                 )
