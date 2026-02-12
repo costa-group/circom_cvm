@@ -7,6 +7,8 @@ use crate::intermediate_representation::translate::{CodeInfo, FieldTracker, Temp
 use code_producers::c_elements::*;
 use code_producers::wasm_elements::*;
 use code_producers::cvm_elements::*;
+use code_producers::cvt_elements::*;
+
 use program_structure::ast::SignalType;
 
 use program_structure::file_definition::FileLibrary;
@@ -274,6 +276,7 @@ fn initialize_cvm_producer(vcp: &VCP, database: &TemplateDB, cvm_multi_assign_fl
     let stats = vcp.get_stats();
     producer.cvm_multi_assign_flag = cvm_multi_assign_flag;
     producer.main_header = vcp.get_main_instance().unwrap().template_header.clone();
+    producer.main_id = vcp.get_main_instance().unwrap().template_id;
     producer.main_signal_offset = 1;
     producer.prime = prime.to_str_radix(10);
     producer.prime_str = vcp.prime.clone();
@@ -320,6 +323,63 @@ fn initialize_cvm_producer(vcp: &VCP, database: &TemplateDB, cvm_multi_assign_fl
     (producer.major_version, producer.minor_version, producer.patch_version) = get_number_version(version);
     producer
 }
+
+// CVT producer builder
+fn initialize_cvt_producer(vcp: &VCP, database: &TemplateDB, cvm_multi_assign_flag: bool, version: &str) -> CVTProducer {
+    use program_structure::utils::constants::UsefulConstants;
+    let initial_node = vcp.get_main_id();
+    let prime = UsefulConstants::new(&vcp.prime).get_p().clone();
+    let mut producer = CVTProducer::default();
+    let stats = vcp.get_stats();
+    producer.cvm_multi_assign_flag = cvm_multi_assign_flag;
+    producer.main_header = vcp.get_main_instance().unwrap().template_header.clone();
+    producer.main_signal_offset = 1;
+    producer.prime = prime.to_str_radix(10);
+    producer.prime_str = vcp.prime.clone();
+    producer.fr_memory_size = match vcp.prime.as_str(){
+        "goldilocks" => 412,
+        "bn128" => 1948,
+        "bls12381" => 1948,
+        "grumpkin" => 1948,
+        "pallas" => 1948,
+        "vesta" => 1948,
+        "secq256r1" => 1948,
+        "bls12-377" => 1948,
+        _ => unreachable!()
+    };
+    //producer.fr_memory_size = 412 if goldilocks and 1948 for bn128 and bls12381
+    // for each created component we store three u32, for each son we store a u32 in its father
+    producer.size_of_component_tree = stats.all_created_components * 3 + stats.all_needed_subcomponents_indexes;
+    producer.total_number_of_signals = stats.all_signals + 1;
+    producer.size_32_bit = prime.bits() / 32 + if prime.bits() % 32 != 0 { 1 } else { 0 };
+    producer.size_32_shift = 0;
+    let mut pow = 1;
+    while pow < producer.size_32_bit {
+        pow *= 2;
+        producer.size_32_shift += 1;
+    }
+    producer.size_32_shift += 2;
+    producer.number_of_components = stats.all_created_components;
+    producer.witness_to_signal_list = vcp.get_witness_list().clone();
+    producer.signals_in_witness = producer.witness_to_signal_list.len();
+    producer.number_of_main_inputs = vcp.templates[initial_node].number_of_inputs;
+    producer.number_of_main_outputs = vcp.templates[initial_node].number_of_outputs;
+
+    // add the info of the buses
+    (
+        producer.num_of_bus_instances, 
+        producer.busid_field_info
+    ) = get_info_buses(&vcp.buses); 
+
+    producer.main_input_list = main_input_list(&vcp.templates[initial_node],&producer.busid_field_info);
+    producer.io_map = build_io_map(vcp, database);
+    producer.template_instance_list = build_template_list(vcp);
+    producer.field_tracking.clear();
+
+    (producer.major_version, producer.minor_version, producer.patch_version) = get_number_version(version);
+    producer
+}
+
 
 // WASM producer builder
 fn initialize_wasm_producer(vcp: &VCP, database: &TemplateDB, wat_flag:bool, sanity_check_style: usize, version: &str) -> WASMProducer {
@@ -763,6 +823,7 @@ pub fn build_circuit(vcp: VCP, flag: CompilationFlags, version: &str) -> Circuit
     }
     let template_database = TemplateDB::build(&vcp.templates);
     let mut circuit = Circuit::default();
+    circuit.cvt_producer = initialize_cvt_producer(&vcp, &template_database, flag.cvm_multi_assign_flag, version);
     circuit.cvm_producer = initialize_cvm_producer(&vcp, &template_database, flag.cvm_multi_assign_flag, version);
     circuit.wasm_producer = initialize_wasm_producer(&vcp, &template_database, flag.wat_flag, flag.sanity_check_style, version);
     circuit.c_producer = initialize_c_producer(&vcp, &template_database, flag.no_asm_flag, flag.sanity_check_style, version);
@@ -787,7 +848,8 @@ pub fn build_circuit(vcp: VCP, flag: CompilationFlags, version: &str) -> Circuit
         let constant = field_tracker.get_constant(i).unwrap().clone();
         circuit.wasm_producer.field_tracking.push(constant.clone());
         circuit.c_producer.field_tracking.push(constant.clone());
-        circuit.cvm_producer.field_tracking.push(constant);
+        circuit.cvm_producer.field_tracking.push(constant.clone());
+        circuit.cvt_producer.field_tracking.push(constant);
     }
     for fun in &mut circuit.functions {
         set_arena_size_in_calls(&mut fun.body, &function_to_arena_size);

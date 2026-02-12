@@ -11,6 +11,9 @@ pub struct CompilerConfig {
     pub cvm_folder: String,
     pub cvm_name: String,
     pub cvm_file: String,
+    pub cvt_folder: String,
+    pub cvt_name: String,
+    pub cvt_file: String,
     pub js_folder: String,
     pub wasm_name: String,
     pub wat_file: String,
@@ -23,6 +26,7 @@ pub struct CompilerConfig {
     pub wasm_flag: bool,
     pub c_flag: bool,
     pub cvm_flag: bool,
+    pub cvt_flag: bool,
     pub cvm_multi_assign_flag: bool,
     pub debug_output: bool,
     pub produce_input_log: bool,
@@ -36,7 +40,7 @@ pub struct CompilerConfig {
 pub fn compile(config: CompilerConfig) -> Result<(), ()> {
 
 
-    if config.c_flag || config.wat_flag || config.wasm_flag || config.cvm_flag{
+    if config.c_flag || config.wat_flag || config.wasm_flag || config.cvm_flag || config.cvt_flag{
         let mut circuit = compiler_interface::run_compiler(
             config.vcp,
             Config { 
@@ -144,13 +148,14 @@ pub fn compile(config: CompilerConfig) -> Result<(), ()> {
                 Colour::Green.paint("Written successfully:"),
                 config.cvm_file,
             );
-/*            println!(
-                "{} {}/{}",
+        }
+        if config.cvt_flag{
+            compiler_interface::write_cvt(&mut circuit, &config.cvt_folder, &config.cvt_name, &config.cvt_file)?;
+            println!(
+                "{} {}",
                 Colour::Green.paint("Written successfully:"),
-                &config.c_folder,
-                "main.cvm".to_string(),
+                config.cvt_file,
             );
-*/
         }
     }
     

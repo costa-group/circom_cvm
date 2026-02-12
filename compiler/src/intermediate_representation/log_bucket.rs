@@ -3,6 +3,7 @@ use crate::translating_traits::*;
 use code_producers::c_elements::*;
 use code_producers::wasm_elements::*;
 use code_producers::cvm_elements::*;
+use code_producers::cvt_elements::*;
 
 
 
@@ -165,7 +166,19 @@ impl WriteC for LogBucket {
 
 
 impl WriteCVM for LogBucket{
-    fn produce_cvm(&self, _producer: &mut CVMProducer) -> (Vec<String>, String) {
+    fn produce_cvm(&self, _producer: &mut CVMProducer) -> (Vec<Vec<u8>>, Vec<u8>) {
+        /*
+        if producer.get_current_line() != self.line {
+            instructions.push(format!(";;line {}", self.line));
+            producer.set_current_line(self.line);
+        }
+         */
+        (Vec::new(),Vec::new())
+    }
+}
+
+impl WriteCVT for LogBucket{
+    fn produce_cvt(&self, _producer: &mut CVTProducer) -> (Vec<String>, String) {
         /*
         if producer.get_current_line() != self.line {
             instructions.push(format!(";;line {}", self.line));
@@ -175,3 +188,4 @@ impl WriteCVM for LogBucket{
         (vec![";; log bucket not implemented".to_string()],"".to_string())
     }
 }
+

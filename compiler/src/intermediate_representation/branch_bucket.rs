@@ -2,7 +2,9 @@ use super::ir_interface::*;
 use crate::translating_traits::*;
 use code_producers::c_elements::*;
 use code_producers::wasm_elements::*;
+use code_producers::cvt_elements::*;
 use code_producers::cvm_elements::*;
+
 
 #[derive(Clone)]
 pub struct BranchBucket {
@@ -123,15 +125,15 @@ impl WriteC for BranchBucket {
     }
 }
 
-impl WriteCVM for BranchBucket{
-    fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<String>, String) {
-        use code_producers::cvm_elements::cvm_code_generator::*;
+impl WriteCVT for BranchBucket{
+    fn produce_cvt(&self, producer: &mut CVTProducer) -> (Vec<String>, String) {
+        use code_producers::cvt_elements::cvt_code_generator::*;
         let mut instructions = vec![];
         if producer.needs_comments() {
             instructions.push(";; branch bucket".to_string());
 	}
         if self.if_branch.len() > 0 {
-            let (mut instructions_cond, vcond) = self.cond.produce_cvm(producer);
+            let (mut instructions_cond, vcond) = self.cond.produce_cvt(producer);
             instructions.append(&mut instructions_cond);
             if producer.get_current_line() != self.line {
                 instructions.push(format!(";;line {}", self.line));
@@ -139,7 +141,7 @@ impl WriteCVM for BranchBucket{
             }
             instructions.push(format!("{} {}", add_ifff(), vcond));
             for ins in &self.if_branch {
-                let (mut instructions_if, _) = ins.produce_cvm(producer);
+                let (mut instructions_if, _) = ins.produce_cvt(producer);
                 instructions.append(&mut instructions_if);
             }
             if producer.get_current_line() != self.line {
@@ -149,14 +151,14 @@ impl WriteCVM for BranchBucket{
             if self.else_branch.len() > 0 {
                 instructions.push(add_else());
                 for ins in &self.else_branch {
-                    let (mut instructions_else, _) = ins.produce_cvm(producer);
+                    let (mut instructions_else, _) = ins.produce_cvt(producer);
                     instructions.append(&mut instructions_else);
                 }
             }
 	    instructions.push(add_end());
         } else {
             if self.else_branch.len() > 0 {
-                let (mut instructions_cond, vcond) = self.cond.produce_cvm(producer);
+                let (mut instructions_cond, vcond) = self.cond.produce_cvt(producer);
                 instructions.append(&mut instructions_cond);
                 if producer.get_current_line() != self.line {
                     instructions.push(format!(";;line {}", self.line));
@@ -166,7 +168,7 @@ impl WriteCVM for BranchBucket{
                 instructions.push(format!("{} = {} {}", res, eqzff(), vcond));
                 instructions.push(format!("{} {}", add_ifff(), res));
                 for ins in &self.else_branch {
-                    let (mut instructions_else, _) = ins.produce_cvm(producer);
+                    let (mut instructions_else, _) = ins.produce_cvt(producer);
                     instructions.append(&mut instructions_else);
                 }
 		instructions.push(add_end());
@@ -176,5 +178,13 @@ impl WriteCVM for BranchBucket{
             instructions.push(";; end of branch bucket".to_string());
 	}
         (instructions,"".to_string())
+    }
+}
+
+
+impl WriteCVM for BranchBucket{
+    fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<Vec<u8>>,Vec<u8>) {
+        let mut instructions = vec![];
+        (instructions,Vec::new())
     }
 }

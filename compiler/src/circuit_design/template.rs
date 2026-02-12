@@ -3,6 +3,8 @@ use crate::translating_traits::*;
 use code_producers::c_elements::*;
 use code_producers::wasm_elements::*;
 use code_producers::cvm_elements::*;
+use code_producers::cvt_elements::*;
+
 use crate::hir::very_concrete_program::Wire;
 use program_structure::ast::SignalType;
 use crate::hir::very_concrete_program::Argument;
@@ -161,8 +163,80 @@ impl WriteWasm for TemplateCodeInfo {
 }
 
 impl WriteCVM for TemplateCodeInfo {
-    fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<String>, String) {
+    fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<Vec<u8>>, Vec<u8>) {
         use code_producers::cvm_elements::cvm_code_generator::*;
+        let mut instructions = vec![];
+
+        instructions.push(TEMPLATES.to_vec());
+
+        // Include the outputs
+        let size_out = usize_as_bytes(self.outputs.len(), 4);
+        instructions.push(size_out);
+        for s in &self.outputs{
+            let mut out_info = match s{
+                Wire::TSignal(signal) =>{
+                    generate_variable_declaration(None, &signal.lengths)
+                },
+                Wire::TBus(bus) =>{
+                    generate_variable_declaration(Some(bus.bus_id), &bus.lengths)
+
+                }
+            };
+            instructions.append(&mut out_info);
+        } 
+
+        // Include the inputs
+        let size_in= usize_as_bytes(self.inputs.len(), 4);
+        instructions.push(size_in);
+        for s in &self.inputs{
+            let mut in_info = match s{
+                Wire::TSignal(signal) =>{
+                    generate_variable_declaration(None, &signal.lengths)
+                },
+                Wire::TBus(bus) =>{
+                    generate_variable_declaration(Some(bus.bus_id), &bus.lengths)
+
+                }
+            };
+            instructions.append(&mut in_info);
+        } 
+
+        // Include the signals
+        let signals = self.number_of_intermediates + self.number_of_outputs + self.number_of_inputs;
+        let n_signals = usize_as_bytes(signals, 8);
+        instructions.push(n_signals);
+
+
+        // Include the list of subcomponents
+        let size_comp: Vec<u8>= usize_as_bytes(self.number_of_components, 4);
+        instructions.push(size_comp);
+        for comp_indexes in &self.components_instances{
+            for index in comp_indexes{
+                let index_info = match index{
+                    None => {
+                        0
+                    },
+                    
+                    Some(v) => {
+                        *v+1 // we add 1 to use 0 for the null component
+                    }
+                };
+                let index_bytes: Vec<u8>= usize_as_bytes(index_info, 4);
+                instructions.push(index_bytes);
+            }
+        }
+
+
+
+        // Include the instructions
+
+        (instructions, Vec::new())
+    }
+}
+
+impl WriteCVT for TemplateCodeInfo {
+    fn produce_cvt(&self, producer: &mut CVTProducer) -> (Vec<String>, String) {
+        use code_producers::cvt_elements::cvt_code_generator::*;
         // create function code
         let mut instructions = vec![];
 
@@ -224,7 +298,7 @@ impl WriteCVM for TemplateCodeInfo {
         instructions.push(format!("{} = i64.{}", return_position, &self.var_stack_depth));
 
         for t in &self.body {
-            let (mut instructions_body,_) = t.produce_cvm(producer);
+            let (mut instructions_body,_) = t.produce_cvt(producer);
             instructions.append(&mut instructions_body);
         }
         instructions.push("".to_string());

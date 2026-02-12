@@ -6,6 +6,12 @@ use crate::translating_traits::*;
 use code_producers::c_elements::*;
 use code_producers::wasm_elements::*;
 use code_producers::cvm_elements::*;
+use code_producers::cvt_elements::*;
+use code_producers::cvm_elements::cvm_code_generator::*;
+use std::io::BufWriter;
+use std::fs::File;
+
+use crate::num_bigint::BigInt;
 
 use std::io::Write;
 
@@ -21,6 +27,7 @@ pub struct Circuit {
     pub wasm_producer: WASMProducer,
     pub c_producer: CProducer,
     pub cvm_producer: CVMProducer,
+    pub cvt_producer: CVTProducer,
     pub templates: Vec<TemplateCode>,
     pub functions: Vec<FunctionCode>,
 }
@@ -29,6 +36,7 @@ impl Default for Circuit {
     fn default() -> Self {
         Circuit {
             cvm_producer: CVMProducer::default(),
+            cvt_producer: CVTProducer::default(),
             c_producer: CProducer::default(),
             wasm_producer: WASMProducer::default(),
             templates: Vec::new(),
@@ -570,13 +578,41 @@ impl WriteC for Circuit {
 }
 
 impl WriteCVM for Circuit {
-    fn produce_cvm(&self, _producer: &mut CVMProducer) -> (Vec<String>, String) {
+    fn produce_cvm(&self, _producer: &mut CVMProducer) -> (Vec<Vec<u8>>, Vec<u8>) {
+        //use code_producers::cvm_elements::cvm_code_generator::*;
+        (Vec::new(),Vec::new())
+    }
+
+    fn write_cvm(&self, writer: &mut BufWriter<File>, producer: &mut CVMProducer) -> Result<(), ()> {
+        initialize_file(writer)?;
+        
+        write_prime_section(writer, producer)?;
+        write_memory_signals_section(writer,  producer)?;
+        write_components_heap_section(writer, producer)?;
+        write_all_types(writer, producer)?;
+        write_main_template(writer, producer)?;
+        //write_components()
+        write_witness(writer, producer)?;
+        write_inputs(writer, producer)?;
+        for f in &self.functions {
+            f.write_cvm(writer, producer)?;
+        }
+        for f in &self.templates {
+            f.write_cvm(writer, producer)?;
+        }
+        writer.flush().map_err(|_| {})
+        
+    }
+}
+
+impl WriteCVT for Circuit {
+    fn produce_cvt(&self, _producer: &mut CVTProducer) -> (Vec<String>, String) {
         //use code_producers::cvm_elements::cvm_code_generator::*;
         (Vec::new(),"".to_string())
     }
 
-    fn write_cvm<T: Write>(&self, writer: &mut T, producer: &mut CVMProducer) -> Result<(), ()> {
-        use code_producers::cvm_elements::cvm_code_generator::*;
+    fn write_cvt<T: Write>(&self, writer: &mut T, producer: &mut CVTProducer) -> Result<(), ()> {
+        use code_producers::cvt_elements::cvt_code_generator::*;
 
         let mut code_aux = generate_prime(&producer);
         let mut code = merge_code(code_aux);
@@ -613,19 +649,18 @@ impl WriteCVM for Circuit {
 
 
         for f in &self.functions {
-            f.write_cvm(writer, producer)?;
+            f.write_cvt(writer, producer)?;
             //writer.flush().map_err(|_| {})?;
         }
 
         for t in &self.templates {
-            t.write_cvm(writer, producer)?;
+            t.write_cvt(writer, producer)?;
             //writer.flush().map_err(|_| {})?;
         }
 
         writer.flush().map_err(|_| {})
     }
 }
-
 
 impl Circuit {
     pub fn build(vcp: VCP, flags: CompilationFlags, version: &str) -> Self {
@@ -681,7 +716,7 @@ impl Circuit {
         self.write_wasm(writer, &self.wasm_producer)
     }
 
-    pub fn produce_cvm<W: Write>(&mut self, _cvm_folder: &str, _cvm_name: &str, writer: &mut W) -> Result<(), ()> {
+    pub fn produce_cvm(&mut self, _cvm_folder: &str, _cvm_name: &str, writer: &mut BufWriter<File>) -> Result<(), ()> {
         //use std::path::Path;
         use std::mem;
         //let cvm_folder_path = Path::new(cvm_folder).to_path_buf();
@@ -690,6 +725,18 @@ impl Circuit {
         let mut extracted_producer = mem::replace(&mut self.cvm_producer, CVMProducer::default());
         self.write_cvm(writer, &mut extracted_producer)?;
         self.cvm_producer = extracted_producer;
+        Ok(())
+    }
+
+    pub fn produce_cvt<W: Write>(&mut self, _cvt_folder: &str, _cvt_name: &str, writer: &mut W) -> Result<(), ()> {
+        //use std::path::Path;
+        use std::mem;
+        //let cvm_folder_path = Path::new(cvm_folder).to_path_buf();
+        //cvm_code_generator::generate_generate_witness_js_file(&cvm_folder_path).map_err(|_err| {})?;
+        //cvm_code_generator::generate_witness_calculator_js_file(&cvm_folder_path).map_err(|_err| {})?;
+        let mut extracted_producer = mem::replace(&mut self.cvt_producer, CVTProducer::default());
+        self.write_cvt(writer, &mut extracted_producer)?;
+        self.cvt_producer = extracted_producer;
         Ok(())
     }
 }

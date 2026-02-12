@@ -3,6 +3,8 @@ use crate::translating_traits::*;
 use code_producers::c_elements::*;
 use code_producers::wasm_elements::*;
 use code_producers::cvm_elements::*;
+use code_producers::cvt_elements::*;
+
 
 
 #[derive(Clone, Hash)]
@@ -94,7 +96,18 @@ impl WriteC for ValueBucket {
 
 
 impl WriteCVM for ValueBucket{
-    fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<String>, String) {
+    fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<Vec<u8>>, Vec<u8>) {
+        //use cvm_code_generator::*;
+        match self.parse_as {
+            ValueType::U32 => (vec![], Vec::new()),
+            ValueType::BigInt => (vec![],Vec::new())
+        }
+    }
+}
+
+
+impl WriteCVT for ValueBucket{
+    fn produce_cvt(&self, producer: &mut CVTProducer) -> (Vec<String>, String) {
         //use cvm_code_generator::*;
         match self.parse_as {
             ValueType::U32 => (vec![], format!("i64.{}",self.value)),

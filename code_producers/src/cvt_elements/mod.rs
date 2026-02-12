@@ -1,8 +1,10 @@
-pub mod cvm_code_generator;
+pub mod cvt_code_generator;
 
 use crate::components::*;
 
-pub struct CVMProducer {
+type CVTInstruction = String;
+
+pub struct CVTProducer {
     pub main_signal_offset: usize,
     pub fr_memory_size: usize, // depending of the prime; missing in build.rs
     pub size_32_bit: usize,
@@ -14,7 +16,6 @@ pub struct CVMProducer {
     pub size_of_component_tree: usize,
     pub number_of_components: usize,
     pub main_header: String,
-    pub main_id: usize,
     pub prime: String,
     pub prime_str: String,
     pub main_input_list: InputList,
@@ -45,15 +46,14 @@ pub struct CVMProducer {
     implicit_component_creation: bool,
 }
 
-impl Default for CVMProducer {
+impl Default for CVTProducer {
     fn default() -> Self {
         //let mut my_map = TemplateInstanceIOMap::new();
         //my_map.insert(0,[(0,0),(1,2),(2,4)].to_vec());
         //my_map.insert(1,[(0,0),(1,1)].to_vec());
         //my_map.insert(2,[(0,0),(1,1),(2,3)].to_vec());
-        CVMProducer {
+        CVTProducer {
             main_header: "Main_0".to_string(),
-            main_id: 0,
             main_signal_offset: 1,
             prime: "21888242871839275222246405745257275088548364400416034343698204186575808495617"
                 .to_string(),
@@ -112,7 +112,7 @@ impl Default for CVMProducer {
     }
 }
 
-impl CVMProducer {
+impl CVTProducer {
     /*
         pub fn set_constant(&self,value: &str) -> WasmInstruction {
             set_constant(value)
@@ -152,9 +152,6 @@ impl CVMProducer {
     }
     pub fn get_main_header(&self) -> &str {
         &self.main_header
-    }
-    pub fn get_main_id(&self) -> usize {
-        self.main_id
     }
     pub fn get_main_signal_offset(&self) -> usize {
         self.main_signal_offset

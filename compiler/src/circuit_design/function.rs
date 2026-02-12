@@ -5,6 +5,8 @@ use crate::translating_traits::*;
 use code_producers::c_elements::*;
 use code_producers::wasm_elements::*;
 use code_producers::cvm_elements::*;
+use code_producers::cvt_elements::*;
+
 
 //use std::io::Write;
 
@@ -135,8 +137,19 @@ impl WriteC for FunctionCodeInfo {
 }
 
 impl WriteCVM for FunctionCodeInfo {
-    fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<String>, String) {
-        use code_producers::cvm_elements::cvm_code_generator::*;
+    fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<Vec<u8>>, Vec<u8>) {
+
+        let mut instructions = vec![];
+
+
+        (instructions, Vec::new())
+        
+    }
+}
+
+impl WriteCVT for FunctionCodeInfo {
+    fn produce_cvt(&self, producer: &mut CVTProducer) -> (Vec<String>, String) {
+        use code_producers::cvt_elements::cvt_code_generator::*;
         // create function code
         let mut instructions = vec![];
 
@@ -177,7 +190,7 @@ impl WriteCVM for FunctionCodeInfo {
             instructions.push(format!("{} = i64.{}", return_call_position, size));
         }
         for t in &self.body {
-            let (mut instructions_body,_) = t.produce_cvm(producer);
+            let (mut instructions_body,_) = t.produce_cvt(producer);
             instructions.append(&mut instructions_body);
         }
         instructions.push("".to_string());

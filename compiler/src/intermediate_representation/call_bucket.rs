@@ -2,6 +2,7 @@ use super::ir_interface::*;
 use crate::translating_traits::*;
 use code_producers::c_elements::*;
 use code_producers::wasm_elements::*;
+use code_producers::cvt_elements::*;
 use code_producers::cvm_elements::*;
 
 
@@ -887,9 +888,9 @@ impl WriteC for CallBucket {
     }
 }
 
-impl WriteCVM for CallBucket{
-    fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<String>, String) {
-        use cvm_code_generator::*;
+impl WriteCVT for CallBucket{
+    fn produce_cvt(&self, producer: &mut CVTProducer) -> (Vec<String>, String) {
+        use cvt_code_generator::*;
         use super::location_rule::*;
         let mut instructions = vec![];
         instructions.push(";; start of call bucket".to_string());
@@ -908,7 +909,7 @@ impl WriteCVM for CallBucket{
             };
             if size > 1 {
                 if let Instruction::Load(load) = &**p {
-                    let (mut instructions_p, lp) = load.src.produce_cvm(&load.address_type, &load.context,producer);
+                    let (mut instructions_p, lp) = load.src.produce_cvt(&load.address_type, &load.context,producer);
                     instructions.append(&mut instructions_p);
                     match lp {
                         ComputedAddress::Variable(rvar) => {
@@ -925,7 +926,7 @@ impl WriteCVM for CallBucket{
                     assert!(false); //should never be the case!
                 }
             } else {
-                let (mut instructions_value, src) = p.produce_cvm(producer);
+                let (mut instructions_value, src) = p.produce_cvt(producer);
                 instructions.append(&mut instructions_value);
                 params = format!("{} {}", params, src);
             }
@@ -939,7 +940,7 @@ impl WriteCVM for CallBucket{
                 assert!(false);
             }
             ReturnType::Final(data) => {
-                let (mut instructions_dest, ldest) = data.dest.produce_cvm(&data.dest_address_type, &data.context,producer);
+                let (mut instructions_dest, ldest) = data.dest.produce_cvt(&data.dest_address_type, &data.context,producer);
                 let (mut instructions_size, size) = match &data.context.size {
                     SizeOption::Single(value) => (vec![],format!("i64.{}",value)),
                     SizeOption::Multiple(values) => {
@@ -1144,3 +1145,9 @@ impl WriteCVM for CallBucket{
 }
 
 
+impl WriteCVM for CallBucket{
+    fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<Vec<u8>>,Vec<u8>) {
+        let mut instructions = vec![];
+        (instructions,Vec::new())
+    }
+}

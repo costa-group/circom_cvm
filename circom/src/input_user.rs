@@ -14,12 +14,16 @@ pub struct Input {
     pub out_c_code: PathBuf,
     pub out_c_dat: PathBuf,
     pub out_sym: PathBuf,
+    pub out_cvt_folder: PathBuf,
+    pub out_cvt_code: PathBuf,
+    pub out_cvt_name: String,
     pub out_cvm_folder: PathBuf,
     pub out_cvm_code: PathBuf,
     pub out_cvm_name: String,
     //pub field: &'static str,
     pub c_flag: bool,
     pub cvm_multi_assign_flag: bool,
+    pub cvt_flag: bool,
     pub cvm_flag: bool,
     pub wasm_flag: bool,
     pub wat_flag: bool,
@@ -49,6 +53,7 @@ const WAT: &'static str = "wat";
 const WASM: &'static str = "wasm";
 const CPP: &'static str = "cpp";
 const CVM: &'static str = "cvm";
+const CVT: &'static str = "cvt";
 const JS: &'static str = "js";
 const DAT: &'static str = "dat";
 const SYM: &'static str = "sym";
@@ -73,6 +78,7 @@ impl Input {
         let output_c_path = Input::build_folder(&output_path, &file_name, CPP);
         let output_js_path = Input::build_folder(&output_path, &file_name, JS);
         let output_cvm_path = Input::build_folder(&output_path, &file_name, CVM);
+        let output_cvt_path = Input::build_folder(&output_path, &file_name, CVT);
         let o_style = input_processing::get_simplification_style(&matches)?;
         let sanity_check_style = input_processing::get_sanity_check_style(&matches)?;
         let link_libraries = input_processing::get_link_libraries(&matches);
@@ -83,6 +89,9 @@ impl Input {
             out_cvm_folder: output_cvm_path.clone(),
             out_cvm_code: Input::build_output(&output_cvm_path, &file_name, CVM),
             out_cvm_name: file_name.clone(),
+            out_cvt_folder: output_cvt_path.clone(),
+            out_cvt_code: Input::build_output(&output_cvt_path, &file_name, CVT),
+            out_cvt_name: file_name.clone(),
             out_wat_code: Input::build_output(&output_js_path, &file_name, WAT),
             out_wasm_code: Input::build_output(&output_js_path, &file_name, WASM),
 	        out_js_folder: output_js_path.clone(),
@@ -107,6 +116,7 @@ impl Input {
             c_flag: c_flag,
             cvm_multi_assign_flag: input_processing::get_cvm_multi_assign(&matches),
             cvm_flag: input_processing::get_cvm(&matches),
+            cvt_flag: input_processing::get_cvt(&matches),
             no_asm_flag:input_processing::get_no_asm(&matches),
             sanity_check_style: sanity_check_style as usize,
             r1cs_flag: input_processing::get_r1cs(&matches),
@@ -163,6 +173,15 @@ impl Input {
     pub fn cvm_name(&self) -> String {
         self.out_cvm_name.clone()
     }
+    pub fn cvt_file(&self) -> &str {
+        self.out_cvt_code.to_str().unwrap()
+    }
+    pub fn cvt_folder(&self) -> &str {
+        self.out_cvt_folder.to_str().unwrap()
+    }
+    pub fn cvt_name(&self) -> String {
+        self.out_cvt_name.clone()
+    }
     pub fn wat_file(&self) -> &str {
         self.out_wat_code.to_str().unwrap()
     }
@@ -209,6 +228,9 @@ impl Input {
     }
     pub fn cvm_flag(&self) -> bool {
         self.cvm_flag
+    }
+    pub fn cvt_flag(&self) -> bool {
+        self.cvt_flag
     }
     pub fn no_asm_flag(&self) -> bool {
         self.no_asm_flag
@@ -363,6 +385,10 @@ mod input_processing {
 
     pub fn get_cvm(matches: &ArgMatches) -> bool {
         matches.is_present("print_cvm")
+    }
+
+    pub fn get_cvt(matches: &ArgMatches) -> bool {
+        matches.is_present("print_cvt")
     }
 
     pub fn get_cvm_multi_assign(matches: &ArgMatches) -> bool {
@@ -544,6 +570,13 @@ mod input_processing {
                     .takes_value(false)
                     .display_order(90)
                     .help("Compiles the circuit to CVM (Circom Virtual Machine)"),
+            )
+            .arg(
+                Arg::with_name("print_cvt")
+                    .long("cvt")
+                    .takes_value(false)
+                    .display_order(90)
+                    .help("Compiles the circuit to CVT (Circom Virtual Machine Textual)"),
             )
             .arg(
                 Arg::with_name("cvm_multi_assign")

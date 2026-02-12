@@ -2,6 +2,7 @@ use super::ir_interface::*;
 use crate::translating_traits::*;
 use code_producers::c_elements::*;
 use code_producers::wasm_elements::*;
+use code_producers::cvt_elements::*;
 use code_producers::cvm_elements::*;
 
 
@@ -124,8 +125,15 @@ impl WriteC for ReturnBucket {
 
 
 impl WriteCVM for ReturnBucket{
-    fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<String>,String) {
-        use cvm_code_generator::*;
+    fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<Vec<u8>>,Vec<u8>) {
+        let mut instructions = vec![];
+        (instructions,Vec::new())
+    }
+}
+
+impl WriteCVT for ReturnBucket{
+    fn produce_cvt(&self, producer: &mut CVTProducer) -> (Vec<String>,String) {
+        use cvt_code_generator::*;
         let mut instructions = vec![];
         instructions.push(";; return bucket".to_string());
         if producer.get_current_line() != self.line {
@@ -133,7 +141,7 @@ impl WriteCVM for ReturnBucket{
             producer.set_current_line(self.line);
         }
         if !self.is_array {
-            let (mut instructions_src, src) = self.value.produce_cvm(producer); // compute the source
+            let (mut instructions_src, src) = self.value.produce_cvt(producer); // compute the source
             instructions.append(&mut instructions_src);
             if producer.get_current_line() != self.line {
                 instructions.push(format!(";;line {}", self.line));
@@ -143,7 +151,7 @@ impl WriteCVM for ReturnBucket{
         } else {
             if let Instruction::Load(load) = &*self.value {
                 use super::location_rule::*;
-                let (mut instructions_src, lsrc) = load.src.produce_cvm(&load.address_type, &load.context, producer);
+                let (mut instructions_src, lsrc) = load.src.produce_cvt(&load.address_type, &load.context, producer);
                 if let ComputedAddress::Variable(src) = &lsrc {
                     instructions.append(&mut instructions_src);
                     let return_position = producer.get_current_function_return_position_var();

@@ -2,7 +2,9 @@ use super::ir_interface::*;
 use crate::translating_traits::*;
 use code_producers::c_elements::*;
 use code_producers::wasm_elements::*;
+use code_producers::cvt_elements::*;
 use code_producers::cvm_elements::*;
+
 
 
 #[derive(Clone)]
@@ -90,14 +92,14 @@ impl WriteC for AssertBucket {
     }
 }
 
-impl WriteCVM for AssertBucket{
-    fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<String>, String) {
-        use code_producers::cvm_elements::cvm_code_generator::*;
+impl WriteCVT for AssertBucket{
+    fn produce_cvt(&self, producer: &mut CVTProducer) -> (Vec<String>, String) {
+        use code_producers::cvt_elements::cvt_code_generator::*;
         let mut instructions = vec![];
         if producer.needs_comments() {
             instructions.push(";; assert bucket".to_string());
 	}
-        let (mut instructions_eval, avar) = self.evaluate.produce_cvm(producer);
+        let (mut instructions_eval, avar) = self.evaluate.produce_cvt(producer);
         instructions.append(&mut instructions_eval);
         let cvar = producer.fresh_var();
         if producer.get_current_line() != self.line {
@@ -112,5 +114,13 @@ impl WriteCVM for AssertBucket{
             instructions.push(";; end of assert bucket".to_string());
 	}
         (instructions,"".to_string())
+    }
+}
+
+
+impl WriteCVM for AssertBucket{
+    fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<Vec<u8>>,Vec<u8>) {
+        let mut instructions = vec![];
+        (instructions,Vec::new())
     }
 }

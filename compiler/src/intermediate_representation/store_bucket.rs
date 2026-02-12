@@ -2,7 +2,9 @@ use super::ir_interface::*;
 use crate::translating_traits::*;
 use code_producers::c_elements::*;
 use code_producers::wasm_elements::*;
+use code_producers::cvt_elements::*;
 use code_producers::cvm_elements::*;
+
 
 
 #[derive(Clone)]
@@ -854,9 +856,9 @@ impl WriteC for StoreBucket {
 }
 
 
-impl WriteCVM for StoreBucket{
-    fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<String>, String) {
-        use code_producers::cvm_elements::cvm_code_generator::*;
+impl WriteCVT for StoreBucket{
+    fn produce_cvt(&self, producer: &mut CVTProducer) -> (Vec<String>, String) {
+        use code_producers::cvt_elements::cvt_code_generator::*;
         use super::location_rule::*;
         let mut instructions = vec![];
 
@@ -904,12 +906,12 @@ impl WriteCVM for StoreBucket{
             // if producer.needs_comments() {
             //    instructions.push(";; getting src".to_string());
 	    // }
-            let (mut instructions_src, vsrc) = self.src.produce_cvm(producer); // compute the source
+            let (mut instructions_src, vsrc) = self.src.produce_cvt(producer); // compute the source
             instructions.append(&mut instructions_src);
             if producer.needs_comments() {
                 instructions.push(";; getting dest".to_string());
 	    }
-            let (mut instructions_dest, ldest) = self.dest.produce_cvm(&self.dest_address_type,&self.context, producer);
+            let (mut instructions_dest, ldest) = self.dest.produce_cvt(&self.dest_address_type,&self.context, producer);
             instructions.append(&mut instructions_dest);
             if producer.get_current_line() != self.line {
                 instructions.push(format!(";;line {}", self.line));
@@ -954,10 +956,10 @@ impl WriteCVM for StoreBucket{
             }
         } else {
             if let Instruction::Load(load) = &*self.src {
-                let (mut instructions_src, lsrc) = load.src.produce_cvm(&load.address_type, &load.context, producer); 
+                let (mut instructions_src, lsrc) = load.src.produce_cvt(&load.address_type, &load.context, producer); 
                 instructions.append(&mut instructions_src);
                 if producer.cvm_multi_assign_flag {
-                    let (mut instructions_dest, ldest) = self.dest.produce_cvm(&self.dest_address_type,&self.context, producer);
+                    let (mut instructions_dest, ldest) = self.dest.produce_cvt(&self.dest_address_type,&self.context, producer);
                     instructions.append(&mut instructions_dest);
                     //
                     let vsize = producer.fresh_var();
@@ -1160,7 +1162,7 @@ impl WriteCVM for StoreBucket{
                     producer.set_current_line(self.line);
                 }
                     
-                let (mut instructions_dest, ldest) = self.dest.produce_cvm(&self.dest_address_type,&self.context, producer);
+                let (mut instructions_dest, ldest) = self.dest.produce_cvt(&self.dest_address_type,&self.context, producer);
                 instructions.append(&mut instructions_dest);
                 let dest_location;
                 let mut instruction_set_dest = "".to_string();
@@ -1287,4 +1289,11 @@ impl WriteCVM for StoreBucket{
 	}
         (instructions,"".to_string())
     }        
+}
+
+impl WriteCVM for StoreBucket{
+    fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<Vec<u8>>,Vec<u8>) {
+        let mut instructions = vec![];
+        (instructions,Vec::new())
+    }
 }

@@ -3,6 +3,7 @@ use crate::translating_traits::*;
 use code_producers::c_elements::*;
 use code_producers::wasm_elements::*;
 use code_producers::cvm_elements::*;
+use code_producers::cvt_elements::*;
 
 
 #[derive(Clone)]
@@ -94,9 +95,9 @@ impl WriteC for LoopBucket {
 }
 
 
-impl WriteCVM for LoopBucket{
-    fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<String>, String) {
-        use code_producers::cvm_elements::cvm_code_generator::*;
+impl WriteCVT for LoopBucket{
+    fn produce_cvt(&self, producer: &mut CVTProducer) -> (Vec<String>, String) {
+        use code_producers::cvt_elements::cvt_code_generator::*;
         let mut instructions = vec![];
         if producer.needs_comments() {
             instructions.push(format!(";; loop bucket. Line {}", self.line)); //.to_string()
@@ -106,11 +107,11 @@ impl WriteCVM for LoopBucket{
             producer.set_current_line(self.line);
         }
         instructions.push(add_loop());
-        let (mut instructions_continue, vcond) = self.continue_condition.produce_cvm(producer);
+        let (mut instructions_continue, vcond) = self.continue_condition.produce_cvt(producer);
         instructions.append(&mut instructions_continue);
         instructions.push(format!("{} {}", add_ifff(), vcond));
         for ins in &self.body {
-            let (mut instructions_loop, _) = ins.produce_cvm(producer);
+            let (mut instructions_loop, _) = ins.produce_cvt(producer);
             instructions.append(&mut instructions_loop);
         }
         instructions.push(add_continue());
@@ -124,5 +125,13 @@ impl WriteCVM for LoopBucket{
             instructions.push(";; end of loop bucket".to_string());
 	}
         (instructions,"".to_string())
+    }
+}
+
+
+impl WriteCVM for LoopBucket{
+    fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<Vec<u8>>,Vec<u8>) {
+        let mut instructions = vec![];
+        (instructions,Vec::new())
     }
 }

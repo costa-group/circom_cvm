@@ -1,5 +1,7 @@
 use super::ir_interface::*;
+use code_producers::cvt_elements::*;
 use code_producers::cvm_elements::*;
+
 use crate::translating_traits::*;
 
 #[derive(Clone)]
@@ -63,12 +65,12 @@ impl ToString for LocationRule {
 }
 
 impl  LocationRule {
-    pub fn produce_cvm(&self, address_type: & AddressType, _context: & InstrContext, producer: &mut CVMProducer) -> (Vec<String>, ComputedAddress) {
+    pub fn produce_cvt(&self, address_type: & AddressType, _context: & InstrContext, producer: &mut CVTProducer) -> (Vec<String>, ComputedAddress) {
         use LocationRule::*;
-        use cvm_code_generator::*;
+        use cvt_code_generator::*;
         match &self {
             Indexed { location, .. } => {
-                let (mut instructions, vloc) = location.produce_cvm(producer);
+                let (mut instructions, vloc) = location.produce_cvt(producer);
                 match &address_type {
                     AddressType::Variable => {
                         (instructions, ComputedAddress::Variable(vloc))
@@ -77,7 +79,7 @@ impl  LocationRule {
                         (instructions, ComputedAddress::Signal(vloc))
                     }
                     AddressType::SubcmpSignal {cmp_address, .. } => {
-                        let (mut instructions_cmp, vcmp) = cmp_address.produce_cvm(producer);
+                        let (mut instructions_cmp, vcmp) = cmp_address.produce_cvt(producer);
                         instructions.append(&mut instructions_cmp);
                         (instructions, ComputedAddress::SubcmpSignal(vcmp,vloc))
                     }
@@ -90,7 +92,7 @@ impl  LocationRule {
 			if producer.needs_comments() {
                             instructions.push(";; is subcomponent mapped".to_string());
 			}
-                        let (mut instructions_cmp, vcmp) = cmp_address.produce_cvm(producer);
+                        let (mut instructions_cmp, vcmp) = cmp_address.produce_cvt(producer);
                         instructions.append(&mut instructions_cmp);
                         let tid = producer.fresh_var();
                         instructions.push(format!("{} = get_template_id {}", tid, vcmp));
@@ -110,7 +112,7 @@ impl  LocationRule {
                                     let index_list = &index_info.indexes;
                                     let dimensions = index_info.symbol_dim;
                                     assert!(index_list.len() > 0);
-                                    let (mut instructions_idx0, vidx0) = index_list[0].produce_cvm(producer);
+                                    let (mut instructions_idx0, vidx0) = index_list[0].produce_cvt(producer);
                                     instructions.append(&mut instructions_idx0);
                                     let psize = producer.fresh_var();
                                     let mut prevsize = psize;
@@ -118,7 +120,7 @@ impl  LocationRule {
 				    for i in 1..index_list.len() {
                                         let dimi = producer.fresh_var();
                                         instructions.push(format!("{} = {} {} i64.{} i64.{}", dimi, get_dimention_function, tbid, signal_code, i));
-                                        let (mut instructions_idxi, vidxi) = index_list[i].produce_cvm(producer);
+                                        let (mut instructions_idxi, vidxi) = index_list[i].produce_cvt(producer);
                                         instructions.append(&mut instructions_idxi);
                                         let curmul = producer.fresh_var();
                                         instructions.push(format!("{} = {} {} {}", curmul, mul64(), prevsize, dimi));
@@ -180,5 +182,9 @@ impl  LocationRule {
                 }
             }
         }
+    }
+
+    pub fn produce_cvm(&self, address_type: & AddressType, _context: & InstrContext, producer: &mut CVMProducer) -> (Vec<String>, ComputedAddress) {
+        unreachable!()
     }
 }

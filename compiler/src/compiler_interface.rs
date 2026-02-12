@@ -2,6 +2,7 @@ pub use crate::circuit_design::circuit::{Circuit, CompilationFlags};
 pub use crate::hir::very_concrete_program::VCP;
 use std::fs::File;
 use std::io::BufWriter;
+ 
 
 pub struct Config {
     pub debug_output: bool,
@@ -53,6 +54,7 @@ pub fn write_c(circuit: &Circuit, c_folder: &str, c_run_name: &str, c_file: &str
 
 
 pub fn write_cvm(circuit: &mut Circuit, cvm_folder: &str, cvm_name: &str, cvm_file: &str) -> Result<(), ()> {
+
     use std::path::Path;
     if Path::new(cvm_folder).is_dir() {
         std::fs::remove_dir_all(cvm_folder).map_err(|_err| {})?;
@@ -61,6 +63,17 @@ pub fn write_cvm(circuit: &mut Circuit, cvm_folder: &str, cvm_name: &str, cvm_fi
     let cvm_file = File::create(cvm_file).map_err(|_err| {})?;
     let mut cvm_file = BufWriter::new(cvm_file);
     circuit.produce_cvm(cvm_folder, cvm_name, &mut cvm_file)
+}
+
+pub fn write_cvt(circuit: &mut Circuit, cvt_folder: &str, cvt_name: &str, cvt_file: &str) -> Result<(), ()> {
+    use std::path::Path;
+    if Path::new(cvt_folder).is_dir() {
+        std::fs::remove_dir_all(cvt_folder).map_err(|_err| {})?;
+    }
+    std::fs::create_dir(cvt_folder).map_err(|_err| {})?;
+    let cvt_file = File::create(cvt_file).map_err(|_err| {})?;
+    let mut cvt_file = BufWriter::new(cvt_file);
+    circuit.produce_cvt(cvt_folder, cvt_name, &mut cvt_file)
 }
 
 fn produce_debug_output(circuit: &Circuit) -> Result<(), ()> {

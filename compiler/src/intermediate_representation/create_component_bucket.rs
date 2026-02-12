@@ -3,6 +3,7 @@ use crate::translating_traits::*;
 use code_producers::c_elements::*;
 use code_producers::wasm_elements::*;
 use code_producers::cvm_elements::*;
+use code_producers::cvt_elements::*;
 
 
 #[derive(Clone)]
@@ -354,7 +355,13 @@ impl WriteC for CreateCmpBucket {
 }
 
 impl WriteCVM for CreateCmpBucket{
-    fn produce_cvm(&self, _producer: &mut CVMProducer) -> (Vec<String>, String) {
+    fn produce_cvm(&self, _producer: &mut CVMProducer) -> (Vec<Vec<u8>>, Vec<u8>) {
+        (Vec::new(),Vec::new())
+    }
+}
+
+impl WriteCVT for CreateCmpBucket{
+    fn produce_cvt(&self, _producer: &mut CVTProducer) -> (Vec<String>, String) {
         (Vec::new(),"".to_string())
     }
 }

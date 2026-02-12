@@ -68,6 +68,10 @@ fn start() -> Result<(), ()> {
         cvm_folder: user_input.cvm_folder().to_string(),
         cvm_name: user_input.cvm_name().to_string(),
         cvm_file: user_input.cvm_file().to_string(),
+        cvt_flag: user_input.cvt_flag(),
+        cvt_folder: user_input.cvt_folder().to_string(),
+        cvt_name: user_input.cvt_name().to_string(),
+        cvt_file: user_input.cvt_file().to_string(),
         prime: user_input.prime(),        
     };
     compilation_user::compile(compilation_config)?;

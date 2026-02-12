@@ -2,7 +2,9 @@ use super::ir_interface::*;
 use crate::translating_traits::*;
 use code_producers::c_elements::*;
 use code_producers::wasm_elements::*;
+use code_producers::cvt_elements::*;
 use code_producers::cvm_elements::*;
+
 
 
 #[derive(Clone)]
@@ -456,9 +458,9 @@ impl WriteC for LoadBucket {
     }
 }
 
-impl WriteCVM for LoadBucket{
-    fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<String>, String) {
-        use code_producers::cvm_elements::cvm_code_generator::*;
+impl WriteCVT for LoadBucket{
+    fn produce_cvt(&self, producer: &mut CVTProducer) -> (Vec<String>, String) {
+        use code_producers::cvt_elements::cvt_code_generator::*;
         use super::location_rule::*;
         let mut instructions = vec![];
         if producer.needs_comments() {
@@ -468,7 +470,7 @@ impl WriteCVM for LoadBucket{
             instructions.push(format!(";;line {}", self.line));
             producer.set_current_line(self.line);
         }
-        let (mut instructions_src, lsrc) = self.src.produce_cvm(&self.address_type, &self.context,producer); 
+        let (mut instructions_src, lsrc) = self.src.produce_cvt(&self.address_type, &self.context,producer); 
         instructions.append(&mut instructions_src);
         let res = producer.fresh_var();
         match lsrc {
@@ -494,5 +496,12 @@ impl WriteCVM for LoadBucket{
             instructions.push(";; end of load bucket".to_string());
         }
         (instructions,res)
+    }
+}
+
+impl WriteCVM for LoadBucket{
+    fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<Vec<u8>>,Vec<u8>) {
+        let mut instructions = vec![];
+        (instructions,Vec::new())
     }
 }

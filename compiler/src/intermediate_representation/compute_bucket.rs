@@ -2,7 +2,9 @@ use super::ir_interface::*;
 use crate::translating_traits::*;
 use code_producers::c_elements::*;
 use code_producers::wasm_elements::*;
+use code_producers::cvt_elements::*;
 use code_producers::cvm_elements::*;
+
 
 
 #[derive(Clone, PartialEq, Eq)]
@@ -468,9 +470,9 @@ impl WriteC for ComputeBucket {
     }
 }
 
-impl WriteCVM for ComputeBucket{
-    fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<String>, String) {
-        use code_producers::cvm_elements::cvm_code_generator::*;
+impl WriteCVT for ComputeBucket{
+    fn produce_cvt(&self, producer: &mut CVTProducer) -> (Vec<String>, String) {
+        use code_producers::cvt_elements::cvt_code_generator::*;
         let mut instructions = vec![];
         if producer.needs_comments() {
             instructions.push(";; compute bucket".to_string());
@@ -487,7 +489,7 @@ impl WriteCVM for ComputeBucket{
         let params;
         if ! is_array_eq {
             for e in &self.stack {
-                let (mut instructions_exp, res) = e.produce_cvm(producer);
+                let (mut instructions_exp, res) = e.produce_cvt(producer);
                 instructions.append(&mut instructions_exp);
                 vresults.push(res);
             }
@@ -582,7 +584,7 @@ impl WriteCVM for ComputeBucket{
                     let mut i = 0;
                     for e in &self.stack {
                         if let Instruction::Load(load) = &**e {
-                            let (mut instructions_exp, lsrc) = load.src.produce_cvm(&load.address_type, &load.context,producer);
+                            let (mut instructions_exp, lsrc) = load.src.produce_cvt(&load.address_type, &load.context,producer);
                             instructions.append(&mut instructions_exp);
                             match lsrc {
                                 ComputedAddress::Variable(rvar) => {
@@ -614,7 +616,7 @@ impl WriteCVM for ComputeBucket{
                     if is_multiple { 
                         if let Instruction::Load(load) = &*self.stack[1] {
                             if let AddressType::SubcmpSignal {cmp_address, .. } = &load.address_type {
-                                let (mut instructions_cmp, vcmp) = cmp_address.produce_cvm(producer);
+                                let (mut instructions_cmp, vcmp) = cmp_address.produce_cvt(producer);
                                 instructions.append(&mut instructions_cmp);
                                 let mut instructions_if_eq = create_if_selection(&values, &vcmp, &counter, producer);
                                 instructions.append(&mut instructions_if_eq);
@@ -683,5 +685,12 @@ impl WriteCVM for ComputeBucket{
             instructions.push(";; end of compute bucket".to_string());
 	}
         (instructions,res)
+    }
+}
+
+impl WriteCVM for ComputeBucket{
+    fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<Vec<u8>>,Vec<u8>) {
+        let mut instructions = vec![];
+        (instructions,Vec::new())
     }
 }

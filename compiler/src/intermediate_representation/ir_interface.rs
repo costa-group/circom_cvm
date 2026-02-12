@@ -20,6 +20,7 @@ use crate::translating_traits::*;
 use code_producers::c_elements::*;
 use code_producers::wasm_elements::*;
 use code_producers::cvm_elements::*;
+use code_producers::cvt_elements::*;
 
 
 pub trait IntoInstruction {
@@ -130,7 +131,7 @@ impl WriteWasm for Instruction {
 }
 
 impl WriteCVM for Instruction {
-    fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<String>,String) {
+    fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<Vec<u8>>,Vec<u8>) {
         use Instruction::*;
         match self {
             Value(v) => v.produce_cvm(producer),
@@ -144,6 +145,25 @@ impl WriteCVM for Instruction {
             Assert(v) => v.produce_cvm(producer),
             CreateCmp(v) => v.produce_cvm(producer),
             Log(v) => v.produce_cvm(producer),
+        }
+    }
+}
+
+impl WriteCVT for Instruction {
+    fn produce_cvt(&self, producer: &mut CVTProducer) -> (Vec<String>,String) {
+        use Instruction::*;
+        match self {
+            Value(v) => v.produce_cvt(producer),
+            Load(v) => v.produce_cvt(producer),
+            Store(v) => v.produce_cvt(producer),
+            Compute(v) => v.produce_cvt(producer),
+            Call(v) => v.produce_cvt(producer),
+            Branch(v) => v.produce_cvt(producer),
+            Return(v) => v.produce_cvt(producer),
+            Loop(v) => v.produce_cvt(producer),
+            Assert(v) => v.produce_cvt(producer),
+            CreateCmp(v) => v.produce_cvt(producer),
+            Log(v) => v.produce_cvt(producer),
         }
     }
 }

@@ -1,6 +1,10 @@
 use code_producers::c_elements::*;
 use code_producers::wasm_elements::*;
 use code_producers::cvm_elements::*;
+use code_producers::cvt_elements::*;
+use std::io::BufWriter;
+use std::fs::File;
+
 
 use std::io::Write;
 
@@ -30,12 +34,22 @@ pub trait WriteWasm {
     }
 }
 
-pub trait WriteCVM {
-    fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<String>, String);
-    fn write_cvm<T: Write>(&self, writer: &mut T, producer: &mut CVMProducer) -> Result<(), ()> {
-        let (wasm_instructions,_) = self.produce_cvm(producer);
-        let code = cvm_code_generator::merge_code(wasm_instructions);
+pub trait WriteCVT {
+    fn produce_cvt(&self, producer: &mut CVTProducer) -> (Vec<String>, String);
+    fn write_cvt<T: Write>(&self, writer: &mut T, producer: &mut CVTProducer) -> Result<(), ()> {
+        let (wasm_instructions,_) = self.produce_cvt(producer);
+        let code = cvt_code_generator::merge_code(wasm_instructions);
         writer.write_all(code.as_bytes()).map_err(|_| {})?;
+        writer.flush().map_err(|_| {})
+    }
+}
+
+pub trait WriteCVM {
+    fn produce_cvm(&self, producer: &mut CVMProducer) -> (Vec<Vec<u8>>, Vec<u8>);
+    fn write_cvm(&self, writer: &mut BufWriter<File>, producer: &mut CVMProducer) -> Result<(), ()> {
+        let (cvt_instructions,_) = self.produce_cvm(producer);
+        let code = cvm_code_generator::merge_code(cvt_instructions);
+        writer.write_all(&code).map_err(|_| {})?;
         writer.flush().map_err(|_| {})
     }
 }
