@@ -102,6 +102,7 @@ impl  LocationRule {
                             // instructions.push(format!(";; idexes.len = {}",indexes.len()));
                             let mut accsize = sp;
                             let mut tbid = tid.clone();
+                            let mut current_field_code = signal_code;
                             let mut get_dimention_function = "get_template_signal_dimension".to_string();
                             let mut get_size_function = "get_template_signal_size".to_string();
                             let mut get_type_function = "get_template_signal_type".to_string();
@@ -118,7 +119,7 @@ impl  LocationRule {
                                     instructions.push(format!("{} = {}", prevsize, vidx0));
                                     for i in 1..index_list.len() {
                                         let dimi = producer.fresh_var();
-                                        instructions.push(format!("{} = {} {} i64.{} i64.{}", dimi, get_dimention_function, tbid, signal_code, i));
+                                        instructions.push(format!("{} = {} {} i64.{} i64.{}", dimi, get_dimention_function, tbid, current_field_code, i));
                                         let (mut instructions_idxi, vidxi) = index_list[i].produce_cvm(producer);
                                         instructions.append(&mut instructions_idxi);
                                         let curmul = producer.fresh_var();
@@ -133,16 +134,16 @@ impl  LocationRule {
                                         //println!("There is difference: {}",diff);
                                         // must be last access
                                         assert!(idxpos+1 == indexes.len());
-                                        for i in 0..diff-1 {
+                                        for i in 0..diff {
                                             let dimi = producer.fresh_var();
-                                            instructions.push(format!("{} = {} {} i64.{} i64.{}", dimi, get_dimention_function, tid, signal_code, indexes.len() + i));                                        
+                                            instructions.push(format!("{} = {} {} i64.{} i64.{}", dimi, get_dimention_function, tbid, current_field_code, index_list.len() + i));
                                             let cursize = producer.fresh_var();
                                             instructions.push(format!("{} = {} {} {}", cursize, mul64(), prevsize, dimi));
                                             prevsize = cursize;
                                         }
                                     } // after this we have the product of the remaining dimensions
                                     let vsize = producer.fresh_var();
-                                    instructions.push(format!("{} = {} {} i64.{}", vsize,  get_size_function, tid, signal_code));
+                                    instructions.push(format!("{} = {} {} i64.{}", vsize,  get_size_function, tbid, current_field_code));
                                     let finalsize = producer.fresh_var();
                                     instructions.push(format!("{} = {} {} {}", finalsize, mul64(), prevsize, vsize));
                                     let access = producer.fresh_var();
@@ -151,8 +152,9 @@ impl  LocationRule {
                                     accsize = access;
                                 } else if let AccessType::Qualified(field_no) = &indexes[idxpos] {
                                     let bid = producer.fresh_var();
-                                    instructions.push(format!("{} = {} {} i64.{}", bid, get_type_function, tbid, signal_code));
+                                    instructions.push(format!("{} = {} {} i64.{}", bid, get_type_function, tbid, current_field_code));
                                     tbid = bid.clone();
+                                    current_field_code = field_no;
                                     let sfield = producer.fresh_var();
                                     instructions.push(format!("{} =  get_bus_field_position {} i64.{}", sfield, bid, field_no));
                                     let access = producer.fresh_var();
@@ -161,7 +163,7 @@ impl  LocationRule {
                                     get_type_function = " get_bus_field_type".to_string();
                                 } else {
                                     assert!(false);
-                                }   
+                                }
                                 if idxpos == 0 {
                                     get_dimention_function = " get_bus_field_dimension".to_string();
                                     get_size_function = " get_bus_field_size".to_string();
