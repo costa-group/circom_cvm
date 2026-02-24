@@ -434,7 +434,7 @@ For instance
 ```text
 get_template_signal_size <i64 value> <i64 value>
 ```
-Given a template id and a signal id returns the size (i64) of the signal in such template.
+Given a template id and a signal id returns the size (i64) of the base type of the signal in such template. It is the size of the basis of the tensor (without considering the dimensions). 
 It can only be used in the code of a template.
 
 ```text
@@ -452,25 +452,25 @@ It can only be used in the code of a template.
 ```text
 get_bus_field_position <i64 value> <i64 value>
 ```
-Given a bus id and a bus field signal id returns the offset (i64) of the signal in such template.
+Given a bus id and a bus field signal id returns the offset (i64) of the signal in such bus.
 It can only be used in the code of a template.
 
 ```text
 get_bus_field_size <i64 value> <i64 value>
 ```
-Given a bus id and a bus field signal id returns the size (i64) of the signal in such template.
+Given a bus id and a bus field signal id returns the size (i64) of the base type of the field in such bus. It is the size of the basis of the tensor (without considering the dimensions).
 It can only be used in the code of a template.
 
 ```text
 get_bus_field_dimension <i64 value> <i64 value> <i64 value>
 ```
-Given a bus id, a bus field signal id and a dimension returns the size (i64) of this dimension of the signal in such template.
+Given a bus id, a bus field signal id and a dimension returns the size (i64) of this dimension of the signal in such bus.
 It can only be used in the code of a template.
 
 ```text
 get_bus_field_type <i64 value> <i64 value>
 ```
-Given a bus id and a bus field signal id returns the type id (i64) of the signal in such template.
+Given a bus id and a bus field signal id returns the type id (i64) of the signal in such bus.
 It can only be used in the code of a template.
 
 outs ??
