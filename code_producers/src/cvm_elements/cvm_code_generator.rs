@@ -5,6 +5,16 @@ use crate::c_elements::FieldMap;
 use crate::components::FieldData;
 use std::fs::File;
 use std::io::{BufWriter, Seek, SeekFrom, Write};
+//use compiler::intermediate_representation::CVMInstr;
+//use compiler::intermediate_representation::CVMParam;
+
+/*
+pub struct OpCode {
+    name: String,
+    param_types: Vec<usize>,
+    result_type: Option<usize>,
+}
+*/
 
 const SECTIONS: u8 = 10;
 const MAGIC: &[u8] = b"cvm";
@@ -20,6 +30,8 @@ const INPUTS: &[u8] = &[7, 0, 0, 0];
 pub const TEMPLATES: &[u8] = &[8, 0, 0, 0];
 const FUNCTIONS: &[u8] = &[9, 0, 0, 0];
 const PLACE_HOLDER: &[u8] = &[3, 3, 3, 3, 3, 3, 3, 3];
+
+// static INSTRUCTIONS: [f64; 6] = [18.0,13.0,8.0,0.32,0.36,0.31];
 
 fn into_format(number: &[u8], with_bytes: usize) -> (Vec<u8>, usize) {
     let mut value = number.to_vec();
